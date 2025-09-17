@@ -24,3 +24,5 @@ results/**
 .vscode/
 .idea/
 *.log
+sshky
+sshky.pub
