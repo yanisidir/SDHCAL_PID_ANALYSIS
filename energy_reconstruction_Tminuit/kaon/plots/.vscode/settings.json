@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "EnergyReco2.C": "cpp",
+        "plot_coeff.C": "cpp",
+        "EnergyReco.C": "cpp"
+    }
+}

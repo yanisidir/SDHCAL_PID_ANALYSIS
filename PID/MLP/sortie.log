@@ -1,0 +1,82 @@
+nohup: ignoring input
+→ Lecture de tous les fichiers ROOT …
+   Total d’événements chargés : 390000
+   Après nettoyage (drop NA/inf) : 389999
+   Taille train : 311999, test : 78000
+   Après SMOTE : [104000 104000 104000] samples par classe
+→ Entraînement final du MLP …
+Iteration 1, loss = 0.73066642
+Validation score: 0.655385
+Iteration 2, loss = 0.69546031
+Validation score: 0.662468
+Iteration 3, loss = 0.68585400
+Validation score: 0.663269
+Iteration 4, loss = 0.68096562
+Validation score: 0.665288
+Iteration 5, loss = 0.67826126
+Validation score: 0.658141
+Iteration 6, loss = 0.67607920
+Validation score: 0.666250
+Iteration 7, loss = 0.67408460
+Validation score: 0.665385
+Iteration 8, loss = 0.67249858
+Validation score: 0.666955
+Iteration 9, loss = 0.67173559
+Validation score: 0.665705
+Iteration 10, loss = 0.67087823
+Validation score: 0.665929
+Iteration 11, loss = 0.67037060
+Validation score: 0.671218
+Iteration 12, loss = 0.66928643
+Validation score: 0.670609
+Iteration 13, loss = 0.66885081
+Validation score: 0.669519
+Iteration 14, loss = 0.66829487
+Validation score: 0.670641
+Iteration 15, loss = 0.66777498
+Validation score: 0.667981
+Iteration 16, loss = 0.66769652
+Validation score: 0.665449
+Iteration 17, loss = 0.66723763
+Validation score: 0.668846
+Iteration 18, loss = 0.66662675
+Validation score: 0.668590
+Iteration 19, loss = 0.66652241
+Validation score: 0.669038
+Iteration 20, loss = 0.66627132
+Validation score: 0.669904
+Iteration 21, loss = 0.66600449
+Validation score: 0.669167
+Iteration 22, loss = 0.66558511
+Validation score: 0.670224
+Iteration 23, loss = 0.66549467
+Validation score: 0.667917
+Iteration 24, loss = 0.66545185
+Validation score: 0.669679
+Iteration 25, loss = 0.66492958
+Validation score: 0.666827
+Iteration 26, loss = 0.66474593
+Validation score: 0.668494
+Iteration 27, loss = 0.66483993
+Validation score: 0.671026
+Validation score did not improve more than tol=0.000100 for 15 consecutive epochs. Stopping.
+
+===== Résultats =====
+Accuracy : 0.6693
+Matrice de confusion :
+ [[46.96923077 43.49230769  9.53846154]
+ [22.95769231 67.64230769  9.4       ]
+ [ 5.04230769  8.77692308 86.18076923]]
+
+Rapport de classification :
+               precision    recall  f1-score   support
+
+         pi-       0.63      0.47      0.54     26000
+      proton       0.56      0.68      0.62     26000
+          K0       0.82      0.86      0.84     26000
+
+    accuracy                           0.67     78000
+   macro avg       0.67      0.67      0.66     78000
+weighted avg       0.67      0.67      0.66     78000
+
+   → Modèle et scaler sauvegardés dans processed_data

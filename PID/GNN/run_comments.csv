@@ -1,0 +1,66 @@
+run_id,comment
+1,
+2,
+3,
+4,
+5,
+6,
+7,
+8,
+9,
+10,
+11,
+12,
+13,
+14,
+15,
+16,
+17,
+18,
+19,avec un seul voisin k=1
+20,avec un seul voisin k=1
+21,run1
+22,run1
+23,run1
+24,run1
+25,run1
+26,zero smearing
+27,zero smearing
+28,20k discret zero smearing
+29,
+30,
+31,
+32,
+33,
+34,
+36,test time sans smearing
+37,
+38,
+39,
+40,
+41,
+42,
+43,smearing sur tt donnees et prend en compte une normalisation par couche
+44,smearing sur tt donnees et prend en compte une normalisation par couche
+45,smearing sur tt donnees et prend en compte une normalisation par couche
+46,smearing sur tt donnees et prend en compte une normalisation par couche
+47,route et 1 voisin
+48,route et 1 voisin sans smearing
+49,time et 1 voisin sans smearing
+51,essaie code william old
+52,essaie code william old
+53,essaie code william old
+54,essaie code william old
+55,debug
+56,
+57,
+58,
+59,
+60,
+61,
+62,
+63,
+64,
+65,
+66,
+67,

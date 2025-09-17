@@ -1,0 +1,7 @@
+run_id,root_filename,tree_name,test_size,random_state,hidden_layer_sizes,alpha,batch_size,learning_rate_init,max_iter
+1,130k_Params.root,paramsTree,0.2,42,"(128, 64, 32)",0.0001,32,0.001,500
+2,analyse_pi/data/1k_pi_E1to100_params.root;analyse_kaon/data/1k_kaon_E1to100_params.root;analyse_proton/data/1k_proton_E1to100_params.root,paramsTree,0.2,42,"(128, 64, 32)",0.0001,32,0.001,500
+3,../../analyse_pi/data/1k_pi_E1to100_params.root;../../analyse_kaon/data/1k_kaon_E1to100_params.root;../../analyse_proton/data/1k_proton_E1to100_params.root,paramsTree,0.2,42,"(128, 64, 32)",0.0001,32,0.001,500
+4,../../analyse_pi/data/100k_pi_E1to100_params.root;../../analyse_kaon/data/100k_kaon_E1to100_params.root;../../analyse_proton/data/100k_proton_E1to100_params.root,paramsTree,0.2,42,"(128, 64, 32)",0.0001,32,0.001,500
+5,../../analyse_pi/data/130k_pi_E1to130_params.root;../../analyse_kaon/data/130k_kaon_E1to130_params.root;../../analyse_proton/data/130k_proton_E1to130_params.root,paramsTree,0.2,42,"(128, 64, 32)",0.0001,32,0.001,500
+6,/gridgroup/ilc/midir/analyse/data/params/130k_pi_E1to130_params.root;/gridgroup/ilc/midir/analyse/data/params/130k_kaon_E1to130_params.root;/gridgroup/ilc/midir/analyse/data/params/130k_proton_E1to130_params.root,paramsTree,0.2,42,"(128, 64, 32)",0.0001,32,0.001,500,0

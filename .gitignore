@@ -1,0 +1,12 @@
+*.root
+*.npz
+*.joblib
+*.pkl
+*.pt
+*.pth
+*.h5
+data/*
+!data/README.md
+!data/samples/**
+models/**
+results/**

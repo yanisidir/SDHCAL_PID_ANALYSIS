@@ -1,0 +1,5 @@
+run_id,particle,file_path,tree_name,energy_col,test_size,random_state,hidden_layer_sizes,alpha,batch_size,learning_rate_init,max_iter,early_stopping,n_iter_no_change,validation_fraction,grid_search
+1,kaon,/gridgroup/ilc/midir/analyse/energy_reconstruction_Tminuit/data/params/130k_kaon_E1to130_params_merged.root,paramsTree,primaryEnergy,0.2,42,"128,64,32",0.0001,32,0.001,500,True,15,0.1,False
+2,kaon,/gridgroup/ilc/midir/analyse/energy_reconstruction_Tminuit/data/params/130k_kaon_E1to130_params_merged.root,paramsTree,primaryEnergy,0.2,42,"128,64,32",0.0001,32,0.001,500,True,15,0.1,False
+3,kaon,/gridgroup/ilc/midir/analyse/data/params/130k_kaon_E1to130_params_merged.root,paramsTree,primaryEnergy,0.2,42,"128,64,32",0.0001,32,0.001,500,True,15,0.1,False
+4,kaon,/gridgroup/ilc/midir/analyse/data/params/130k_kaon_E1to130_params_merged.root,paramsTree,primaryEnergy,0.2,42,"128,64,32",0.0001,32,0.001,500,True,15,0.1,False

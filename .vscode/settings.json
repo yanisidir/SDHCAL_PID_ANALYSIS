@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "EnergyReco.C": "cpp",
+        "pion_proton_EnergyReco.C": "cpp",
+        "validate_root_file.C": "cpp",
+        "comapre.C": "cpp",
+        "compareBegin.C": "cpp",
+        "compareClusters.C": "cpp",
+        "plot_Thr3.C": "cpp",
+        "compareThr3.C": "cpp",
+        "compareDensity.C": "cpp",
+        "compareRadius.C": "cpp",
+        "compareEmFraction.C": "cpp"
+    }
+}

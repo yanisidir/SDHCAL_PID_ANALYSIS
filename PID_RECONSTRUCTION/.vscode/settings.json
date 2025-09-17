@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "repack_tree.C": "cpp",
+        "CountTrackSegments.C": "cpp"
+    }
+}

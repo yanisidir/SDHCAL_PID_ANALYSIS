@@ -1,0 +1,2 @@
+run_id,file_paths,tree_name,test_size,random_state,learning_rate,n_estimators,num_leaves,max_depth,reg_alpha,reg_lambda,min_child_samples,subsample,colsample_bytree,class_weight,grid_search
+1,/gridgroup/ilc/midir/analyse/data/params/130k_pi_E1to130_params.root;/gridgroup/ilc/midir/analyse/data/params/130k_kaon_E1to130_params.root;/gridgroup/ilc/midir/analyse/data/params/130k_proton_E1to130_params.root,paramsTree,0.2,42,0.01,1000,63,-1,0.1,0.1,30,0.8,0.8,balanced,0

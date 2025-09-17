@@ -1,0 +1,4 @@
+run_id,file_path,tree_name,energy_col,test_size,random_state,learning_rate,n_estimators,num_leaves,max_depth,reg_alpha,reg_lambda,min_child_samples,subsample,colsample_bytree,grid_search
+1,../../analyse_pi/data/130k_proton_E1to130_params.root,paramsTree,primaryEnergy,0.2,42,0.05,2000,127,-1,0.0,0.1,20,0.8,0.8,0
+2,../../analyse_pi/data/130k_proton_E1to130_params.root,paramsTree,primaryEnergy,0.2,42,0.05,2000,127,-1,0.0,0.1,20,0.8,0.8,0
+3,../../analyse_pi/data/130k_proton_E1to130_params.root,paramsTree,primaryEnergy,0.2,42,0.05,2000,127,-1,0.0,0.1,20,0.8,0.8,0

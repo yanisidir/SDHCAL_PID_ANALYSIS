@@ -1,0 +1,13 @@
+nohup: ignoring input
+→ Lecture de tous les fichiers ROOT …
+   Total d’événements chargés : 200000
+   Après nettoyage (drop NA/inf) : 199998
+   Taille train : 159998, test : 40000
+   Après SMOTE : [79999 79999] samples par classe
+Fitting 5 folds for each of 81 candidates, totalling 405 fits
+/home/ilc/midir/miniconda3/envs/ml-env/lib/python3.10/site-packages/joblib/externals/loky/backend/resource_tracker.py:299: UserWarning: resource_tracker: There appear to be 2 leaked file objects to clean up at shutdown
+  warnings.warn(
+/home/ilc/midir/miniconda3/envs/ml-env/lib/python3.10/site-packages/joblib/externals/loky/backend/resource_tracker.py:299: UserWarning: resource_tracker: There appear to be 54 leaked semlock objects to clean up at shutdown
+  warnings.warn(
+/home/ilc/midir/miniconda3/envs/ml-env/lib/python3.10/site-packages/joblib/externals/loky/backend/resource_tracker.py:299: UserWarning: resource_tracker: There appear to be 2 leaked folder objects to clean up at shutdown
+  warnings.warn(

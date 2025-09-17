@@ -1,0 +1,9 @@
+nohup: ignoring input
+Analyse terminée, résultats dans data/130k_kaon_E1to130_params.root
+
+
+    std::vector<std::pair<std::string,std::string>> files = {
+        {"/gridgroup/ilc/midir/analyse/data/digitzed/130k_kaon_E1to130_digitized.root",   "/gridgroup/ilc/midir/analyse/data/params/130k_kaon_E1to130_params.root"},
+        {"/gridgroup/ilc/midir/analyse/data/digitzed/130k_pi_E1to130_digitized.root",     "/gridgroup/ilc/midir/analyse/data/params/130k_pi_E1to130_params.root"},
+        {"/gridgroup/ilc/midir/analyse/data/digitzed/130k_proton_E1to130_digitized.root", "/gridgroup/ilc/midir/analyse/data/params/130k_proton_E1to130_params.root"}
+    };

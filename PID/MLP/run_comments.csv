@@ -1,0 +1,6 @@
+run_id,comment
+1,"Finished run 1 with acc=0.6691, auc=0.8494"
+3,"Finished run 3 with acc=0.6267, auc=0.8324"
+4,"Finished run 4 with acc=0.6854, auc=0.8598"
+5,"Finished run 5 with acc=0.6807, auc=0.8582"
+6,"Finished run 6 with acc=0.6857, auc=0.8590"
