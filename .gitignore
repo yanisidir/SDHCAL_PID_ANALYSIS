@@ -1,28 +1,78 @@
+# =========================
 # Python
+# =========================
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.joblib
+*.npz
+
+# Environnements virtuels
 .venv/
-.env
+env/
+ENV/
+*.env
+
+# Jupyter
 .ipynb_checkpoints/
-build/
+
+# =========================
+# C / C++
+# =========================
 *.o
 *.so
 *.a
-*.root
+*.out
+*.exe
+*.dll
+*.dylib
 *.pcm
-*.npz
-*.joblib
-*.pkl
+build/
+
+# =========================
+# Machine Learning / Data
+# =========================
 *.pt
 *.pth
 *.h5
+*.onnx
+*.ckpt
+
+# Données brutes (sauf README & samples)
 data/*
 !data/README.md
 !data/samples/**
+
+# =========================
+# Résultats / modèles
+# =========================
 models/**
 results/**
+
+# =========================
+# Logs & reports
+# =========================
+*.log
+*.csv
+*.tsv
+
+# =========================
+# IDE / Éditeurs
+# =========================
 .vscode/
 .idea/
-*.log
+*.swp
+*.swo
+
+# =========================
+# Sécurité
+# =========================
+# Ne jamais commiter de clés SSH ou certificats
+*.pem
+*.key
+*.crt
+*.pub
 sshky
 sshky.pub
