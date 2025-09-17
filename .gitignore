@@ -1,4 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+.ipynb_checkpoints/
+build/
+*.o
+*.so
+*.a
 *.root
+*.pcm
 *.npz
 *.joblib
 *.pkl
@@ -10,3 +21,6 @@ data/*
 !data/samples/**
 models/**
 results/**
+.vscode/
+.idea/
+*.log
