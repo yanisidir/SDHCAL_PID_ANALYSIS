@@ -39,7 +39,7 @@ Le projet regroupe : extraction de paramètres de gerbe (C++/ROOT), modèles de 
 * **C++11** (compilation testée en C++11)
 * **ROOT** (avec `root-config` dans le PATH)
 * **Python 3.9+** recommandé
-* (Optionnel) **conda** / **mamba** pour l’environnement Python
+* (Optionnel) **conda** pour l’environnement Python
 
 ### Python (typique)
 
@@ -49,6 +49,16 @@ Le projet regroupe : extraction de paramètres de gerbe (C++/ROOT), modèles de 
 * (GNN) PyTorch + PyTorch Geometric (si tu utilises `PID/GNN/`)
 
 > Les modèles entraînés/scaleurs (fichiers `.joblib` et `.pt/.pth`) sont déjà versionnés dans les sous-dossiers `results*/models` pour référence, mais **ne sont pas nécessaires** si tu réentraînes.
+
+## Données
+
+⚠️ Les données utilisées pour l’analyse **ne sont pas incluses** dans ce dépôt (taille trop volumineuse).  
+Elles proviennent du dépôt [SDHCALSim](https://github.com/ggarillot/SDHCALSim).
+
+### Obtenir les données
+1. Cloner le dépôt officiel :
+   ```bash
+   git clone https://github.com/ggarillot/SDHCALSim
 
 ---
 
