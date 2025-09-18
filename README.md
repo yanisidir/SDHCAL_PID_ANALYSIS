@@ -1,9 +1,3 @@
-Voici un **README.md** prêt à coller à la racine de ton dépôt.
-Il est pensé pour : SDHCAL, ROOT + C++11, Python (BDT/MLP/GNN), et reconstruction d’énergie avec/sans PID.
-J’ai gardé les chemins exacts de ton arborescence et évité d’inventer des options de scripts (tu pourras compléter si tu exposes une CLI).
-
----
-
 # SDHCAL PID ANALYSIS
 
 Identification de particules (π⁻/K⁰/proton) et reconstruction d’énergie dans un SDHCAL (Semi-Digital Hadronic CALorimeter) à partir de jeux simulés (1–130 GeV).
