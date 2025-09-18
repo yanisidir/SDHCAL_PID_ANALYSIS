@@ -59,7 +59,7 @@ The project includes: shower parameter extraction (C++/ROOT), PID models (BDT/ML
 
 ## Data
 
-⚠️ The datasets used for the analysis are **not included** (too large).
+The datasets used for the analysis are **not included** (too large).
 They come from **[SDHCALSim](https://github.com/ggarillot/SDHCALSim)** to **simulate the SDHCAL prototype**, **[digitizerTuning](https://github.com/ggarillot/digitizerTuning)** to **digitize**, and **[SDHCALMarlinProcessor](https://github.com/ggarillot/SDHCALMarlinProcessor)** to **convert LCIO→ROOT**.
 
 ### Get/link the data
