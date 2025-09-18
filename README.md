@@ -27,8 +27,6 @@ Le projet regroupe : extraction de paramètres de gerbe (C++/ROOT), modèles de 
 * [Résultats & figures](#résultats--figures)
 * [Conseils de reproductibilité](#conseils-de-reproductibilité)
 * [Contribuer](#contribuer)
-* [Citation](#citation)
-* [Licence](#licence)
 
 ---
 
