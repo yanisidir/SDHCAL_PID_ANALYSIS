@@ -1,7 +1,3 @@
-Perfect 👍 Here’s the **full English translation** of your README, section by section, with nothing left in French:
-
----
-
 # SDHCAL PID ANALYSIS
 
 Particle identification (π⁻/K⁰/proton) and energy reconstruction in an SDHCAL (Semi-Digital Hadronic CALorimeter) from simulated datasets (1–130 GeV).
