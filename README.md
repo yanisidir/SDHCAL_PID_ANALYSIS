@@ -1,209 +1,244 @@
+Perfect 👍 Here’s the **full English translation** of your README, section by section, with nothing left in French:
+
+---
+
 # SDHCAL PID ANALYSIS
 
-Identification de particules (π⁻/K⁰/proton) et reconstruction d’énergie dans un SDHCAL (Semi-Digital Hadronic CALorimeter) à partir de jeux simulés (1–130 GeV).
-Le projet regroupe : extraction de paramètres de gerbe (C++/ROOT), modèles de PID (BDT/MLP/GNN), reconstruction d’énergie (BDT/MLP et méthodes χ²/TMinuit), et figures associées.
-
-## Points clés
-
-* **Données** : fichiers ROOT simulés (brut, digitized, paramètres, splits, sets de validation) sous `data/`.
-* **Paramètres de gerbe** : calculés/soignés dans `ShowerAnalyzer/` et `data/scripts/` (C++/ROOT + Python utilitaires).
-* **PID** : modèles **BDT**, **MLP**, **GNN** sous `PID/` (artefacts, courbes, matrices de confusion).
-* **Reconstruction d’énergie** : variantes **BDT/MLP** (Python) et **χ²/TMinuit** (C++/ROOT) sous `Energy_reconstruction_ml/` et `energy_reconstruction_Tminuit/`.
-* **Comparaisons** : scripts ROOT pour comparer densité/rayon/EM-fraction/Thr3 sous `compare_parameters/`.
+Particle identification (π⁻/K⁰/proton) and energy reconstruction in an SDHCAL (Semi-Digital Hadronic CALorimeter) from simulated datasets (1–130 GeV).
+The project includes: shower parameter extraction (C++/ROOT), PID models (BDT/MLP/GNN), energy reconstruction (BDT/MLP and χ²/TMinuit methods), and associated figures.
 
 ---
 
-## Table des matières
+## Key points
 
-* [Pré-requis](#pré-requis)
-* [Installation rapide](#installation-rapide)
-* [Organisation du dépôt](#organisation-du-dépôt)
-* [Pipelines typiques](#pipelines-typiques)
+* **Data**: simulated ROOT files (raw, digitized, parameters, splits, validation sets) referenced under `data/` (not versioned).
+* **Shower parameters**: computed in `ShowerAnalyzer/` and `data/scripts/` (C++/ROOT + Python utilities).
+* **PID**: models **BDT**, **MLP**, **GNN** under `PID/` (artifacts, curves, confusion matrices).
+* **Energy reconstruction**: variants **BDT/MLP** (Python) and **χ²/TMinuit** (C++/ROOT) under `Energy_reconstruction_ml/` and `energy_reconstruction_Tminuit/`.
+* **Comparisons**: ROOT scripts to compare density/radius/EM-fraction/Thr3 under `compare_parameters/`.
 
-  * [1) Préparation & paramètres](#1-préparation--paramètres)
+---
+
+## Table of contents
+
+* [Prerequisites](#prerequisites)
+* [Data](#data)
+
+  * [Data pipeline (from SDHCALSim → PID/Energy)](#data-pipeline-from-sdhcalsim--pidenergy)
+* [Quick installation](#quick-installation)
+* [Repository structure](#repository-structure)
+* [Typical pipelines](#typical-pipelines)
+
+  * [1) Preparation & parameters](#1-preparation--parameters)
   * [2) PID (BDT/MLP/GNN)](#2-pid-bdtmlpgnn)
-  * [3) Reconstruction d’énergie](#3-reconstruction-dénergie)
-  * [4) PID → Énergie (couplage)](#4-pid--énergie-couplage)
-* [Résultats & figures](#résultats--figures)
-* [Conseils de reproductibilité](#conseils-de-reproductibilité)
-* [Contribuer](#contribuer)
+  * [3) Energy reconstruction](#3-energy-reconstruction)
+  * [4) PID → Energy (coupling)](#4-pid--energy-coupling)
+* [Quick start](#quick-start)
+* [Results & figures](#results--figures)
+* [Reproducibility tips](#reproducibility-tips)
+* [Contributing](#contributing)
+* [Contact](#contact)
 
 ---
 
-## Pré-requis
+## Prerequisites
 
-### Outils système
+### System tools
 
-* **C++11** (compilation testée en C++11)
-* **ROOT** (avec `root-config` dans le PATH)
-* **Python 3.9+** recommandé
-* (Optionnel) **conda** pour l’environnement Python
+* **C++11** (compilation tested with C++11)
+* **ROOT** (with `root-config` in PATH)
+* **Python 3.9+** recommended
+* (Optional) **conda** for Python environment
 
-### Python (typique)
+### Python (typical)
 
 * numpy, pandas, scikit-learn, joblib
-* lightgbm (pour LGBM)
+* lightgbm (for LGBM)
 * matplotlib
-* (GNN) PyTorch + PyTorch Geometric (si tu utilises `PID/GNN/`)
+* (GNN) PyTorch + PyTorch Geometric (if using `PID/GNN/`)
 
-> Les modèles entraînés/scaleurs (fichiers `.joblib` et `.pt/.pth`) sont déjà versionnés dans les sous-dossiers `results*/models` pour référence, mais **ne sont pas nécessaires** si tu réentraînes.
-
-## Données
-
-⚠️ Les données utilisées pour l’analyse **ne sont pas incluses** dans ce dépôt (taille trop volumineuse).  
-Elles proviennent du dépôt [SDHCALSim](https://github.com/ggarillot/SDHCALSim).
-
-### Obtenir les données
-1. Cloner le dépôt officiel :
-   ```bash
-   git clone https://github.com/ggarillot/SDHCALSim
+> Trained models/scalers (`.joblib` and `.pt/.pth` files) can be regenerated; they are not required if you retrain.
 
 ---
 
-## Installation rapide
+## Data
+
+⚠️ The datasets used for the analysis are **not included** (too large).
+They come from **[SDHCALSim](https://github.com/ggarillot/SDHCALSim)** to **simulate the SDHCAL prototype**, **[digitizerTuning](https://github.com/ggarillot/digitizerTuning)** to **digitize**, and **[SDHCALMarlinProcessor](https://github.com/ggarillot/SDHCALMarlinProcessor)** to **convert LCIO→ROOT**.
+
+### Get/link the data
+
+1. Clone the upstream repo:
+
+   ```bash
+   git clone https://github.com/ggarillot/SDHCALSim
+   export SDHCALSIM_DIR=$(pwd)/SDHCALSim
+   ```
+2. Choose a local location for your outputs (not versioned):
+
+   ```bash
+   export SDHCAL_DATA_DIR=/path/to/SDHCAL_data
+   mkdir -p "$SDHCAL_DATA_DIR"
+   ```
+3. (Option A) **Environment variable**: our scripts will read `SDHCAL_DATA_DIR`.
+   (Option B) **Symbolic link** at the repo root:
+
+   ```bash
+   ln -s "$SDHCAL_DATA_DIR" data
+   ```
+
+### Data pipeline (from SDHCALSim → PID/Energy)
+
+```
+SDHCALSim (slcio) ─► Digitization (slcio) ─► LcioToRoot (root) ─► ShowerAnalyzer (params.root)
+   example.py            digitOnLocal.py      LcioToRootProcessor.py    computeParams*.cpp
+```
+
+> Upstream requirements:
+>
+> * [iLCSoft](https://github.com/iLCSoft/iLCInstall) (Marlin/LCIO),
+> * [SDHCALMarlinProcessor](https://github.com/ggarillot/SDHCALMarlinProcessor) (depends on [CaloSoftWare](https://github.com/SDHCAL/CaloSoftWare)),
+> * [SDHCALSim](https://github.com/ggarillot/SDHCALSim)
+> * [digitizerTuning](https://github.com/ggarillot/digitizerTuning)
+>   On sites with **CVMFS**, source the environment (e.g.):
+>
+> ```bash
+> source /cvmfs/ilc.desy.de/sw/x86_64_gcc82_centos7/v02-02-01/init_ilcsoft.sh
+> ```
+
+Then follow the **four steps**:
+
+1. **Simulation (LCIO .slcio)**
+2. **Digitization (slcio → slcio)**
+3. **Conversion LCIO → ROOT**
+4. **Parameter extraction (params.root)** with `ShowerAnalyzer/computeParams.cpp`
+
+---
+
+## Quick installation
 
 ```bash
-# 1) Cloner
-git clone <URL_DU_REPO> SDHCAL_PID_ANALYSIS
+# 1) Clone this repo
+git clone <REPO_URL> SDHCAL_PID_ANALYSIS
 cd SDHCAL_PID_ANALYSIS
 
-# 2) (Optionnel) Créer l'environnement
+# 2) (Optional) Create the environment
 conda create -n sdhcal python=3.10 -y
 conda activate sdhcal
 
-# 3) Installer les dépendances usuelles
+# 3) Install usual dependencies
 pip install numpy pandas scikit-learn joblib lightgbm matplotlib
-
-# (GNN uniquement)
-# pip install torch torch_geometric  # à adapter selon ta plateforme CUDA/CPU
+# (GNN) adapt to your platform:
+# pip install torch torch_geometric
 ```
 
-Côté C++/ROOT (exemple de compilation manuelle) :
+C++/ROOT example compilation:
 
 ```bash
-# Exemple: compiler un binaire simple utilisant ROOT (adapter le .cpp)
 g++ -std=c++11 ShowerAnalyzer/computeParams.cpp $(root-config --cflags --libs) -o computeParams
 ```
 
 ---
 
-## Organisation du dépôt
+## Repository structure
 
-* `data/` — **Jeux de données** et artefacts
+* `data/` — **Datasets** and artifacts (not versioned)
 
-  * `raw/`, `digitized/` — fichiers ROOT bruts/digitisés
-  * `params/`, `merged_primaryEnergy/` — fichiers ROOT de **paramètres** (features) par particule/énergie
-  * `split*/`, `validation_set_*.root`, `val_set_*.root` — splits & sets de validation
-  * `scripts/` — utilitaires (merge, repair, visualisation, split, shuffle, etc.)
-  * `data_1k/` — petit set + scripts `root_to_csv.py`, `clean_csv.py`, `analyse_csv.py`
-* `ShowerAnalyzer/` — **Extraction de paramètres C++/ROOT** (computeParams, version parallèle, logs)
-* `PID/` — **Identification de particules**
+  * `raw/`, `digitized/` — raw/digitized ROOT
+  * `params/`, `merged_primaryEnergy/` — ROOT **parameters** (features) by particle/energy
+  * `split*/`, `validation_set_*.root`, `val_set_*.root` — splits & validation sets
+  * `scripts/` — utilities (merge, repair, visualization, split, shuffle, etc.)
+  * `data_1k/` — toy dataset + scripts `root_to_csv.py`, `clean_csv.py`, `analyse_csv.py`
+* `ShowerAnalyzer/` — **Parameter extraction** (computeParams, parallel version, logs)
+* `PID/` — **Particle identification**
 
-  * `BDT/`, `MLP/`, `GNN/` — scripts d’entraînement/inférence, artefacts (`models/`, `plots/`, CSVs)
-* `Energy_reconstruction_ml/` — **Reconstruction d’énergie** par BDT/MLP
-
-  * `BDT/` et `MLP/` avec scripts, paramètres, performances et **plots**
-* `energy_reconstruction_Tminuit/` — **Méthodes χ²/TMinuit** (ROOT/C++), par espèce (kaon, proton, pion-) + plots globaux
-* `compare_parameters/` — Comparaisons de variables (ROOT macros `.C` et figures)
-* `PID_RECONSTRUCTION/` — **Études couplées** PID → reconstruction d’énergie (figures, CSVs, scripts)
-* `tools/` — utilitaires (RANSAC tracks, visualisation de gerbes)
+  * `BDT/`, `MLP/`, `GNN/` — training/inference, artifacts (`models/`, `plots/`, CSVs)
+* `Energy_reconstruction_ml/` — **Energy reconstruction** (BDT/MLP)
+* `energy_reconstruction_Tminuit/` — **χ²/TMinuit** (ROOT/C++), by species + global plots
+* `compare_parameters/` — Variable comparisons (macros `.C` + figures)
+* `PID_RECONSTRUCTION/` — **Coupled studies** PID → energy reconstruction (figures, CSVs)
+* `tools/` — utilities (RANSAC tracks, shower visualization)
 
 ---
 
-## Pipelines typiques
+## Typical pipelines
 
-### 1) Préparation & paramètres
+### 1) Preparation & parameters
 
-1. **A partir de `data/raw/`** → digitisation/params (déjà présents sous `data/digitized/` et `data/params/`).
-2. **Extraction/clean/merge** via `data/scripts/` (ex. `merge_primary_energy.py`, `repair_params.py`, `rootspliter.py`).
-3. (C++) **Extraction parallèle** possible via `ShowerAnalyzer/computeParams_parallel.cpp`.
-
-> Si tu repars de RAW, assure-toi que ROOT voit bien tes includes et que tu compiles en **C++11**.
+* From digitized ROOT → extract **params** with `ShowerAnalyzer`.
+* Merge/clean with `data/scripts/` (merge\_primary\_energy, repair\_params, rootspliter).
+* Parallel version available: `computeParams_parallel.cpp`.
 
 ### 2) PID (BDT/MLP/GNN)
 
-* **BDT** : `PID/BDT/`
+* **BDT**: `PID/BDT/` (LightGBM, plots, confusion matrices)
+* **MLP**: `PID/MLP/` (classification, results/plots)
+* **GNN**: `PID/GNN/` (PyTorch Geometric, trained `.pt` models, plots)
 
-  * Entraînement/visualisation : `LGBM_classifier_PID.py`, `feature_importance_with_permutation.py`, `plot_trees.py`
-  * Inférence (ex.) : `identify_hadron.py`
-  * Artefacts : `processed_data/` (matrices de confusion, importances, scaler, modèle)
-* **MLP** : `PID/MLP/`
+### 3) Energy reconstruction
 
-  * Entraînement : `hadron_classifier_MLP.py` ou `2_hadron_classifier_MLP.py`
-  * Résultats : `results/` (modèle, scaler, courbes d’entraînement, importances)
-* **GNN** : `PID/GNN/`
+* **ML (BDT/MLP)**: `Energy_reconstruction_ml/`
+* **χ² / TMinuit (ROOT/C++)**: `energy_reconstruction_Tminuit/`
 
-  * Scripts : `GNN_3_classes.py`, `GNN.py`, variantes de debug
-  * Modèles : `models/best_model_*.pt` et `best_model.pth`
-  * Plots : `plots/` (courbes loss/acc, matrices de confusion)
+### 4) PID → Energy (coupling)
 
-> Les chemins d’entrée attendent des **ROOT de paramètres** (ex. `data/params/130k_*_params.root`) ou des CSV dérivés (`data/data_1k/*.csv`).
-> Si tu souhaites une **CLI** unifiée, ajoute ultérieurement des arguments (train/test/split/paths) et mets-les en lumière ici.
-
-### 3) Reconstruction d’énergie
-
-* **ML (BDT / MLP)** : `Energy_reconstruction_ml/`
-
-  * BDT : `hadron_energy_reco_lgbm.py`, `pion_energy_reco_lgbm.py`, `proton_energy_reco_lgbm.py`, etc.
-  * MLP : `MLP_Energy_reconstruction_*.py`
-  * Sorties : `performances/`, `results_*_energy_reco/` (modèles, scalers, `arrays/test_and_pred_*.npz`) & **plots** (linéarité, déviation, résolution, training)
-* **χ² / TMinuit (ROOT/C++)** : `energy_reconstruction_Tminuit/`
-
-  * Scripts par espèce (`kaon/`, `pion-/`, `proton/`), plus versions « all » (ex. `pion_proton_EnergyReco.C`)
-  * Figures globales sous `energy_reconstruction_Tminuit/plots/`
-
-### 4) PID → Énergie (couplage)
-
-* `PID_RECONSTRUCTION/` propose des scénarios **avec** et **sans** PID (par espèce ou global)
-
-  * CSV de synthèse : `kaon_pi-_proton/csv/` (ex. `pid_energy_LGBM.csv`, `no_pid_energy_param.csv`, …)
-  * Figures comparatives : linéarité, déviation, résolution, σ/E vs E (avec/sans PID; 100 GeV/130 GeV calib…)
+* `PID_RECONSTRUCTION/`: scenarios **with** and **without** PID (per species or global)
 
 ---
 
-## Résultats & figures
+## Quick start
 
-Tu trouveras des figures prêtes à l’emploi dans :
+```bash
+# 0) Make sure you have a params ROOT ready:
+#    $SDHCAL_DATA_DIR/params/output_params.root
+export SDHCAL_DATA_DIR=/path/to/SDHCAL_data
 
-* `PID/*/plots/` (PID)
-* `Energy_reconstruction_ml/*/plots/` et `*/results_*/*/plots/` (reco d’énergie ML)
-* `energy_reconstruction_Tminuit/plots/` (χ²/TMinuit)
-* `PID_RECONSTRUCTION/*/plots/` (couplage PID↔Ereco)
-* `compare_parameters/plots/` (variables de gerbe)
+# 1) PID (example: BDT 3 classes)
+python PID/BDT/LGBM_classifier_PID.py \
+  --input "$SDHCAL_DATA_DIR/params/output_params.root" \
+  --out   PID/BDT/processed_data
 
-Quelques noms parlants (exemples) :
-
-* `PID/BDT/processed_data/confusion_matrix.png`
-* `Energy_reconstruction_ml/BDT/results_all_energy_reco/plots/linearity_and_deviation_all.png`
-* `energy_reconstruction_Tminuit/plots/Resolution_relative_all.png`
-* `PID_RECONSTRUCTION/kaon_pi-_proton/plots/PID_Resolution_relative_LGBM.png`
-
----
-
-## Conseils de reproductibilité
-
-* **Seeds** : fixe les graines (numpy/sklearn/torch) si tu veux des courbes strictement reproductibles.
-* **Splits** : conserve les splits (`data/split*/`) pour comparer « à jeu égal ».
-* **Normalisation** : toujours sérialiser/recharger les **scalers** correspondants au modèle (`scaler_*.joblib`).
-* **Versionning** : ROOT + compilo C++11 + versions Python lib → consigne-les dans `Energy_reconstruction_ml/*/parameters/run_parameters*.csv` (déjà présent pour l’auto-traçabilité).
-* **.gitignore** : le dépôt ignore modèles volumineux, résultats, données brutes (sauf README/samples). Place des **échantillons** dans `data/samples/` si tu veux des run « out-of-the-box ».
+# 2) Energy reconstruction (example: LGBM)
+python Energy_reconstruction_ml/BDT/hadron_energy_reco_lgbm.py \
+  --input "$SDHCAL_DATA_DIR/params/output_params.root" \
+  --out   Energy_reconstruction_ml/BDT/results_all_energy_reco
+```
 
 ---
 
-## Contribuer
+## Results & figures
 
-1. Fork → branche thématique `feat/…` ou `fix/…`
-2. Respecter C++ **C++11** (contexte HPC/ROOT) et PEP8 côté Python
-3. Ajouter une note **Reproductibilité** (seed, splits, versions) dans tes PR
-4. Pour les figures, exporter en **.pdf** et **.png** si utile, et déposer dans le dossier `plots/` pertinent
+Typical outputs:
+
+* `PID/*/plots/` — PID results
+* `Energy_reconstruction_ml/*/plots/` and `*/results_*/*/plots/` — ML energy reconstruction
+* `energy_reconstruction_Tminuit/plots/` — χ²/TMinuit
+* `PID_RECONSTRUCTION/*/plots/` — Coupling PID ↔ Ereco
+* `compare_parameters/plots/` — Shower variable comparisons
+
+---
+
+## Reproducibility tips
+
+* **Seeds**: set numpy/sklearn/torch for reproducibility.
+* **Splits**: keep `data/split*/` for fair comparisons.
+* **Normalization**: save/reload scalers (`scaler_*.joblib`).
+* **Versioning**: log ROOT/compiler/package versions in `Energy_reconstruction_ml/*/parameters/run_parameters*.csv`.
+* **.gitignore**: raw data/models/results are ignored; provide **samples** under `data/samples/` for demo runs.
+
+---
+
+## Contributing
+
+1. Fork → branch `feat/...` or `fix/...`
+2. Follow **C++11** and Python **PEP8**
+3. Add a **Reproducibility note** (seed, splits, versions) in the PR
+4. Export figures as **.pdf** and **.png** (place in the relevant `plots/` folder)
 
 ---
 
 ## Contact
 
-* Auteur : IDIR Mohamed Yanis
-* Questions/bugs : ouvre une **Issue** avec un lien vers le script, l’input (ou échantillon) et la figure attendue.
+* **Author**: IDIR Mohamed Yanis
 
-
-
-
+---
