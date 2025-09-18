@@ -27,7 +27,6 @@ CLI :
     python hadron_energy_reco_lgbm.py --particles all
     python hadron_energy_reco_lgbm.py --particles pi --grid-search
 
-Dépendances : numpy, pandas, matplotlib, scipy, scikit-learn, lightgbm, joblib, uproot.
 """
 
 from __future__ import annotations
