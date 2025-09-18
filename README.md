@@ -193,7 +193,7 @@ Quelques noms parlants (exemples) :
 
 ## Contact
 
-* Auteur : *à compléter*
+* Auteur : IDIR Mohamed Yanis
 * Questions/bugs : ouvre une **Issue** avec un lien vers le script, l’input (ou échantillon) et la figure attendue.
 
 
