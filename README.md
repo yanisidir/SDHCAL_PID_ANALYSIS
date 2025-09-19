@@ -235,6 +235,6 @@ Typical outputs:
 
 ## Contact
 
-* **Author**: IDIR Mohamed Yanis
+* **Author**: IDIR Mohamed Yanis (yanis.idr@outlook.fr)
 
 ---
