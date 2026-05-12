@@ -1,240 +1,178 @@
-# SDHCAL PID ANALYSIS
+# SDHCAL Particle Identification and Energy Reconstruction
 
-Particle identification (π⁻/K⁰/proton) and energy reconstruction in an SDHCAL (Semi-Digital Hadronic CALorimeter) from simulated datasets (1–130 GeV).
-The project includes: shower parameter extraction (C++/ROOT), PID models (BDT/MLP/GNN), energy reconstruction (BDT/MLP and χ²/TMinuit methods), and associated figures.
+This repository contains my M2 internship research software for studying particle identification and energy reconstruction in a Semi-Digital Hadronic Calorimeter (SDHCAL). It combines ROOT/C++ shower-parameter extraction with machine-learning and chi2/TMinuit reconstruction studies for simulated hadronic showers, with an emphasis on clear analysis workflows rather than a production-ready experiment framework.
 
----
+**Skills demonstrated**
 
-## Key points
+- Particle-physics data analysis with ROOT/C++, LCIO-derived detector outputs, and shower observables.
+- Supervised learning for hadron PID using LightGBM BDTs, scikit-learn MLPs, and exploratory graph neural networks.
+- Energy reconstruction with both ML regressors and a semi-digital chi2/TMinuit calibration approach.
+- Reproducible research organization: parameter logs, performance tables, plots, and method comparisons.
+- Scientific communication through documented pipelines, result summaries, and portfolio-oriented repository structure.
 
-* **Data**: simulated ROOT files (raw, digitized, parameters, splits, validation sets) referenced under `data/` (not versioned).
-* **Shower parameters**: computed in `ShowerAnalyzer/` and `data/scripts/` (C++/ROOT + Python utilities).
-* **PID**: models **BDT**, **MLP**, **GNN** under `PID/` (artifacts, curves, confusion matrices).
-* **Energy reconstruction**: variants **BDT/MLP** (Python) and **χ²/TMinuit** (C++/ROOT) under `Energy_reconstruction_ml/` and `energy_reconstruction_Tminuit/`.
-* **Comparisons**: ROOT scripts to compare density/radius/EM-fraction/Thr3 under `compare_parameters/`.
+## Project Overview
 
----
+The SDHCAL is a highly granular hadronic calorimeter concept using semi-digital readout: each cell records threshold information rather than a fully analog energy deposit. This readout is well suited to imaging hadronic showers, but it also makes reconstruction dependent on shower topology, threshold occupancies, and calibration choices.
 
-## Table of contents
+The project investigates two connected tasks:
 
-* [Prerequisites](#prerequisites)
-* [Data](#data)
+1. **Particle identification (PID)** for simulated pi-, K0, and proton showers.
+2. **Energy reconstruction** using shower features, semi-digital hit counts, and particle-dependent or particle-aware reconstruction strategies.
 
-  * [Data pipeline (from SDHCALSim → PID/Energy)](#data-pipeline-from-sdhcalsim--pidenergy)
-* [Quick installation](#quick-installation)
-* [Repository structure](#repository-structure)
-* [Typical pipelines](#typical-pipelines)
+The repository is meant to show the analysis logic, code organization, and representative outputs from the internship. Large datasets and trained artifacts are not versioned.
 
-  * [1) Preparation & parameters](#1-preparation--parameters)
-  * [2) PID (BDT/MLP/GNN)](#2-pid-bdtmlpgnn)
-  * [3) Energy reconstruction](#3-energy-reconstruction)
-  * [4) PID → Energy (coupling)](#4-pid--energy-coupling)
-* [Quick start](#quick-start)
-* [Results & figures](#results--figures)
-* [Reproducibility tips](#reproducibility-tips)
-* [Contributing](#contributing)
-* [Contact](#contact)
+## Physics Motivation
 
----
+Hadronic calorimetry is challenging because hadron showers fluctuate strongly event by event. In a semi-digital detector, the information available per hit is compressed into threshold levels, so reconstruction relies on both counting information and spatial shower development. Useful PID and energy estimators can exploit:
 
-## Prerequisites
+- longitudinal shower development, such as first active layers, barycentres, RMS, and fitted profile quantities;
+- transverse morphology, such as density, radius, eccentricity, and clustering;
+- semi-digital threshold content, such as N1, N2, N3, Thr1, Thr2, Thr3, and threshold ratios;
+- timing or timing-derived features where available;
+- correlations between the particle hypothesis and the optimal energy reconstruction.
 
-### System tools
+## Detector and Data Context
 
-* **C++11** (compilation tested with C++11)
-* **ROOT** (with `root-config` in PATH)
-* **Python 3.9+** recommended
-* (Optional) **conda** for Python environment
+The analysis is based on simulated SDHCAL-like samples. The full upstream chain is external to this repository:
 
-### Python (typical)
-
-* numpy, pandas, scikit-learn, joblib
-* lightgbm (for LGBM)
-* matplotlib
-* (GNN) PyTorch + PyTorch Geometric (if using `PID/GNN/`)
-
-> Trained models/scalers (`.joblib` and `.pt/.pth` files) can be regenerated; they are not required if you retrain.
-
----
-
-## Data
-
-The datasets used for the analysis are **not included** (too large).
-They come from **[SDHCALSim](https://github.com/ggarillot/SDHCALSim)** to **simulate the SDHCAL prototype**, **[digitizerTuning](https://github.com/ggarillot/digitizerTuning)** to **digitize**, and **[SDHCALMarlinProcessor](https://github.com/ggarillot/SDHCALMarlinProcessor)** to **convert LCIO→ROOT**.
-
-### Get/link the data
-
-1. Clone the upstream repo:
-
-   ```bash
-   git clone https://github.com/ggarillot/SDHCALSim
-   export SDHCALSIM_DIR=$(pwd)/SDHCALSim
-   ```
-2. Choose a local location for your outputs (not versioned):
-
-   ```bash
-   export SDHCAL_DATA_DIR=/path/to/SDHCAL_data
-   mkdir -p "$SDHCAL_DATA_DIR"
-   ```
-3. (Option A) **Environment variable**: our scripts will read `SDHCAL_DATA_DIR`.
-   (Option B) **Symbolic link** at the repo root:
-
-   ```bash
-   ln -s "$SDHCAL_DATA_DIR" data
-   ```
-
-### Data pipeline (from SDHCALSim → PID/Energy)
-
-```
-SDHCALSim (slcio) ─► Digitization (slcio) ─► LcioToRoot (root) ─► ShowerAnalyzer (params.root)
-   example.py            digitOnLocal.py      LcioToRootProcessor.py    computeParams*.cpp
+```text
+SDHCAL simulation (.slcio)
+        -> digitization (.slcio)
+        -> LCIO to ROOT conversion
+        -> shower-parameter extraction
+        -> PID and energy reconstruction studies
 ```
 
-> Upstream requirements:
->
-> * [iLCSoft](https://github.com/iLCSoft/iLCInstall) (Marlin/LCIO),
-> * [SDHCALMarlinProcessor](https://github.com/ggarillot/SDHCALMarlinProcessor) (depends on [CaloSoftWare](https://github.com/SDHCAL/CaloSoftWare)),
-> * [SDHCALSim](https://github.com/ggarillot/SDHCALSim)
-> * [digitizerTuning](https://github.com/ggarillot/digitizerTuning)
->   On sites with **CVMFS**, source the environment (e.g.):
->
-> ```bash
-> source /cvmfs/ilc.desy.de/sw/x86_64_gcc82_centos7/v02-02-01/init_ilcsoft.sh
-> ```
+The repository assumes ROOT trees containing either per-hit detector information or derived shower parameters. Many scripts still contain local research-path defaults from the internship environment; for reuse, those paths should be changed to local data locations.
 
-Then follow the **four steps**:
+## Main Objectives
 
-1. **Simulation (LCIO .slcio)**
-2. **Digitization (slcio → slcio)**
-3. **Conversion LCIO → ROOT**
-4. **Parameter extraction (params.root)** with `ShowerAnalyzer/computeParams.cpp`
+- Extract physically interpretable shower variables from digitized calorimeter hits.
+- Compare hadronic shower variables across particle species.
+- Train and evaluate PID models for pi-, K0, and proton separation.
+- Reconstruct incident energy using ML regression and chi2/TMinuit semi-digital calibration.
+- Study how PID decisions affect downstream energy reconstruction.
 
----
+## Methods
 
-## Quick installation
+**Shower feature extraction**
 
-```bash
-# 1) Clone this repo
-git clone <REPO_URL> SDHCAL_PID_ANALYSIS
-cd SDHCAL_PID_ANALYSIS
+- ROOT/C++ event loop over digitized hits.
+- Computation of threshold counts, shower start, barycentre, RMS, density, radius, clustering, longitudinal-profile quantities, timing summaries, and topology features.
+- Main code: `ShowerAnalyzer/`.
 
-# 2) (Optional) Create the environment
-conda create -n sdhcal python=3.10 -y
-conda activate sdhcal
+**Particle identification**
 
-# 3) Install usual dependencies
-pip install numpy pandas scikit-learn joblib lightgbm matplotlib
-# (GNN) adapt to your platform:
-# pip install torch torch_geometric
+- LightGBM BDT classifiers using engineered shower variables.
+- scikit-learn MLP baselines with standardization and SMOTE in selected scripts.
+- Exploratory PyTorch Geometric GNN models using hit-level or graph-like shower representations.
+- Main code: `PID/`.
+
+**Energy reconstruction**
+
+- LightGBM and MLP regression models trained on derived shower parameters.
+- ROOT/C++ chi2 calibration with TMinuit using semi-digital hit counts N1, N2, and N3.
+- Main code: `Energy_reconstruction_ml/` and `energy_reconstruction_Tminuit/`.
+
+**PID-energy coupling**
+
+- Comparisons of reconstruction performance with and without PID-informed model selection.
+- Main code: `PID_RECONSTRUCTION/`.
+
+## Repository Structure
+
+```text
+.
+|-- ShowerAnalyzer/                  ROOT/C++ shower-parameter extraction
+|-- PID/                             PID studies with BDT, MLP, GNN, RF, CNN variants
+|   |-- BDT/                         LightGBM PID classifiers and interpretation plots
+|   |-- MLP/                         scikit-learn MLP PID classifiers
+|   `-- GNN/                         exploratory PyTorch Geometric PID studies
+|-- Energy_reconstruction_ml/        ML-based energy reconstruction
+|   |-- BDT/                         LightGBM regressors and plots
+|   `-- MLP/                         MLP energy-regression studies
+|-- energy_reconstruction_Tminuit/   ROOT/TMinuit chi2 energy reconstruction
+|-- compare_parameters/              ROOT macros and figures comparing shower variables
+|-- PID_RECONSTRUCTION/              PID-aware vs non-PID energy reconstruction studies
+|-- tools/                           Utility scripts for visualization and track counting
+|-- docs/                            Human-readable project documentation
+|-- CITATION.cff                     Suggested citation metadata
+`-- LICENSE.md                       Non-binding license selection note
 ```
 
-C++/ROOT example compilation:
+See also:
 
-```bash
-g++ -std=c++11 ShowerAnalyzer/computeParams.cpp $(root-config --cflags --libs) -o computeParams
-```
+- [Project overview](docs/project_overview.md)
+- [Data pipeline](docs/data_pipeline.md)
+- [Model summary](docs/model_summary.md)
+- [Results summary](docs/results_summary.md)
 
----
+## Data Availability
 
-## Repository structure
+The raw, digitized, converted ROOT files, generated CSV tables, trained models, and large intermediate arrays are not included in this repository. They are too large for GitHub and depend on external simulation and reconstruction environments.
 
-* `data/` — **Datasets** and artifacts (not versioned)
+In principle, the data chain depends on external tools such as SDHCAL simulation, digitization, LCIO/Marlin processing, ROOT, and local storage paths. Lightweight figures and selected performance summaries are kept in the repository when useful for review.
 
-  * `raw/`, `digitized/` — raw/digitized ROOT
-  * `params/`, `merged_primaryEnergy/` — ROOT **parameters** (features) by particle/energy
-  * `split*/`, `validation_set_*.root`, `val_set_*.root` — splits & validation sets
-  * `scripts/` — utilities (merge, repair, visualization, split, shuffle, etc.)
-  * `data_1k/` — toy dataset + scripts `root_to_csv.py`, `clean_csv.py`, `analyse_csv.py`
-* `ShowerAnalyzer/` — **Parameter extraction** (computeParams, parallel version, logs)
-* `PID/` — **Particle identification**
+## Reproduction in Principle
 
-  * `BDT/`, `MLP/`, `GNN/` — training/inference, artifacts (`models/`, `plots/`, CSVs)
-* `Energy_reconstruction_ml/` — **Energy reconstruction** (BDT/MLP)
-* `energy_reconstruction_Tminuit/` — **χ²/TMinuit** (ROOT/C++), by species + global plots
-* `compare_parameters/` — Variable comparisons (macros `.C` + figures)
-* `PID_RECONSTRUCTION/` — **Coupled studies** PID → energy reconstruction (figures, CSVs)
-* `tools/` — utilities (RANSAC tracks, shower visualization)
+The repository is not packaged as a one-command reproduction workflow. A new user would need to:
 
----
+1. Generate or obtain compatible SDHCAL simulated samples.
+2. Digitize the simulated events and convert them to ROOT trees.
+3. Run the ROOT/C++ shower-parameter extraction in `ShowerAnalyzer/`.
+4. Update hard-coded data paths in the PID and energy scripts.
+5. Install the relevant Python packages: `numpy`, `pandas`, `uproot`, `scikit-learn`, `lightgbm`, `imbalanced-learn`, `joblib`, `matplotlib`, and optionally `torch`/`torch_geometric`.
+6. Re-run only the desired PID or energy reconstruction study, keeping train/test splits and seeds fixed where possible.
 
-## Typical pipelines
+This documentation update did not recompile code, rerun training, regenerate plots, or modify scientific algorithms.
 
-### 1) Preparation & parameters
+## Representative Results and Figures
 
-* From digitized ROOT → extract **params** with `ShowerAnalyzer`.
-* Merge/clean with `data/scripts/` (merge\_primary\_energy, repair\_params, rootspliter).
-* Parallel version available: `computeParams_parallel.cpp`.
+The figures below are examples of outputs currently stored in the repository. They are included as visual evidence of the analysis workflow, not as a claim of publication-level performance.
 
-### 2) PID (BDT/MLP/GNN)
+<p align="center">
+  <img src="PID_RECONSTRUCTION/confusion_matrix_pid_LGBM.png" width="31%" alt="Example PID confusion matrix">
+  <img src="Energy_reconstruction_ml/BDT/plots/Lin_n_Dev_all_LGBM.png" width="31%" alt="Example ML energy reconstruction linearity and deviation">
+  <img src="energy_reconstruction_Tminuit/plots/Lin_n_Dev_all_chi2.png" width="31%" alt="Example chi2/TMinuit energy reconstruction linearity and deviation">
+</p>
 
-* **BDT**: `PID/BDT/` (LightGBM, plots, confusion matrices)
-* **MLP**: `PID/MLP/` (classification, results/plots)
-* **GNN**: `PID/GNN/` (PyTorch Geometric, trained `.pt` models, plots)
+Additional useful figure locations:
 
-### 3) Energy reconstruction
+- `PID/BDT/lgbm_viz/` - LightGBM feature-importance, SHAP-style summaries, and tree visualizations.
+- `PID/GNN/plots/` - GNN training and confusion-matrix plots.
+- `Energy_reconstruction_ml/BDT/plots/` - ML energy linearity, relative deviation, and resolution plots.
+- `Energy_reconstruction_ml/MLP/results_*_energy_reco/plots/` - MLP regression curves by particle category.
+- `energy_reconstruction_Tminuit/plots/` - chi2/TMinuit reconstruction profiles and diagnostics.
+- `compare_parameters/plots/` - shower-variable overlays and comparisons.
+- `PID_RECONSTRUCTION/*/plots/` - comparisons of PID-aware and non-PID energy reconstruction.
 
-* **ML (BDT/MLP)**: `Energy_reconstruction_ml/`
-* **χ² / TMinuit (ROOT/C++)**: `energy_reconstruction_Tminuit/`
+## Limitations
 
-### 4) PID → Energy (coupling)
+- The repository does not include the large input datasets needed for direct reruns.
+- Several scripts contain absolute paths from the internship computing environment.
+- The workflows are research scripts rather than a single maintained package or command-line interface.
+- Some studies are exploratory and compare multiple model variants without a final unified benchmark table.
+- Existing figures should be interpreted in the context of the specific simulated samples, splits, and configuration files used at the time.
 
-* `PID_RECONSTRUCTION/`: scenarios **with** and **without** PID (per species or global)
+## Future Improvements
 
----
+- Replace hard-coded data paths with configuration files or command-line arguments across all scripts.
+- Add a small public toy sample or synthetic fixture for smoke tests.
+- Add environment files for Python and ROOT versions.
+- Consolidate metrics into one reproducible summary table.
+- Add lightweight tests for feature extraction and data-loading assumptions.
+- Record exact dataset provenance and split identifiers for every reported figure.
 
-## Quick start
+## Citation
 
-```bash
-# 0) Make sure you have a params ROOT ready:
-#    $SDHCAL_DATA_DIR/params/output_params.root
-export SDHCAL_DATA_DIR=/path/to/SDHCAL_data
+If this repository is useful for orientation or comparison, please cite it using the metadata in [CITATION.cff](CITATION.cff). The repository represents internship research software, not a peer-reviewed publication.
 
-# 1) PID (example: BDT 3 classes)
-python PID/BDT/LGBM_classifier_PID.py \
-  --input "$SDHCAL_DATA_DIR/params/output_params.root" \
-  --out   PID/BDT/processed_data
+## License
 
-# 2) Energy reconstruction (example: LGBM)
-python Energy_reconstruction_ml/BDT/hadron_energy_reco_lgbm.py \
-  --input "$SDHCAL_DATA_DIR/params/output_params.root" \
-  --out   Energy_reconstruction_ml/BDT/results_all_energy_reco
-```
-
----
-
-## Results & figures
-
-Typical outputs:
-
-* `PID/*/plots/` — PID results
-* `Energy_reconstruction_ml/*/plots/` and `*/results_*/*/plots/` — ML energy reconstruction
-* `energy_reconstruction_Tminuit/plots/` — χ²/TMinuit
-* `PID_RECONSTRUCTION/*/plots/` — Coupling PID ↔ Ereco
-* `compare_parameters/plots/` — Shower variable comparisons
-
----
-
-## Reproducibility tips
-
-* **Seeds**: set numpy/sklearn/torch for reproducibility.
-* **Splits**: keep `data/split*/` for fair comparisons.
-* **Normalization**: save/reload scalers (`scaler_*.joblib`).
-* **Versioning**: log ROOT/compiler/package versions in `Energy_reconstruction_ml/*/parameters/run_parameters*.csv`.
-* **.gitignore**: raw data/models/results are ignored; provide **samples** under `data/samples/` for demo runs.
-
----
-
-## Contributing
-
-1. Fork → branch `feat/...` or `fix/...`
-2. Follow **C++11** and Python **PEP8**
-3. Add a **Reproducibility note** (seed, splits, versions) in the PR
-4. Export figures as **.pdf** and **.png** (place in the relevant `plots/` folder)
-
----
+No final license has been selected yet. See [LICENSE.md](LICENSE.md) for a non-binding recommendation. A permissive code license such as MIT or BSD-3-Clause would usually be appropriate for portfolio research code, but dataset rights, collaboration rules, and figure ownership should be checked before choosing one.
 
 ## Contact
 
-* **Author**: IDIR Mohamed Yanis (yanis.idr@outlook.fr)
+**Author:** IDIR Mohamed Yanis
 
----
+**Email:** yanis.idr@outlook.fr

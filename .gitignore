@@ -1,26 +1,30 @@
-# =========================
-# Python
-# =========================
+# Python cache and environments
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*.pkl
-*.joblib
-*.npz
-
-# Environnements virtuels
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
 .venv/
+venv/
 env/
 ENV/
 *.env
 
-# Jupyter
-.ipynb_checkpoints/
+# macOS and editor files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# =========================
-# C / C++
-# =========================
+# C/C++ and ROOT build products
 *.o
 *.so
 *.a
@@ -30,49 +34,55 @@ ENV/
 *.dylib
 *.pcm
 build/
+cmake-build-*/
+ShowerAnalyzer/computeParams
+ShowerAnalyzer/computeParams_parallel
 
-# =========================
-# Machine Learning / Data
-# =========================
-*.pt
-*.pth
-*.h5
-*.onnx
-*.ckpt
-
-# Données brutes (sauf README & samples)
-data/*
-!data/README.md
-!data/samples/**
-
-# =========================
-# Résultats / modèles
-# =========================
-models/**
-results/**
-
-# =========================
-# Logs & reports
-# =========================
-*.log
+# Heavy detector data and generated tabular data
+*.root
+*.slcio
 *.csv
 *.tsv
+*.npz
+*.npy
 
-# =========================
-# IDE / Éditeurs
-# =========================
-.vscode/
-.idea/
-*.swp
-*.swo
+# ML model artifacts and checkpoints
+*.pt
+*.pth
+*.ckpt
+*.joblib
+*.pkl
+*.h5
+*.onnx
 
-# =========================
-# Sécurité
-# =========================
-# Ne jamais commiter de clés SSH ou certificats
-*.pem
-*.key
-*.crt
-*.pub
-sshky
-sshky.pub
+# Logs and transient run output
+*.log
+nohup.out
+models/
+checkpoints/
+runs/
+wandb/
+
+# Large local data directories
+data/
+datasets/
+local_data/
+
+# Keep documentation and lightweight visual outputs versionable.
+!docs/
+!docs/**
+!*.md
+!*.cff
+!*.png
+!*.pdf
+
+# Compiled binaries / objects
+*.o
+*.so
+*.dylib
+*.exe
+ShowerAnalyzer/computeParams
+ShowerAnalyzer/computeParams_parallel
+
+# Logs
+*.log

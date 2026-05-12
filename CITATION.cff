@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this repository for reference, please cite it as internship research software."
+type: software
+title: "SDHCAL Particle Identification and Energy Reconstruction"
+authors:
+  - family-names: "IDIR"
+    given-names: "Mohamed Yanis"
+version: "0.1.0"
+date-released: "2026-05-12"
+abstract: "Research software from an M2 internship on SDHCAL particle identification and energy reconstruction, combining ROOT/C++ shower-parameter extraction, BDT/MLP/GNN PID studies, ML energy regression, chi2/TMinuit reconstruction, and PID-energy coupling comparisons."
+keywords:
+  - "SDHCAL"
+  - "semi-digital calorimetry"
+  - "hadronic showers"
+  - "particle identification"
+  - "energy reconstruction"
+  - "ROOT"
+  - "machine learning"
