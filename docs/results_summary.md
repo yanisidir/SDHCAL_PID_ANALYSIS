@@ -6,13 +6,13 @@ This repository contains representative figures and performance logs from the in
 
 Useful locations:
 
-- `PID/BDT/lgbm_viz/`
+- `results/pid/bdt/feature-interpretation/`
 - `PID/BDT/results_with_time/`
 - `PID/MLP/results/`
 - `PID/MLP/results_with_time/`
 - `PID/GNN/plots/`
-- `PID_RECONSTRUCTION/confusion_matrix_pid_LGBM.png`
-- `PID_RECONSTRUCTION/confusion_matrix_pid_param_LGBM.png`
+- `results/pid-energy-coupling/summary/confusion_matrix_pid_LGBM.png`
+- `results/pid-energy-coupling/summary/confusion_matrix_pid_param_LGBM.png`
 
 These outputs show confusion matrices, training curves, feature-importance diagnostics, and model-comparison material.
 
@@ -23,7 +23,7 @@ Useful locations:
 - `Energy_reconstruction_ml/BDT/plots/`
 - `Energy_reconstruction_ml/BDT/results_all_energy_reco/plots/`
 - `Energy_reconstruction_ml/MLP/results_*_energy_reco/plots/`
-- `energy_reconstruction_Tminuit/plots/`
+- `results/energy-reconstruction/chi2-tminuit/summary-plots/`
 
 Typical figures include:
 
@@ -38,7 +38,7 @@ Typical figures include:
 Useful locations:
 
 - `compare_parameters/`
-- `compare_parameters/plots/`
+- `results/shower-variables/plots/`
 
 The comparison figures summarize differences in selected shower variables such as density, radius, threshold content, and longitudinal quantities.
 

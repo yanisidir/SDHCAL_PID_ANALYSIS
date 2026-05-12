@@ -6,7 +6,7 @@ This directory contains ROOT macros and stored figures comparing selected shower
 
 - `compareRadius.C`, `compareDensity.C`, `compareBegin.C`, `compareThr3.C`, `compareEmFraction.C`: ROOT comparison macros.
 - top-level `.pdf` figures: earlier comparison outputs.
-- `plots/`: additional PNG/PDF overlays and comparison figures.
+- `../results/shower-variables/plots/`: additional PNG/PDF overlays and comparison figures moved out of this source/macro folder.
 
 ## Purpose
 

@@ -17,7 +17,7 @@ The BDT studies use engineered shower observables such as threshold content, sho
 
 ## Outputs
 
-- `lgbm_viz/`: feature-importance and tree-visualization images.
+- `../../results/pid/bdt/feature-interpretation/`: feature-importance and tree-visualization images moved out of the source folder.
 - `results_with_time/`: generated models and plots when scripts are run.
 - `run_parameters.csv`, `run_comments.csv`, `hadron_performances.csv`: lightweight run logs currently present in the folder.
 

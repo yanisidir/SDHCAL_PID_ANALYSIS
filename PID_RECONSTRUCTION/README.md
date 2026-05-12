@@ -10,7 +10,7 @@ Hadron energy reconstruction can depend on the particle hypothesis. These script
 
 - `pi-_proton/`: pion/proton coupling studies.
 - `kaon_pi-_proton/`: three-category coupling studies.
-- top-level confusion matrices: PID outputs used in the coupling analysis.
+- `../results/pid-energy-coupling/summary/`: summary confusion matrices used in the coupling analysis.
 
 ## Typical Outputs
 

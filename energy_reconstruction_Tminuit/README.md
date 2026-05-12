@@ -19,7 +19,7 @@ A reconstructed energy is built from threshold-count terms whose coefficients ca
 - `ResoAndLin.C`: plotting macro for resolution and linearity summaries.
 - `validate_root_file.C`: ROOT-file validation helper.
 - `pion-/`, `kaon/`, `proton/`: particle-specific macros and logs.
-- `plots/`: generated linearity, deviation, and resolution figures.
+- `../results/energy-reconstruction/chi2-tminuit/summary-plots/`: generated linearity, deviation, and resolution figures moved out of this source/macro folder.
 
 ## Notes
 

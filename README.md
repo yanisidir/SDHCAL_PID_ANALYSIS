@@ -95,6 +95,7 @@ The repository assumes ROOT trees containing either per-hit detector information
 |-- compare_parameters/              ROOT macros and figures comparing shower variables
 |-- PID_RECONSTRUCTION/              PID-aware vs non-PID energy reconstruction studies
 |-- tools/                           Utility scripts for visualization and track counting
+|-- results/                         Curated result and plot folders moved with git mv
 |-- docs/                            Human-readable project documentation
 |-- CITATION.cff                     Suggested citation metadata
 `-- LICENSE.md                       Non-binding license selection note
@@ -106,6 +107,7 @@ See also:
 - [Data pipeline](docs/data_pipeline.md)
 - [Model summary](docs/model_summary.md)
 - [Results summary](docs/results_summary.md)
+- [Repository map](docs/repository_map.md)
 
 ## Data Availability
 
@@ -131,19 +133,20 @@ This documentation update did not recompile code, rerun training, regenerate plo
 The figures below are examples of outputs currently stored in the repository. They are included as visual evidence of the analysis workflow, not as a claim of publication-level performance.
 
 <p align="center">
-  <img src="PID_RECONSTRUCTION/confusion_matrix_pid_LGBM.png" width="31%" alt="Example PID confusion matrix">
+  <img src="results/pid-energy-coupling/summary/confusion_matrix_pid_LGBM.png" width="31%" alt="Example PID confusion matrix">
   <img src="Energy_reconstruction_ml/BDT/plots/Lin_n_Dev_all_LGBM.png" width="31%" alt="Example ML energy reconstruction linearity and deviation">
-  <img src="energy_reconstruction_Tminuit/plots/Lin_n_Dev_all_chi2.png" width="31%" alt="Example chi2/TMinuit energy reconstruction linearity and deviation">
+  <img src="results/energy-reconstruction/chi2-tminuit/summary-plots/Lin_n_Dev_all_chi2.png" width="31%" alt="Example chi2/TMinuit energy reconstruction linearity and deviation">
 </p>
 
 Additional useful figure locations:
 
-- `PID/BDT/lgbm_viz/` - LightGBM feature-importance, SHAP-style summaries, and tree visualizations.
+- `results/pid/bdt/feature-interpretation/` - LightGBM feature-importance, SHAP-style summaries, and tree visualizations.
 - `PID/GNN/plots/` - GNN training and confusion-matrix plots.
 - `Energy_reconstruction_ml/BDT/plots/` - ML energy linearity, relative deviation, and resolution plots.
 - `Energy_reconstruction_ml/MLP/results_*_energy_reco/plots/` - MLP regression curves by particle category.
-- `energy_reconstruction_Tminuit/plots/` - chi2/TMinuit reconstruction profiles and diagnostics.
-- `compare_parameters/plots/` - shower-variable overlays and comparisons.
+- `results/energy-reconstruction/chi2-tminuit/summary-plots/` - chi2/TMinuit reconstruction profiles and diagnostics.
+- `results/shower-variables/plots/` - shower-variable overlays and comparisons.
+- `results/pid-energy-coupling/summary/` - PID-energy coupling summary confusion matrices.
 - `PID_RECONSTRUCTION/*/plots/` - comparisons of PID-aware and non-PID energy reconstruction.
 
 ## Limitations
