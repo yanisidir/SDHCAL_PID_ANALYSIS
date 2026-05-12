@@ -1,0 +1,69 @@
+\chapter*{Conclusion générale}
+\phantomsection
+\addcontentsline{toc}{chapter}{Conclusion générale}
+
+Ce mémoire avait pour objectif d’explorer le potentiel d’un calorimètre hadronique hautement granulaire de type SDHCAL pour deux problématiques majeures de la physique expérimentale des hautes énergies : l’identification des particules hadroniques et la reconstruction précise de leur énergie incidente. Ces deux enjeux sont centraux dans les détecteurs modernes, en particulier dans la perspective des futures expériences où la performance calorimétrique jouera un rôle déterminant pour la reconstruction globale des événements.
+
+Le SDHCAL constitue, à ce titre, un démonstrateur particulièrement intéressant. Sa granularité fine permet d’accéder à la structure détaillée des gerbes hadroniques, tandis que sa lecture semi-digitale à trois seuils offre une information complémentaire sur la densité locale des dépôts d’énergie. L’exploitation optimale de cette richesse instrumentale nécessite cependant des méthodes d’analyse capables de combiner un grand nombre d’observables corrélées et non linéaires.
+
+Dans une première partie, nous avons étudié l’identification de particules hadroniques à partir d’échantillons simulés de pions négatifs \(\pi^-\), de protons \(p\) et, dans une phase exploratoire, de kaons neutres longs \(K^0_L\). Plusieurs approches d’apprentissage supervisé ont été comparées, parmi lesquelles les perceptrons multicouches, les forêts aléatoires et les arbres de décision boostés. Les meilleurs résultats ont été obtenus avec LightGBM, qui s’est révélé particulièrement adapté aux données tabulaires extraites des gerbes.
+
+Les performances atteignent une accuracy globale de l’ordre de \(68\,\%\) dans le cas multiclasse, avec une séparation très nette des \(K^0_L\), tandis que la principale difficulté demeure la confusion résiduelle entre pions et protons. L’analyse des corrélations et des importances de variables a montré que les observables liées au début de la gerbe, à sa densité locale et à certaines informations temporelles jouent un rôle déterminant dans la séparation des espèces. Ces résultats confirment que le SDHCAL possède un véritable potentiel d’identification hadronique, même dans le cadre d’une approche reposant sur des descripteurs globaux.
+
+Dans une seconde partie, nous avons abordé la reconstruction de l’énergie incidente. Deux stratégies ont été étudiées et comparées : une méthode paramétrique fondée sur le comptage des hits aux trois seuils et une régression supervisée par arbres boostés. La première reproduit l’approche classique développée historiquement pour le SDHCAL, tandis que la seconde vise à exploiter un ensemble élargi de variables décrivant plus finement la morphologie des gerbes.
+
+Les résultats montrent que les deux approches atteignent une bonne linéarité globale de la réponse et une résolution conforme aux attentes d’un calorimètre hadronique. Néanmoins, la régression LightGBM fournit les meilleures performances, avec des biais plus faibles et une résolution atteignant environ \(8\,\%\) à haute énergie. La méthode paramétrique conserve toutefois des atouts importants en termes de simplicité, de rapidité et d’interprétabilité physique.
+
+Enfin, une étude sur faisceaux mixtes pion/proton a permis de replacer ces résultats dans un cadre plus réaliste, où l’espèce de la particule n’est plus connue a priori. Cette analyse a montré que l’identification préalable des particules améliore directement la reconstruction d’énergie, en permettant de sélectionner une calibration adaptée à chaque type de gerbe. Elle met ainsi en évidence le caractère profondément complémentaire du PID et de la mesure calorimétrique.
+
+Au-delà des performances numériques obtenues, ce travail a permis de développer une chaîne d’analyse complète allant de la simulation des événements jusqu’à l’interprétation physique des résultats, en passant par l’extraction de variables, l’entraînement de modèles d’apprentissage automatique et l’évaluation systématique de leurs performances. Il illustre l’intérêt croissant des méthodes issues de la science des données dans la physique des particules expérimentale.
+
+Plusieurs perspectives naturelles se dégagent de cette étude. L’exploitation directe des hits bruts via des réseaux convolutifs 3D ou des réseaux de neurones graphiques pourrait permettre de dépasser les limites des approches tabulaires actuelles. Une validation sur données expérimentales réelles constituerait également une étape essentielle pour quantifier les effets instrumentaux et les incertitudes de modélisation. Enfin, l’intégration conjointe du PID et de la reconstruction d’énergie dans des stratégies globales de type \emph{Particle Flow} représente une voie particulièrement prometteuse pour les futurs détecteurs granulaires.
+
+En conclusion, ce travail confirme que les calorimètres hadroniques hautement granulaires, couplés à des méthodes modernes d’apprentissage supervisé, offrent des perspectives solides pour améliorer simultanément l’identification des particules et la mesure de leur énergie. Le SDHCAL apparaît ainsi comme un banc d’essai privilégié pour préparer les outils d’analyse des futures générations d’expériences en physique des hautes énergies.
+
+\medskip
+
+
+\chapter*{Perspectives}
+\phantomsection
+\addcontentsline{toc}{chapter}{Perspectives}
+
+Les résultats présentés dans ce mémoire confirment le potentiel du SDHCAL pour l’identification hadronique et la reconstruction calorimétrique de précision. Ils ouvrent également plusieurs perspectives de développement, tant sur le plan méthodologique que sur le plan expérimental, en vue des futurs détecteurs hautement granulaires.
+
+À court terme, une première direction naturelle consiste à approfondir l’optimisation des approches déjà mises en œuvre. Dans le cas de l’identification des particules, des études complémentaires pourraient être menées sur la séparation pion/proton, qui demeure la principale difficulté observée. L’enrichissement du jeu de variables, l’ajustement fin des hyperparamètres des modèles ou encore l’introduction de méthodes de calibration probabiliste permettraient probablement d’améliorer les performances obtenues.
+
+Concernant la reconstruction d’énergie, plusieurs améliorations peuvent également être envisagées. Des corrections résiduelles dépendant de l’énergie reconstruite pourraient réduire les biais observés aux basses et hautes énergies. Une étude plus systématique des effets de saturation, des fuites longitudinales et des conditions de sélection des événements permettrait aussi de mieux comprendre les limites instrumentales actuelles.
+
+À moyen terme, l’exploitation directe des données brutes du détecteur constitue une perspective particulièrement prometteuse. Les approches utilisées dans ce mémoire reposent principalement sur des variables agrégées résumant la morphologie des gerbes. Or, la granularité fine du SDHCAL contient une information beaucoup plus riche, distribuée hit par hit dans l’espace et éventuellement dans le temps.
+
+Dans ce contexte, les réseaux convolutifs tridimensionnels (3D-CNN) pourraient apprendre automatiquement des signatures spatiales complexes à partir de représentations voxelisées des gerbes. Les réseaux de neurones graphiques (GNN), déjà explorés de manière préliminaire dans ce travail, apparaissent également très adaptés aux structures irrégulières et peu denses caractéristiques des calorimètres granulaires. Leur développement futur pourrait permettre de mieux exploiter la connectivité naturelle entre hits voisins.
+
+Une autre perspective importante réside dans les approches multitâches. Plutôt que de traiter séparément l’identification des particules et la reconstruction d’énergie, il serait envisageable d’entraîner un modèle unique capable de prédire simultanément la nature de la particule incidente, son énergie et éventuellement d’autres propriétés physiques. Ce type d’apprentissage conjoint pourrait améliorer les performances globales en exploitant les corrélations entre tâches.
+
+Sur le plan expérimental, la confrontation aux données réelles constituera une étape essentielle. Les modèles développés sur simulation devront être validés face aux effets instrumentaux non idéalisés : bruit électronique, inefficacités locales, désalignements, dérives temporelles ou imperfections de calibration. Des techniques de transfert de domaine entre simulation et données réelles pourraient alors jouer un rôle important pour préserver les performances des algorithmes appris.
+
+À plus long terme, ces travaux s’inscrivent naturellement dans la perspective des futurs collisionneurs leptoniques ou hadroniques, pour lesquels la reconstruction fine des jets et des particules neutres représentera un enjeu majeur. Les calorimètres hautement granulaires sont au cœur des stratégies modernes de type \emph{Particle Flow}, où chaque sous-détecteur contribue de manière optimale à la reconstruction globale de l’événement.
+
+Dans ce cadre, les méthodes développées ici pourraient être intégrées à des chaînes complètes combinant suivi de traces, identification des particules et calorimétrie intelligente. Le couplage entre instrumentation avancée et apprentissage automatique constitue ainsi l’une des voies les plus prometteuses pour repousser les performances expérimentales des prochaines décennies.
+
+En définitive, ce mémoire représente une étape exploratoire mais structurante dans cette direction. Il montre que l’utilisation raisonnée des outils modernes de science des données appliqués à des détecteurs innovants peut ouvrir des perspectives concrètes pour la physique des hautes énergies de demain.
+
+
+\chapter*{Remerciements}
+\phantomsection
+\addcontentsline{toc}{chapter}{Remerciements}
+
+Je tiens à exprimer ma profonde gratitude à mes encadrants de stage, 
+le Pr.~Imad Laktineh et le Pr.~Gerald Grenier, pour la confiance qu’ils m’ont accordée, 
+la qualité de leur accompagnement scientifique et la pertinence de leurs conseils. 
+J’ai énormément appris à leurs côtés ; leur exigence, leur disponibilité et leur bienveillance 
+ont été déterminantes tout au long de ce travail.
+
+Je souhaite également adresser mes remerciements chaleureux aux doctorants 
+William Vaginey et Tanguy Pasquier, qui m’ont guidé au quotidien, 
+répondu avec patience à mes nombreuses questions et partagé de précieux conseils pratiques.  
+
+Enfin, je remercie l’ensemble de l’équipe «~Particules~» ainsi que tout l’IP2I 
+pour leur accueil, leurs échanges stimulants et l’excellente ambiance de travail, 
+qui ont rendu ce stage particulièrement enrichissant et agréable.

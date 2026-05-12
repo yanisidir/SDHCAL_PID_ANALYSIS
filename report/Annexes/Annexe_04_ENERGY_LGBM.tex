@@ -1,0 +1,566 @@
+\chapter{Régression de l’énergie avec LightGBM}
+\label{app:energy_lgbm}
+
+\section{Introduction}
+
+Cette annexe décrit le pipeline utilisé pour la reconstruction de l’énergie hadronique à l’aide de l’algorithme \texttt{LightGBM} en mode régression. L’objectif est d’estimer l’énergie incidente des particules à partir des descripteurs physiques extraits des gerbes reconstruites dans le SDHCAL.
+
+Dans la version finale retenue pour ce mémoire, deux espèces sont considérées :
+
+\[
+\pi^- \qquad \text{et} \qquad p.
+\]
+
+Des modèles indépendants sont entraînés pour chaque espèce, afin d’adapter la régression aux différences physiques de développement de leurs gerbes dans le calorimètre.
+
+Le pipeline complet comprend :
+
+\begin{itemize}
+    \item la lecture des fichiers \texttt{ROOT} contenant les observables reconstruites ;
+    \item la sélection des variables d’entrée les plus pertinentes ;
+    \item le nettoyage des événements invalides ;
+    \item la séparation des données en ensembles d’entraînement, validation et test ;
+    \item l’apprentissage d’un \texttt{LGBMRegressor} ;
+    \item l’optimisation en espace logarithmique ;
+    \item l’évaluation par métriques de régression ;
+    \item la production automatique des figures de linéarité, biais, résolution et importance des variables.
+\end{itemize}
+
+L’intérêt principal de cette approche est sa capacité à exploiter simultanément un grand nombre de descripteurs corrélés, tout en conservant une bonne stabilité numérique et un coût d’entraînement modéré. Elle constitue ainsi une alternative naturelle à la méthode paramétrique fondée sur la minimisation du \(\chi^2\), présentée dans une autre annexe.
+
+\section{Jeu de données et variables d’entrée}
+
+Les données utilisées pour l’entraînement proviennent de fichiers \texttt{ROOT} distincts, générés à partir des simulations du SDHCAL puis enrichis par les paramètres reconstruits décrits dans les annexes précédentes. Deux échantillons indépendants sont exploités :
+
+\begin{itemize}
+    \item un échantillon de pions chargés \(\pi^-\) ;
+    \item un échantillon de protons \(p\).
+\end{itemize}
+
+Chaque événement contient :
+
+\begin{itemize}
+    \item l’énergie vraie incidente de la particule primaire ;
+    \item un ensemble de descripteurs géométriques, topologiques et semi-digitaux ;
+    \item les variables temporelles extraites des hits ;
+    \item les observables globales de gerbe.
+\end{itemize}
+
+L’énergie cible à prédire est stockée dans la variable :
+
+\[
+E_{\mathrm{true}} = \texttt{primaryEnergy}.
+\]
+
+Le modèle reçoit en entrée un vecteur de variables sélectionnées, parmi lesquelles :
+
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Catégorie} & \textbf{Variables} & \textbf{Interprétation} \\
+\midrule
+Morphologie &
+\texttt{Radius}, \texttt{meanRadius}, \texttt{Zrms} &
+extension spatiale de la gerbe \\
+
+Début / profondeur &
+\texttt{Begin}, \texttt{Xmax}, \texttt{Zbary} &
+position longitudinale \\
+
+Densité &
+\texttt{Density}, \texttt{nhitDensity} &
+compacité locale \\
+
+Seuils &
+\texttt{N3}, \texttt{sumThrTotal}, \texttt{ratioThr23} &
+contenu énergétique semi-digital \\
+
+Clusters &
+\texttt{nCluster}, \texttt{MaxClustSize} &
+structure interne \\
+
+Temps &
+\texttt{tMean}, \texttt{tMax} &
+développement temporel \\
+
+Forme globale &
+\texttt{eccentricity3D}, \texttt{lambda1}, \texttt{lambda2} &
+anisotropie de la gerbe \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Le choix de ces variables repose sur leur sens physique direct vis-à-vis du dépôt d’énergie hadronique. Certaines traduisent la quantité totale d’interactions visibles, tandis que d’autres permettent de corriger indirectement les fluctuations de développement de gerbe.
+
+L’approche multi-variable utilisée par LightGBM permet d’exploiter simultanément ces corrélations non linéaires, ce qui serait difficile à reproduire avec une calibration analytique simple.
+
+\section{Prétraitement des données}
+
+Avant l’entraînement du modèle, plusieurs étapes de préparation sont appliquées afin de garantir la qualité statistique des échantillons et la stabilité numérique de la régression.
+
+\subsection{Nettoyage des valeurs invalides}
+
+Les tableaux extraits depuis les fichiers \texttt{ROOT} sont convertis en structures tabulaires \texttt{pandas}. Les événements contenant des valeurs non définies (\texttt{NaN}) ou infinies (\(\pm \infty\)) dans au moins une variable d’entrée sont supprimés.
+
+Cette opération permet d’éviter :
+
+\begin{itemize}
+    \item des erreurs durant l’apprentissage ;
+    \item des divisions non physiques ;
+    \item des biais liés à des événements mal reconstruits.
+\end{itemize}
+
+On note alors :
+
+\[
+\mathcal{D}_{\mathrm{clean}} \subset \mathcal{D}_{\mathrm{raw}}
+\]
+
+l’ensemble nettoyé utilisé pour la suite.
+
+\subsection{Séparation entraînement / validation / test}
+
+Les événements sont divisés aléatoirement en trois sous-ensembles indépendants :
+
+\begin{itemize}
+    \item ensemble d’entraînement ;
+    \item ensemble de validation ;
+    \item ensemble de test final.
+\end{itemize}
+
+Le script applique d’abord une séparation globale :
+
+\[
+80\% \text{ apprentissage} \qquad 20\% \text{ test}
+\]
+
+puis extrait une fraction supplémentaire de validation à partir de l’ensemble d’apprentissage.
+
+L’ensemble de test n’est jamais utilisé durant l’optimisation des hyperparamètres, ce qui garantit une estimation honnête des performances finales.
+
+\subsection{Standardisation des variables}
+
+Bien que les méthodes par arbres soient relativement peu sensibles à l’échelle des variables, une normalisation de type \texttt{StandardScaler} est appliquée dans cette version du pipeline :
+
+\[
+x' = \frac{x-\mu}{\sigma}
+\]
+
+où \(\mu\) et \(\sigma\) sont respectivement la moyenne et l’écart-type calculés sur l’échantillon d’entraînement uniquement.
+
+Cette transformation améliore :
+
+\begin{itemize}
+    \item la stabilité numérique ;
+    \item la comparabilité entre variables ;
+    \item la robustesse lors de futures extensions hybrides.
+\end{itemize}
+
+Les paramètres du scaler sont sauvegardés afin de garantir l’application rigoureusement identique lors de l’inférence sur de nouvelles données.
+
+\section{Apprentissage en espace logarithmique}
+
+La reconstruction directe de l’énergie hadronique sur une large plage dynamique présente plusieurs difficultés : dispersion croissante avec l’énergie, asymétrie des distributions résiduelles et importance relative plus forte des erreurs aux basses énergies.
+
+Afin de limiter ces effets, la cible de régression n’est pas apprise directement sous la forme \(E\), mais sous la transformation logarithmique :
+
+\[
+y = \log(E_{\mathrm{true}}).
+\]
+
+Le modèle apprend donc à prédire :
+
+\[
+\hat{y} = f(\mathbf{x}),
+\]
+
+où \(\mathbf{x}\) représente le vecteur des variables d’entrée. L’énergie reconstruite finale est ensuite obtenue par transformation inverse :
+
+\[
+E_{\mathrm{reco}} = \exp(\hat{y}).
+\]
+
+\subsection{Motivations physiques et numériques}
+
+Ce choix présente plusieurs avantages importants :
+
+\begin{itemize}
+    \item réduction de la dynamique entre faibles et hautes énergies ;
+    \item meilleure homogénéité des erreurs relatives ;
+    \item stabilisation de l’apprentissage ;
+    \item diminution de l’influence des événements extrêmes ;
+    \item comportement plus proche d’une résolution proportionnelle.
+\end{itemize}
+
+En pratique, une erreur absolue constante sur \(\log(E)\) correspond approximativement à une erreur relative constante sur \(E\), ce qui est particulièrement adapté aux études de calorimétrie.
+
+\subsection{Fonction de coût utilisée}
+
+Durant l’entraînement, le modèle minimise principalement une perte quadratique en espace logarithmique, complétée par une métrique personnalisée évaluant la résolution relative après retour dans l’espace physique.
+
+Cela permet d’orienter l’optimisation non seulement vers une bonne précision numérique, mais également vers une performance physiquement pertinente pour la reconstruction d’énergie.
+
+\section{Modèle LightGBM utilisé}
+
+La régression est réalisée avec l’algorithme \texttt{LightGBM} (\emph{Light Gradient Boosting Machine}), fondé sur l’agrégation séquentielle d’arbres de décision. Chaque nouvel arbre est entraîné pour corriger les résidus laissés par l’ensemble précédent.
+
+Le prédicteur final s’écrit schématiquement :
+
+\[
+F_M(\mathbf{x}) = \sum_{m=1}^{M} \eta \, T_m(\mathbf{x}),
+\]
+
+où :
+
+\begin{itemize}
+    \item \(T_m\) est le \(m\)-ième arbre ;
+    \item \(M\) est le nombre total d’arbres ;
+    \item \(\eta\) est le taux d’apprentissage (\texttt{learning\_rate}).
+\end{itemize}
+
+\subsection{Pourquoi LightGBM ?}
+
+Cet algorithme est particulièrement adapté à la reconstruction d’énergie calorimétrique car il permet :
+
+\begin{itemize}
+    \item de modéliser des dépendances non linéaires complexes ;
+    \item d’exploiter efficacement les corrélations entre descripteurs ;
+    \item de gérer naturellement des variables hétérogènes ;
+    \item d’obtenir de bonnes performances avec peu de prétraitement ;
+    \item de fournir les importances des variables.
+\end{itemize}
+
+Il constitue ainsi un excellent compromis entre performance, rapidité d’entraînement et interprétabilité.
+
+\subsection{Hyperparamètres principaux}
+
+La configuration retenue dans le script final repose sur les valeurs suivantes :
+
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+\textbf{Paramètre} & \textbf{Valeur} \\
+\midrule
+\texttt{learning\_rate} & 0.05 \\
+\texttt{n\_estimators} & 2000 \\
+\texttt{num\_leaves} & 127 \\
+\texttt{max\_depth} & illimité (\(-1\)) \\
+\texttt{subsample} & 0.8 \\
+\texttt{colsample\_bytree} & 0.8 \\
+\texttt{min\_child\_samples} & 20 \\
+\texttt{reg\_lambda} & 0.1 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Ces paramètres assurent une bonne capacité d’apprentissage tout en limitant le sur-ajustement.
+
+\subsection{Optimisation optionnelle}
+
+Le script permet également, via une option dédiée, d’effectuer une recherche automatique d’hyperparamètres (\texttt{GridSearchCV}) sur plusieurs combinaisons de :
+
+\begin{itemize}
+    \item nombre de feuilles ;
+    \item profondeur maximale ;
+    \item taux d’apprentissage ;
+    \item nombre d’arbres.
+\end{itemize}
+
+Cette étape n’est utilisée que lors des campagnes d’optimisation spécifiques.
+
+\section{Stratégie d’entraînement}
+
+L’apprentissage du modèle suit une procédure supervisée classique reposant sur trois ensembles distincts : entraînement, validation et test. Cette séparation permet d’optimiser les performances tout en contrôlant la capacité de généralisation du modèle.
+
+\subsection{Ensemble d’entraînement}
+
+L’ensemble d’entraînement est utilisé pour ajuster progressivement les paramètres internes des arbres de décision successifs. À chaque itération, un nouvel arbre est ajouté afin de corriger les erreurs résiduelles du modèle courant.
+
+Le processus de boosting construit donc une approximation de plus en plus précise de la relation :
+
+\[
+\mathbf{x} \longrightarrow \log(E_{\mathrm{true}}).
+\]
+
+\subsection{Ensemble de validation}
+
+L’ensemble de validation est utilisé pendant l’apprentissage pour suivre les performances sur des données indépendantes. Il sert à détecter l’apparition d’un sur-apprentissage lorsque la performance continue de s’améliorer sur l’entraînement mais se dégrade sur la validation.
+
+Deux métriques principales sont surveillées :
+
+\begin{itemize}
+    \item la perte quadratique (\texttt{l2}) ;
+    \item la métrique personnalisée de résolution relative.
+\end{itemize}
+
+\subsection{Early stopping}
+
+Le script utilise un mécanisme d’arrêt anticipé (\emph{early stopping}). Si aucune amélioration significative n’est observée sur l’échantillon de validation après un certain nombre d’itérations consécutives, l’entraînement est interrompu automatiquement.
+
+Dans la configuration finale :
+
+\[
+N_{\mathrm{patience}} = 50.
+\]
+
+Cette méthode évite :
+
+\begin{itemize}
+    \item l’ajout inutile d’arbres ;
+    \item le sur-ajustement ;
+    \item un temps de calcul excessif.
+\end{itemize}
+
+\subsection{Reproductibilité}
+
+Afin d’assurer la reproductibilité des résultats, les graines pseudo-aléatoires sont fixées dans le script pour :
+
+\begin{itemize}
+    \item \texttt{numpy} ;
+    \item les routines internes LightGBM ;
+    \item les séparations train/test.
+\end{itemize}
+
+Ainsi, deux exécutions identiques conduisent aux mêmes partitions statistiques et à des performances comparables.
+\section{Métriques d’évaluation}
+
+Les performances du modèle sont évaluées exclusivement sur l’ensemble de test, resté totalement indépendant durant l’apprentissage. Plusieurs indicateurs complémentaires sont utilisés afin de caractériser la qualité de la reconstruction d’énergie.
+
+\subsection{Erreur quadratique moyenne}
+
+La racine de l’erreur quadratique moyenne (\texttt{RMSE}) mesure l’écart absolu typique entre l’énergie prédite et l’énergie vraie :
+
+\[
+\mathrm{RMSE} =
+\sqrt{
+\frac{1}{N}
+\sum_{i=1}^{N}
+\left(E_i^{\mathrm{reco}}-E_i^{\mathrm{true}}\right)^2
+}.
+\]
+
+Cette métrique pénalise fortement les grandes erreurs.
+
+\subsection{Erreur absolue moyenne}
+
+L’erreur absolue moyenne (\texttt{MAE}) est définie par :
+
+\[
+\mathrm{MAE} =
+\frac{1}{N}
+\sum_{i=1}^{N}
+\left|
+E_i^{\mathrm{reco}}-E_i^{\mathrm{true}}
+\right|.
+\]
+
+Elle est généralement plus robuste aux valeurs extrêmes que la RMSE.
+
+\subsection{Coefficient de détermination}
+
+Le coefficient \(R^2\) quantifie la fraction de variance expliquée par le modèle :
+
+\[
+R^2 = 1 - \frac{\sum (y_i-\hat y_i)^2}{\sum (y_i-\bar y)^2}.
+\]
+
+Une valeur proche de 1 indique une excellente capacité prédictive.
+
+\subsection{Résolution énergétique relative}
+
+La métrique la plus importante du point de vue physique reste la résolution énergétique :
+
+\[
+\frac{\sigma(E)}{E}.
+\]
+
+Dans le script, elle est estimée globalement à partir du résidu relatif :
+
+\[
+r_i = \frac{E_i^{\mathrm{reco}}-E_i^{\mathrm{true}}}{E_i^{\mathrm{true}}},
+\]
+
+puis :
+
+\[
+\frac{\sigma(E)}{E}
+=
+\sqrt{
+\frac{1}{N}\sum_i r_i^2
+}.
+\]
+
+Cette grandeur mesure directement la dispersion relative de la reconstruction.
+
+\subsection{Études différentielles}
+
+En complément des métriques globales, les performances sont étudiées en fonction de l’énergie incidente via un découpage en intervalles :
+
+\begin{itemize}
+    \item linéarité ;
+    \item biais relatif ;
+    \item résolution par bin d’énergie.
+\end{itemize}
+
+Ces observables sont les plus pertinentes pour comparer différentes méthodes de calibration calorimétrique.
+
+\section{Productions graphiques automatiques}
+
+Le pipeline génère automatiquement plusieurs figures permettant d’interpréter le comportement du modèle au-delà des seules métriques numériques globales. Ces représentations sont sauvegardées pour chaque campagne d’entraînement.
+
+\subsection{Courbes d’apprentissage}
+
+L’évolution de la fonction de coût sur les ensembles d’entraînement et de validation est tracée en fonction du nombre d’itérations :
+
+\begin{itemize}
+    \item perte \texttt{train} ;
+    \item perte \texttt{valid}.
+\end{itemize}
+
+Ces courbes permettent d’identifier :
+
+\begin{itemize}
+    \item une convergence correcte ;
+    \item un sous-apprentissage ;
+    \item un sur-apprentissage ;
+    \item l’instant optimal d’arrêt anticipé.
+\end{itemize}
+
+\subsection{Profil de linéarité}
+
+La moyenne de l’énergie reconstruite est calculée dans des intervalles d’énergie vraie :
+
+\[
+\langle E_{\mathrm{reco}} \rangle \;\; \text{vs} \;\; E_{\mathrm{true}}.
+\]
+
+Une réponse idéale correspond à la droite :
+
+\[
+E_{\mathrm{reco}} = E_{\mathrm{true}}.
+\]
+
+Tout écart systématique à cette diagonale traduit un biais de calibration.
+
+\subsection{Courbe de résolution}
+
+La résolution énergétique est évaluée dans plusieurs intervalles d’énergie :
+
+\[
+\frac{\sigma(E)}{E}(E_{\mathrm{true}}).
+\]
+
+Cette courbe est essentielle pour juger la performance physique réelle du modèle sur toute la gamme d’énergie.
+
+\subsection{Déviation relative}
+
+Le biais moyen relatif est également tracé :
+
+\[
+\frac{\langle E_{\mathrm{reco}} \rangle - E_{\mathrm{true}}}{E_{\mathrm{true}}}.
+\]
+
+Cette représentation met clairement en évidence les zones de sur-estimation ou sous-estimation.
+
+\subsection{Importance des variables}
+
+Enfin, LightGBM fournit automatiquement l’importance des descripteurs utilisés, calculée à partir du gain total apporté par chaque variable lors des séparations des arbres.
+
+Cela permet :
+
+\begin{itemize}
+    \item d’identifier les variables dominantes ;
+    \item de simplifier d’éventuels futurs modèles ;
+    \item d’interpréter physiquement la reconstruction.
+\end{itemize}
+
+\section{Sauvegarde des artefacts et traçabilité}
+
+Afin d’assurer la reproductibilité complète des études, chaque exécution du pipeline génère automatiquement un identifiant unique (\texttt{run\_id}) associé à l’ensemble des fichiers produits.
+
+\subsection{Modèles sauvegardés}
+
+Pour chaque particule étudiée, les objets suivants sont enregistrés :
+
+\begin{itemize}
+    \item le modèle \texttt{LightGBM} entraîné ;
+    \item le normaliseur \texttt{StandardScaler} utilisé en entrée ;
+    \item les prédictions sur l’échantillon de test.
+\end{itemize}
+
+Les fichiers sont stockés dans une arborescence dédiée :
+
+\begin{center}
+\texttt{results\_*\_energy\_reco/}
+\end{center}
+
+avec des sous-dossiers séparés pour :
+
+\begin{itemize}
+    \item \texttt{models/}
+    \item \texttt{plots/}
+    \item \texttt{arrays/}
+\end{itemize}
+
+\subsection{Journalisation des paramètres}
+
+Les hyperparamètres d’entraînement sont archivés dans des fichiers \texttt{CSV}, notamment :
+
+\begin{itemize}
+    \item taux d’apprentissage ;
+    \item nombre d’arbres ;
+    \item profondeur maximale ;
+    \item fraction d’échantillonnage ;
+    \item date d’exécution ;
+    \item particule traitée.
+\end{itemize}
+
+Cela permet de retrouver précisément les conditions d’obtention d’un résultat donné.
+
+\subsection{Historique des performances}
+
+Les performances finales sont également enregistrées automatiquement :
+
+\begin{itemize}
+    \item RMSE ;
+    \item MAE ;
+    \item \(R^2\) ;
+    \item résolution relative \(\sigma(E)/E\).
+\end{itemize}
+
+Un commentaire libre peut être associé à chaque campagne afin de documenter un test spécifique.
+
+\subsection{Intérêt scientifique}
+
+Cette traçabilité est essentielle dans une étude comparative impliquant plusieurs modèles, plusieurs jeux de variables ou plusieurs méthodes de calibration.
+
+Elle permet :
+
+\begin{itemize}
+    \item la reproduction exacte d’un résultat ;
+    \item la comparaison rigoureuse entre campagnes ;
+    \item la sélection du meilleur modèle final ;
+    \item l’industrialisation future de la chaîne d’analyse.
+\end{itemize}
+
+\section{Conclusion}
+
+Cette annexe a présenté le pipeline complet de reconstruction d’énergie hadronique fondé sur une régression par \texttt{LightGBM}. Contrairement à une calibration analytique reposant sur un nombre limité d’observables, cette approche exploite simultanément un grand ensemble de descripteurs issus de la morphologie, de la topologie et de la composante temporelle des gerbes hadroniques.
+
+L’apprentissage en espace logarithmique améliore la stabilité sur une large gamme d’énergie, tandis que le mécanisme de boosting permet de capturer des corrélations non linéaires complexes entre variables d’entrée et énergie incidente.
+
+Les outils de validation intégrés au pipeline — métriques globales, profils de linéarité, courbes de résolution et importance des variables — offrent une vision complète des performances obtenues.
+
+Cette méthode constitue ainsi une alternative moderne et performante à la calibration paramétrique traditionnelle. Elle représente également une base solide pour des développements ultérieurs reposant sur :
+
+\begin{itemize}
+    \item des ensembles multi-particules plus larges ;
+    \item des calibrations conditionnées par le PID ;
+    \item des architectures hybrides mêlant GNN et modèles tabulaires ;
+    \item des approches entièrement end-to-end à partir des hits bruts.
+\end{itemize}
+
+Dans le cadre de ce mémoire, cette régression par arbres boostés a joué un rôle central dans l’étude comparative des différentes stratégies de reconstruction d’énergie du SDHCAL.
+
+\clearpage

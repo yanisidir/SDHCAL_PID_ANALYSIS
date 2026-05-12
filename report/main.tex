@@ -1,0 +1,250 @@
+\documentclass[11pt,a4paper]{report}
+% ==========================
+%     ENCODAGE & LANGUE
+% ==========================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{setspace}
+\usepackage{csquotes}
+\usepackage{siunitx}
+
+% ==========================
+%     MISE EN PAGE
+% ==========================
+\usepackage[a4paper,top=2.4cm,bottom=2.6cm,inner=2.6cm,outer=2.2cm]{geometry}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{fancyhdr}
+\definecolor{ReportBlue}{HTML}{1F4E79}
+\definecolor{ReportDark}{HTML}{1F2933}
+\definecolor{ReportGray}{HTML}{5C6670}
+\definecolor{ReportLink}{HTML}{0B5CAD}
+\setlength\headheight{16pt}
+\emergencystretch=2em
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{ReportGray}{Rapport M2 -- SDHCAL}}
+\fancyhead[R]{\small\nouppercase{\leftmark}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyfoot[C]{\small\thepage}
+  \renewcommand{\headrulewidth}{0pt}
+}
+
+% ==========================
+%     POLICE & MICROTYPE
+% ==========================
+\usepackage{fourier}
+\usepackage[protrusion=true,expansion=true]{microtype}
+
+% ==========================
+%     FIGURES & TABLEAUX
+% ==========================
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage[font=small,labelfont={bf,color=ReportBlue},labelsep=period]{caption}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{tikz}
+% ==========================
+%     MATHS & LISTES
+% ==========================
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\setlist{topsep=0.35em,itemsep=0.2em,parsep=0.1em}
+
+% ==========================
+%     LIENS
+% ==========================
+\usepackage[colorlinks=true,linkcolor=ReportBlue,citecolor=ReportBlue,urlcolor=ReportLink]{hyperref}
+\usepackage{bookmark}
+\hypersetup{
+  pdftitle={Rapport de stage M2 -- PID et reconstruction d'energie dans le SDHCAL},
+  pdfauthor={Mohamed Yanis IDIR},
+  pdfsubject={Rapport de stage de Master 2},
+  pdfkeywords={SDHCAL, calorimetrie hadronique, identification des particules, apprentissage automatique}
+}
+
+% ==========================
+%     BIBLIOGRAPHIE (optionnelle)
+% ==========================
+\usepackage[backend=biber,sorting=none]{biblatex}
+\addbibresource{references.bib}
+
+% ==========================
+%     TITRES
+% ==========================
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{ReportBlue}}
+  {\chaptertitlename\ \thechapter}
+  {0.35em}
+  {\Huge\color{ReportDark}}
+  [\vspace{0.4ex}\titlerule]
+\titleformat{name=\chapter,numberless}[display]
+  {\normalfont\huge\bfseries\color{ReportBlue}}
+  {}
+  {0pt}
+  {\Huge\color{ReportDark}}
+  [\vspace{0.4ex}\titlerule]
+\titlespacing*{\chapter}{0pt}{-0.5cm}{1.2cm}
+\titleformat{\section}
+  {\Large\bfseries\color{ReportBlue}}
+  {\thesection}
+  {0.8em}
+  {}
+\titleformat{\subsection}
+  {\large\bfseries\color{ReportDark}}
+  {\thesubsection}
+  {0.8em}
+  {}
+\titleformat{\subsubsection}{\large\bfseries}{\thesubsubsection}{1em}{}
+
+% ==========================
+%     COMMANDES UTILES
+% ==========================
+\newcommand{\HRule}[1]{\textcolor{ReportBlue}{\rule{\linewidth}{#1}}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\E}[1]{\times 10^{#1}}
+
+% ==========================
+%     PROFONDEUR TOC
+% ==========================
+\onehalfspacing
+\setcounter{tocdepth}{2}
+\setcounter{secnumdepth}{2}
+\makeatletter
+\renewcommand{\@pnumwidth}{2.2em}
+\renewcommand{\@tocrmarg}{3.0em}
+\makeatother
+
+% ==========================
+%     DOCUMENT
+% ==========================
+\begin{document}
+\date{}
+\hypersetup{pageanchor=false}
+\pagenumbering{gobble}
+
+% ==========================
+%     PAGE DE GARDE
+% ==========================
+\begin{titlepage}
+  \thispagestyle{empty}
+
+  % Logos
+  \begin{minipage}[c]{0.45\textwidth}
+    \centering
+    \includegraphics[width=38mm]{img/ucbl_logo.png}\\[0.25cm]
+    {\small Université Claude Bernard Lyon 1}
+  \end{minipage}\hfill
+  \begin{minipage}[c]{0.45\textwidth}
+    \centering
+    \includegraphics[width=46mm]{img/Logo_IP2I.png}\\[0.25cm]
+    {\small Institut de Physique des Deux Infinis de Lyon (IP2I)}
+  \end{minipage}
+
+  \vspace{3cm}
+  \begin{center}
+    \HRule{1.2pt}\vspace{0.6cm}
+
+    {\LARGE\bfseries
+      Identification des particules hadroniques et reconstruction de l’énergie\\
+      dans un calorimètre SDHCAL à l’aide de méthodes d’apprentissage automatique
+    \par}
+
+    \vspace{0.6cm}
+    \HRule{1.2pt}
+
+    \vspace{0.8cm}
+    {\large \textsc{Rapport de stage}}\\[0.3cm]
+    {\normalsize Année universitaire 2024--2025}
+  \end{center}
+
+  \vfill
+
+  \begin{center}
+    {\normalsize
+      Mohamed Yanis IDIR \\[0.2cm]
+      Master Physique Subatomique
+    }\par
+    \vspace{0.6cm}
+    {\normalsize \textbf{Encadré par :}}\\[0.1cm]
+    {\normalsize
+      Pr.~Imad Laktineh, Université Lyon~1 \\[-1pt]
+      Pr.~Gérald Grenier, Université Lyon~1
+    }
+  \end{center}
+\end{titlepage}
+\clearpage
+\hypersetup{pageanchor=true}
+\pagenumbering{roman}
+
+% ==========================
+%     TABLE DES MATIÈRES
+% ==========================
+\newpage
+\tableofcontents
+\newpage
+
+% ==========================
+%     RÉSUMÉ
+% ==========================
+\chapter*{Résumé}
+\phantomsection
+\addcontentsline{toc}{chapter}{Résumé}
+
+La mesure précise de l’énergie des hadrons constitue un enjeu majeur de la physique des hautes énergies. Contrairement aux gerbes électromagnétiques, relativement stables et bien modélisées, les gerbes hadroniques présentent d’importantes fluctuations événement par événement, liées notamment à la fraction électromagnétique, aux pertes d’énergie invisibles ainsi qu’aux fuites longitudinales et latérales. Ces effets dégradent la linéarité de la réponse calorimétrique et limitent la résolution en énergie.
+
+Le \emph{Semi-Digital Hadron CALorimeter} (SDHCAL) propose une approche originale fondée sur une très haute granularité spatiale associée à une lecture semi-digitale à trois seuils. Une telle architecture permet d’accéder finement à la topologie des gerbes hadroniques et ouvre des perspectives intéressantes aussi bien pour l’identification des particules que pour la reconstruction de leur énergie.
+
+Dans ce travail, une chaîne d’analyse complète a été développée et appliquée à des échantillons simulés de pions, protons et kaons neutres longs. L’identification hadronique repose principalement sur des arbres de décision boostés (\emph{Boosted Decision Trees}, BDT), tandis qu’une étude exploratoire de réseaux de neurones graphiques (GNN) a également été menée. Pour la reconstruction de l’énergie, deux approches ont été comparées : une méthode paramétrique fondée sur un ajustement par minimisation du $\chi^2$ des compteurs multi-seuils, et une régression supervisée par BDT exploitant un ensemble enrichi de descripteurs de gerbe.
+
+Les performances ont ensuite été étudiées dans plusieurs scénarios réalistes combinant identification des particules et reconstruction d’énergie, afin de quantifier l’apport du PID sur la calibration calorimétrique.
+
+Les résultats montrent que l’identification préalable des particules améliore la linéarité de la réponse et réduit les biais de reconstruction. Ils confirment également que les méthodes modernes d’apprentissage automatique constituent une voie prometteuse pour exploiter pleinement le potentiel des calorimètres hadroniques hautement granulaires dans les futurs collisionneurs.
+
+\vspace{0.4cm}
+\textbf{Mots-clés :} SDHCAL, calorimétrie hadronique, identification des particules, reconstruction d’énergie, apprentissage automatique.
+
+% ==========================
+%     CHAPITRES
+% ==========================
+\cleardoublepage
+\pagenumbering{arabic}
+\include{chapters/01-introduction}
+\include{chapters/02-Contexte_theorique}
+\include{chapters/03-Interaction_particules_matiere}
+\include{chapters/04-Identification_particules}
+\include{chapters/05-SDHCAL}
+\include{chapters/06-PID}
+\include{chapters/07-Reconstruction_energie}
+\include{chapters/08-analyses_mixtes}
+\include{chapters/09-conclusions}
+
+% ==========================
+%     ANNEXES
+% ==========================
+\newpage
+\appendix
+\part*{Annexes}
+\phantomsection
+\addcontentsline{toc}{part}{Annexes}
+
+\include{Annexes/Annexe_01_ShowerAnalyzer}
+\include{Annexes/Annexe_02_PID_LGBM}
+\include{Annexes/Annexe_03_GNN_PID}
+% \include{Annexes/Annexe_04_ENERGY_LGBM}
+% \include{Annexes/Annexe_05_Parametric_CHI2}
+
+% ==========================
+%     BIBLIO
+% ==========================
+\printbibliography
+
+\end{document}

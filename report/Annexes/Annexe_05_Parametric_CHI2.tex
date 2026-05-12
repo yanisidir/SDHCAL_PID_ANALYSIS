@@ -1,0 +1,518 @@
+\chapter{Reconstruction d’énergie par méthode paramétrique \texorpdfstring{$\chi^2$}{chi²}}
+\label{app:chi2}
+
+\section{Introduction}
+
+Cette annexe décrit la méthode paramétrique utilisée pour reconstruire l’énergie hadronique à partir des informations semi-digitales du SDHCAL. Contrairement à l’approche par apprentissage supervisé présentée dans l’annexe précédente, cette méthode repose sur une calibration analytique explicite reliant les compteurs de hits aux trois seuils à l’énergie incidente.
+
+L’idée générale est d’écrire l’énergie reconstruite comme une combinaison pondérée des multiplicités associées aux trois seuils :
+
+\[
+N_1,\qquad N_2,\qquad N_3,
+\]
+
+où les coefficients de pondération dépendent eux-mêmes du nombre total de hits dans l’événement. Cette dépendance permet d’introduire une correction non linéaire simple, adaptée à l’évolution de la réponse du calorimètre avec l’énergie.
+
+Les paramètres libres du modèle sont déterminés par minimisation d’un \(\chi^2\) global construit à partir des événements simulés. La procédure est implémentée en \texttt{ROOT} avec \texttt{TMinuit}.
+
+Dans la version finale utilisée dans ce mémoire, cette méthode a été appliquée aux deux espèces hadroniques principales considérées pour la reconstruction d’énergie :
+
+\[
+\pi^- \qquad \text{et} \qquad p.
+\]
+
+Elle constitue une référence importante, à la fois physiquement interprétable et historiquement proche des calibrations développées pour les calorimètres semi-digitaux.
+
+\section{Principe de la reconstruction semi-digitale}
+
+Dans un calorimètre analogique classique, l’énergie déposée est estimée à partir de la somme continue des signaux mesurés cellule par cellule. Dans le cas du SDHCAL, l’information disponible est discrétisée : chaque cellule active indique uniquement si le signal franchit un ou plusieurs seuils prédéfinis.
+
+Chaque hit est ainsi classé en trois catégories d’amplitude croissante :
+
+\[
+\text{seuil 1}, \qquad \text{seuil 2}, \qquad \text{seuil 3}.
+\]
+
+Pour un événement donné, on définit alors :
+
+\[
+N_1 = \text{nombre de hits associés au seuil 1},
+\]
+
+\[
+N_2 = \text{nombre de hits associés au seuil 2},
+\]
+
+\[
+N_3 = \text{nombre de hits associés au seuil 3}.
+\]
+
+Ces trois observables contiennent une information plus riche qu’un simple comptage total. En particulier :
+
+\begin{itemize}
+\item \(N_1\) est sensible aux dépôts faibles et aux zones diffuses de la gerbe ;
+\item \(N_2\) traduit des densités intermédiaires ;
+\item \(N_3\) correspond préférentiellement aux régions très denses, proches du cœur de gerbe.
+\end{itemize}
+
+Le nombre total de hits est défini par :
+
+\[
+N_{\text{hit}} = N_1 + N_2 + N_3.
+\]
+
+Ce nombre total croît globalement avec l’énergie incidente, mais la relation n’est pas strictement linéaire en raison des effets de saturation locale, des fluctuations hadroniques et de la composante électromagnétique variable de la gerbe.
+
+Pour tenir compte de ces non-linéarités, la reconstruction adoptée ne se limite pas à une combinaison linéaire fixe des trois compteurs. Les coefficients de pondération sont rendus dépendants de \(N_{\text{hit}}\), ce qui permet d’adapter dynamiquement la calibration selon la taille globale de la gerbe.
+
+\section{Formalisme mathématique}
+
+L’énergie reconstruite est modélisée comme une combinaison linéaire des trois multiplicités de hits :
+
+\[
+E_{\mathrm{reco}}=\alpha(N_{\mathrm{hit}})\,N_1+\beta(N_{\mathrm{hit}})\,N_2+\gamma(N_{\mathrm{hit}})\,N_3,
+\]
+
+où \(N_{\mathrm{hit}}=N_1+N_2+N_3\).
+
+Les fonctions \(\alpha\), \(\beta\) et \(\gamma\) jouent le rôle de coefficients effectifs de calibration. Afin d’introduire une dépendance simple mais suffisamment flexible avec la taille de la gerbe, elles sont paramétrées sous forme polynomiale du second ordre :
+
+\[
+\alpha(N_{\mathrm{hit}})=a_0+a_1N_{\mathrm{hit}}+a_2N_{\mathrm{hit}}^2,
+\]
+
+\[
+\beta(N_{\mathrm{hit}})=b_0+b_1N_{\mathrm{hit}}+b_2N_{\mathrm{hit}}^2,
+\]
+
+\[
+\gamma(N_{\mathrm{hit}})=c_0+c_1N_{\mathrm{hit}}+c_2N_{\mathrm{hit}}^2.
+\]
+
+Le modèle comporte donc neuf paramètres libres :
+
+\[
+(a_0,a_1,a_2,b_0,b_1,b_2,c_0,c_1,c_2).
+\]
+
+Ce choix quadratique constitue un compromis entre simplicité et capacité descriptive :
+
+\begin{itemize}
+\item un ordre trop faible limiterait la correction des non-linéarités ;
+\item un ordre trop élevé introduirait un risque de sur-ajustement et d’instabilité numérique.
+\end{itemize}
+
+Physiquement, cette écriture reflète le fait que la contribution relative des hits de faible, moyenne ou forte amplitude varie avec l’énergie incidente. À basse énergie, la gerbe reste peu développée, tandis qu’à haute énergie les zones denses deviennent plus importantes, ce qui modifie la pondération optimale des trois seuils.
+
+\section{Fonction de minimisation \texorpdfstring{$\chi^2$}{chi²}}
+
+Les neuf paramètres du modèle sont déterminés en comparant, pour chaque événement simulé, l’énergie reconstruite \(E_{\mathrm{reco}}\) à l’énergie vraie du faisceau \(E_{\mathrm{true}}\). L’ajustement repose sur la minimisation d’une fonction globale de type \(\chi^2\).
+
+Pour un ensemble de \(N\) événements, la quantité minimisée est :
+
+\[
+\chi^2=\sum_{i=1}^{N}
+\frac{\left(E_{\mathrm{reco},i}-E_{\mathrm{true},i}\right)^2}
+{E_{\mathrm{true},i}}.
+\]
+
+Le terme au dénominateur introduit une pondération énergétique simple : les événements de haute énergie, naturellement associés à des écarts absolus plus grands, ne dominent pas artificiellement l’ajustement.
+
+Pour chaque événement \(i\), on calcule :
+
+\[
+N_{\mathrm{hit},i}=N_{1,i}+N_{2,i}+N_{3,i},
+\]
+
+puis :
+
+\[
+E_{\mathrm{reco},i}
+=
+\alpha(N_{\mathrm{hit},i})N_{1,i}
++
+\beta(N_{\mathrm{hit},i})N_{2,i}
++
+\gamma(N_{\mathrm{hit},i})N_{3,i}.
+\]
+
+La minimisation est réalisée numériquement avec \texttt{TMinuit} via l’algorithme \texttt{MIGRAD}, largement utilisé en physique des particules pour les problèmes non linéaires.
+
+Le nombre de degrés de liberté associé à l’ajustement vaut :
+
+\[
+\mathrm{ndf}=N-9,
+\]
+
+puisque neuf paramètres indépendants sont ajustés. Le rapport \(\chi^2/\mathrm{ndf}\) constitue alors un indicateur global de qualité de calibration.
+
+Enfin, une pénalité numérique très grande est appliquée lorsque la fonction devient non définie ou non finie au cours de l’optimisation, ce qui stabilise la procédure de minimisation.
+
+\section{Sélection des événements et prétraitement}
+
+Avant l’ajustement, un ensemble de critères simples est appliqué afin de garantir la cohérence physique des événements utilisés pour la calibration.
+
+Les fichiers d’entrée contiennent des échantillons simulés de pions négatifs et de protons dans la plage :
+
+\[
+1 \leq E_{\mathrm{true}} \leq 130~\mathrm{GeV}.
+\]
+
+Seuls les événements appartenant à cet intervalle énergétique sont conservés pour la minimisation.
+
+\subsection*{Rejet des événements fuyants}
+
+Une attention particulière est portée aux gerbes présentant une fuite longitudinale importante. Dans l’implémentation utilisée, les événements possédant au moins un hit dans la dernière couche instrumentée du détecteur sont rejetés.
+
+Mathématiquement :
+
+\[
+\exists \; hit \text{ dans la couche finale}
+\quad \Longrightarrow \quad
+\text{événement exclu}.
+\]
+
+Ce critère vise à supprimer les interactions insuffisamment contenues, pour lesquelles une partie de l’énergie quitte le calorimètre et biaise la calibration.
+
+\subsection*{Variables conservées}
+
+Pour chaque événement retenu, seules quelques grandeurs sont nécessaires :
+
+\begin{itemize}
+\item \(N_1\) : nombre de hits au seuil 1 ;
+\item \(N_2\) : nombre de hits au seuil 2 ;
+\item \(N_3\) : nombre de hits au seuil 3 ;
+\item \(E_{\mathrm{true}}\) : énergie primaire simulée.
+\end{itemize}
+
+Le nombre total de hits est ensuite reconstruit par :
+
+\[
+N_{\mathrm{hit}}=N_1+N_2+N_3.
+\]
+
+\subsection*{Intérêt de cette étape}
+
+Ce prétraitement permet :
+
+\begin{itemize}
+\item d’éviter que les événements mal contenus dégradent l’ajustement ;
+\item de travailler sur un domaine énergétique homogène ;
+\item de limiter la calibration aux observables strictement nécessaires.
+\end{itemize}
+
+La méthode reste ainsi volontairement simple, robuste et directement interprétable.
+
+\section{Procédure numérique avec \texttt{TMinuit}}
+
+L’optimisation des neuf paramètres est réalisée à l’aide de la classe \texttt{TMinuit} de l’environnement \texttt{ROOT}. Cet outil est historiquement très utilisé en physique des hautes énergies pour les ajustements multiparamétriques non linéaires.
+
+\subsection*{Initialisation}
+
+Les paramètres :
+
+\[
+(a_0,a_1,a_2,b_0,b_1,b_2,c_0,c_1,c_2)
+\]
+
+sont initialisés à partir de valeurs de départ différentes selon l’espèce considérée (\(\pi^-\) ou proton). Cette stratégie améliore la convergence en plaçant l’algorithme dans une région réaliste de l’espace des paramètres.
+
+Chaque coefficient est défini avec :
+
+\begin{itemize}
+\item une valeur initiale ;
+\item un pas numérique d’exploration ;
+\item éventuellement des bornes physiques ou numériques.
+\end{itemize}
+
+\subsection*{Minimisation}
+
+La commande principale utilisée est l’algorithme \texttt{MIGRAD}, fondé sur une méthode quasi-newtonienne exploitant les gradients locaux de la fonction \(\chi^2\).
+
+Son objectif est de rechercher :
+
+\[
+\min \chi^2(a_0,\dots,c_2).
+\]
+
+À convergence, \texttt{TMinuit} fournit :
+
+\begin{itemize}
+\item les valeurs optimales des paramètres ;
+\item leurs incertitudes estimées ;
+\item la valeur minimale \(\chi^2_{\min}\) ;
+\item un indicateur d’état de la matrice de covariance.
+\end{itemize}
+
+\subsection*{Indicateur de convergence}
+
+Le code récupère également le statut \texttt{istat}, généralement interprété comme :
+
+\begin{itemize}
+\item \(0\) : matrice de covariance indisponible ;
+\item \(1\) : approximation grossière ;
+\item \(2\) : matrice définie positive ;
+\item \(3\) : estimation fiable et précise.
+\end{itemize}
+
+Une valeur élevée indique donc une convergence plus robuste.
+
+\subsection*{Pourquoi cette méthode ?}
+
+Le choix de \texttt{TMinuit} est particulièrement adapté ici car :
+
+\begin{itemize}
+\item le nombre de paramètres reste modéré ;
+\item la fonction objectif est continue ;
+\item les résultats sont facilement interprétables physiquement ;
+\item la méthode est rapide sur de grands échantillons.
+\end{itemize}
+
+\section{Calcul final de l’énergie reconstruite}
+
+Une fois les paramètres optimisés obtenus, la reconstruction d’énergie est appliquée événement par événement sur l’ensemble des données sélectionnées.
+
+Pour chaque interaction hadronique, on calcule d’abord :
+
+\[
+N_{\mathrm{hit}} = N_1 + N_2 + N_3.
+\]
+
+Les coefficients dépendants de la multiplicité totale sont ensuite évalués :
+
+\[
+\alpha = a_0 + a_1 N_{\mathrm{hit}} + a_2 N_{\mathrm{hit}}^2,
+\]
+
+\[
+\beta = b_0 + b_1 N_{\mathrm{hit}} + b_2 N_{\mathrm{hit}}^2,
+\]
+
+\[
+\gamma = c_0 + c_1 N_{\mathrm{hit}} + c_2 N_{\mathrm{hit}}^2.
+\]
+
+L’énergie reconstruite finale devient alors :
+
+\[
+E_{\mathrm{reco}}=\alpha N_1+\beta N_2+\gamma N_3.
+\]
+
+Cette opération est répétée pour tous les événements du jeu étudié, ce qui permet de produire les distributions nécessaires à l’évaluation des performances.
+
+\subsection*{Interprétation physique}
+
+Cette écriture attribue un poids différent aux hits selon leur seuil :
+
+\begin{itemize}
+\item les hits de seuil 1 représentent les dépôts les plus faibles ;
+\item les hits de seuil 2 traduisent des zones plus denses ;
+\item les hits de seuil 3 correspondent généralement au cœur énergétique de la gerbe.
+\end{itemize}
+
+La dépendance en \(N_{\mathrm{hit}}\) permet d’ajuster automatiquement ces pondérations lorsque la taille globale de la gerbe augmente avec l’énergie incidente.
+
+\subsection*{Avantage pratique}
+
+La méthode reste très rapide en phase d’inférence : après calibration, aucune minimisation supplémentaire n’est requise. La reconstruction consiste uniquement en quelques évaluations polynomiales suivies d’une combinaison linéaire.
+
+\section{Observables de performance produites}
+
+Après reconstruction de l’énergie pour chaque événement, plusieurs observables standards sont calculées afin d’évaluer la qualité de la calibration obtenue.
+
+\section*{Distribution globale des énergies}
+
+Deux histogrammes sont comparés :
+
+\begin{itemize}
+\item la distribution de l’énergie vraie du faisceau \(E_{\mathrm{true}}\) ;
+\item la distribution de l’énergie reconstruite \(E_{\mathrm{reco}}\).
+\end{itemize}
+
+Cette comparaison fournit une première vérification qualitative de la cohérence globale de la méthode.
+
+\section*{Linéarité}
+
+La linéarité mesure la capacité du reconstructeur à restituer en moyenne l’énergie incidente :
+
+\[
+\langle E_{\mathrm{reco}} \rangle \approx E_{\mathrm{true}}.
+\]
+
+Elle est visualisée de deux manières :
+
+\begin{itemize}
+\item un profil moyen \(\langle E_{\mathrm{reco}} \rangle\) en fonction de \(E_{\mathrm{true}}\) ;
+\item un nuage de points \(E_{\mathrm{reco}}\) versus \(E_{\mathrm{true}}\), comparé à la droite idéale \(y=x\).
+\end{itemize}
+
+\section*{Résolution relative}
+
+La résolution énergétique est déterminée dans des intervalles d’énergie vraie. Pour chaque bin, on étudie :
+
+\[
+\Delta E = E_{\mathrm{reco}} - E_{\mathrm{true}}.
+\]
+
+La largeur \(\sigma\) de cette distribution est extraite par ajustement gaussien, puis rapportée au centre du bin :
+
+\[
+\frac{\sigma}{E}.
+\]
+
+Cette grandeur est tracée en fonction de l’énergie incidente.
+
+\section*{Biais relatif}
+
+Un estimateur complémentaire du biais moyen est donné par :
+
+\[
+\frac{\langle E_{\mathrm{reco}} \rangle - E_{\mathrm{true}}}{E_{\mathrm{true}}}.
+\]
+
+Il permet d’identifier d’éventuelles sous-estimations ou surestimations systématiques selon l’énergie.
+
+\section*{Intérêt global}
+
+Ces indicateurs sont exactement ceux utilisés dans le corps principal du mémoire pour comparer :
+
+\begin{itemize}
+\item la méthode paramétrique \(\chi^2\) ;
+\item la régression LightGBM ;
+\item les scénarios avec ou sans identification préalable des particules.
+\end{itemize}
+
+\section{Forces et limites de la méthode}
+
+La reconstruction paramétrique par ajustement \(\chi^2\) constitue une approche simple, rapide et physiquement interprétable. Elle présente cependant des limites naturelles face aux méthodes modernes d’apprentissage automatique.
+
+\subsection*{Forces}
+
+\begin{itemize}
+\item \textbf{Interprétabilité directe :} chaque terme de la formule possède un sens physique clair, lié aux trois seuils de lecture du SDHCAL.
+
+\item \textbf{Calibration compacte :} seuls neuf paramètres sont ajustés, ce qui rend la méthode légère et robuste.
+
+\item \textbf{Rapidité d’exécution :} une fois calibrée, la reconstruction événement par événement est quasi instantanée.
+
+\item \textbf{Stabilité statistique :} avec peu de paramètres, le risque de sur-ajustement reste limité.
+
+\item \textbf{Référence expérimentale solide :} ce type de paramétrisation a historiquement été utilisé pour les calorimètres semi-digitaux.
+\end{itemize}
+
+\subsection*{Limites}
+
+\begin{itemize}
+\item \textbf{Information restreinte :} la méthode exploite essentiellement \(N_1\), \(N_2\), \(N_3\) et \(N_{\mathrm{hit}}\), sans utiliser la structure détaillée de la gerbe.
+
+\item \textbf{Capacité descriptive limitée :} une forme quadratique ne peut modéliser que des non-linéarités relativement simples.
+
+\item \textbf{Peu sensible à la topologie :} les informations spatiales, temporelles ou morphologiques fines sont ignorées.
+
+\item \textbf{Calibration spécifique :} les coefficients optimaux peuvent dépendre du type de particule, du domaine en énergie ou de la géométrie du détecteur.
+
+\item \textbf{Performance plafond :} à haute statistique, les méthodes supervisées non linéaires surpassent généralement ce type d’approche.
+\end{itemize}
+
+\subsection*{Positionnement dans ce mémoire}
+
+Pour ces raisons, la méthode \(\chi^2\) est utilisée ici comme \textbf{baseline physique de référence}. Elle permet :
+
+\begin{itemize}
+\item d’établir un niveau de performance interprétable ;
+\item de quantifier le gain apporté par LightGBM ;
+\item d’évaluer l’intérêt d’un couplage entre PID et reconstruction d’énergie.
+\end{itemize}
+
+\section{Conclusion}
+
+La méthode de reconstruction d’énergie par ajustement \(\chi^2\) repose sur une idée simple : exploiter les trois compteurs semi-digitaux \(N_1\), \(N_2\) et \(N_3\) au moyen de coefficients dépendant de la multiplicité totale \(N_{\mathrm{hit}}\).
+
+Malgré son formalisme compact, cette approche permet déjà de corriger une partie importante des non-linéarités de réponse du calorimètre et de fournir une estimation réaliste de l’énergie incidente sur une large gamme énergétique.
+
+Ses principaux atouts sont :
+
+\begin{itemize}
+\item une calibration rapide ;
+\item une interprétation physique immédiate ;
+\item une mise en œuvre robuste ;
+\item un coût de calcul très faible à l’inférence.
+\end{itemize}
+
+Elle constitue donc une excellente méthode de référence pour les détecteurs semi-digitaux.
+
+Néanmoins, la richesse informationnelle du SDHCAL dépasse largement les seuls compteurs multi-seuils. Les descripteurs topologiques, spatiaux et temporels introduits dans ce travail ouvrent la voie à des modèles plus puissants, capables d’exploiter la structure complète des gerbes hadroniques.
+
+C’est précisément ce qui motive l’utilisation des approches supervisées modernes, en particulier la régression par LightGBM présentée dans le corps principal du mémoire, dont les performances dépassent cette baseline paramétrique.
+
+\section{Tableau récapitulatif}
+
+\begin{table}[H]
+\centering
+\caption{Résumé de la méthode paramétrique de reconstruction d’énergie par ajustement \(\chi^2\).}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.2cm}X}
+\toprule
+\textbf{Élément} & \textbf{Description} \\
+\midrule
+
+Type de méthode &
+Calibration analytique semi-digitale fondée sur les compteurs de hits aux trois seuils. \\
+
+Variables principales &
+\(N_1\), \(N_2\), \(N_3\), avec \(N_{\mathrm{hit}}=N_1+N_2+N_3\). \\
+
+Formule de reconstruction &
+\(E_{\mathrm{reco}}=\alpha N_1+\beta N_2+\gamma N_3\). \\
+
+Dépendance des coefficients &
+\(\alpha\), \(\beta\), \(\gamma\) paramétrés par des polynômes quadratiques en \(N_{\mathrm{hit}}\). \\
+
+Nombre de paramètres &
+9 paramètres libres :
+\((a_0,a_1,a_2,b_0,b_1,b_2,c_0,c_1,c_2)\). \\
+
+Optimisation &
+Minimisation numérique avec \texttt{TMinuit} via l’algorithme \texttt{MIGRAD}. \\
+
+Échantillons utilisés &
+Événements simulés de \(\pi^-\) et protons entre 1 et 130 GeV. \\
+
+Prétraitement &
+Rejet des événements présentant des hits dans la dernière couche instrumentée (fuite longitudinale). \\
+
+Observables de sortie &
+Linéarité, biais relatif, résolution \(\sigma(E)/E\), distributions reconstruites. \\
+
+Forces &
+Rapide, robuste, interprétable, faible coût de calcul. \\
+
+Limites &
+N’utilise pas la topologie détaillée des gerbes ni les corrélations complexes. \\
+
+Rôle dans ce mémoire &
+Méthode baseline de référence comparée aux approches LightGBM. \\
+
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\chapter*{Bilan de l’annexe}
+\addcontentsline{toc}{chapter}{Bilan de l’annexe}
+
+Cette annexe a présenté en détail la méthode historique de reconstruction d’énergie utilisée comme référence dans ce travail. Fondée sur une calibration paramétrique des compteurs semi-digitaux, elle exploite directement la logique multi-seuil du SDHCAL tout en conservant une interprétation physique claire.
+
+L’étude montre qu’une modélisation relativement simple permet déjà d’obtenir des performances crédibles sur une large gamme énergétique. Cela confirme la pertinence intrinsèque du concept semi-digital pour la calorimétrie hadronique.
+
+Cependant, cette approche reste limitée face à la richesse réelle des données disponibles : géométrie fine des gerbes, densités locales, corrélations spatiales, signatures temporelles ou fluctuations événement par événement.
+
+C’est pourquoi elle constitue ici un point de comparaison essentiel plutôt qu’un aboutissement. Les méthodes d’apprentissage automatique introduites dans le mémoire permettent d’aller au-delà de cette description compacte et d’exploiter une fraction beaucoup plus large de l’information contenue dans le détecteur.
+
+En ce sens, la calibration \(\chi^2\) représente à la fois :
+
+\begin{itemize}
+\item une base solide issue des approches classiques ;
+\item un benchmark robuste ;
+\item un témoin quantitatif du gain apporté par les méthodes modernes.
+\end{itemize}
+
+\clearpage

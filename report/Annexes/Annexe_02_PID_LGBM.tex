@@ -1,0 +1,794 @@
+\chapter{Configuration du classificateur PID par LightGBM}
+\label{app:pid_lgbm}
+
+\section{Introduction}
+
+Cette annexe décrit le pipeline utilisé pour l’identification hadronique supervisée à l’aide de l’algorithme \texttt{LightGBM}. L’objectif est de classifier les particules incidentes à partir des descripteurs topologiques, spatiaux et temporels extraits des gerbes hadroniques reconstruites dans le SDHCAL.
+
+Le pipeline complet repose sur :
+
+\begin{itemize}
+    \item la lecture des fichiers \texttt{ROOT} contenant les observables calculées par \texttt{ShowerAnalyzer},
+    \item la préparation des jeux de données d’apprentissage, validation et test,
+    \item le rééquilibrage statistique des classes par sur-échantillonnage,
+    \item l’entraînement d’un classificateur \texttt{LGBMClassifier},
+    \item l’évaluation via plusieurs métriques standard,
+    \item la sauvegarde automatique des modèles et figures de contrôle.
+\end{itemize}
+
+La version initiale du pipeline a été développée en configuration multiclasse (\(\pi^-\), \(p\), \(K^0_L\)). Dans la suite du mémoire, l’étude physique réaliste a toutefois été recentrée sur la séparation pion/proton, plus directement pertinente pour la reconstruction d’énergie sur données mixtes.
+\section{Jeux de données et variables d’entrée}
+\label{app:pid_data}
+
+Le classificateur est entraîné à partir de fichiers simulés au format \texttt{ROOT}, enrichis par les variables calculées avec \texttt{ShowerAnalyzer}. Chaque fichier correspond à une espèce hadronique donnée et contient un arbre nommé \texttt{paramsTree}.
+
+Dans la version initiale multiclasse du pipeline, trois échantillons sont utilisés :
+
+\begin{itemize}
+    \item \texttt{130k\_pi\_E1to130\_params.root},
+    \item \texttt{130k\_kaon\_E1to130\_params.root},
+    \item \texttt{130k\_proton\_E1to130\_params.root}.
+\end{itemize}
+
+Chaque jeu contient environ \(1.3\times 10^5\) événements, avec une énergie primaire distribuée uniformément entre \SIrange{1}{130}{GeV}. Les événements des différents fichiers sont concaténés afin de former un ensemble global d’apprentissage.
+
+\subsection*{Vérité générateur et labels}
+
+L’identité vraie de la particule est fournie par la variable :
+
+\begin{center}
+\texttt{particlePDG}
+\end{center}
+
+Les codes PDG retenus sont :
+
+\[
+-211,\qquad 2212,\qquad 311
+\]
+
+correspondant respectivement à :
+
+\[
+\pi^-,\qquad p,\qquad K^0_L.
+\]
+
+Pour l’apprentissage supervisé, ces identifiants sont convertis en labels entiers :
+
+\[
+\pi^- \rightarrow 0,\qquad p \rightarrow 1,\qquad K^0_L \rightarrow 2.
+\]
+
+\subsection*{Variables d’entrée}
+
+Les variables fournies au classificateur sont issues de l’analyse topologique et calorimétrique des gerbes. Le jeu complet utilisé dans le pipeline initial contient :
+
+\begin{align*}
+\mathcal{X} = \big[
+&\texttt{Thr1},\texttt{Thr2},\texttt{Thr3},\texttt{Begin},\texttt{Radius},\texttt{Density},\\
+&\texttt{NClusters},\texttt{ratioThr23},\texttt{Zbary},\texttt{Zrms},\\
+&\texttt{PctHitsFirst10},\texttt{PlanesWithClusmore2},\\
+&\texttt{AvgClustSize},\texttt{MaxClustSize},\\
+&\texttt{lambda1},\texttt{lambda2},\\
+&\texttt{tMin},\texttt{tMax},\texttt{tMean},\texttt{tSpread},\\
+&\texttt{Nmax},\texttt{z0\_fit},\texttt{Xmax},\texttt{lambda},\\
+&\texttt{nTrackSegments},\texttt{eccentricity3D}
+\big].
+\end{align*}
+
+Ces observables décrivent plusieurs aspects physiques complémentaires :
+
+\begin{itemize}
+    \item composition en seuils et activité locale ;
+    \item développement longitudinal de la gerbe ;
+    \item compacité transverse ;
+    \item fragmentation en amas ;
+    \item structure temporelle ;
+    \item présence éventuelle de traces secondaires internes.
+\end{itemize}
+
+L’intérêt de cette représentation est de condenser l’information brute hit-par-hit en un nombre limité de variables fortement discriminantes pour le PID.
+
+\section{Nettoyage et prétraitement des données}
+\label{app:pid_preprocessing}
+
+Avant l’entraînement du classificateur, plusieurs opérations de préparation sont appliquées afin de garantir la qualité statistique des données et la stabilité numérique du modèle.
+
+\subsection*{Suppression des valeurs invalides}
+
+Les tableaux extraits depuis les fichiers \texttt{ROOT} sont d’abord inspectés afin d’identifier les valeurs non physiques ou non définies. Les valeurs infinies positives ou négatives sont remplacées par des valeurs manquantes, puis les événements incomplets sont supprimés.
+
+En pratique :
+
+\begin{itemize}
+    \item remplacement de \(+\infty\) et \(-\infty\) par \texttt{NaN},
+    \item suppression des lignes contenant au moins une valeur manquante,
+    \item réindexation du tableau final.
+\end{itemize}
+
+Cette étape permet d’éviter la propagation d’erreurs numériques durant l’apprentissage.
+
+\subsection*{Filtrage des espèces étudiées}
+
+Après nettoyage, seuls les événements correspondant aux codes PDG retenus sont conservés :
+
+\[
+-211,\qquad 2212,\qquad 311.
+\]
+
+Les autres particules éventuellement présentes dans les arbres d’entrée sont exclues de l’analyse.
+
+\subsection*{Smearing temporel}
+
+Afin de rendre l’apprentissage plus robuste vis-à-vis des fluctuations instrumentales et d’éviter un sur-ajustement sur des temps parfaitement simulés, un bruit gaussien indépendant est ajouté aux variables temporelles :
+
+\[
+t \leftarrow t + \varepsilon,
+\qquad
+\varepsilon \sim \mathcal{N}(0,\sigma^2),
+\]
+
+avec :
+
+\[
+\sigma = 0.1.
+\]
+
+Le smearing est appliqué aux variables :
+
+\begin{center}
+\texttt{tMin}, \quad \texttt{tMax}, \quad \texttt{tSpread}.
+\end{center}
+
+La graine pseudo-aléatoire est fixée afin d’assurer la reproductibilité complète du pipeline.
+
+\subsection*{Normalisation}
+
+Aucune normalisation explicite des variables n’est nécessaire pour LightGBM. En effet, les méthodes basées sur des arbres de décision sont peu sensibles à l’échelle absolue des variables, contrairement aux réseaux de neurones ou aux méthodes à distance.
+
+Le pipeline travaille donc directement sur les observables physiques brutes après nettoyage.
+
+\section{Découpage des ensembles d’apprentissage}
+\label{app:pid_split}
+
+Afin d’évaluer correctement les performances du classificateur et d’éviter toute fuite d’information (\emph{data leakage}), les données sont séparées en trois sous-ensembles distincts :
+
+\begin{itemize}
+    \item un ensemble d’entraînement (\textit{train}),
+    \item un ensemble de validation (\textit{validation}),
+    \item un ensemble de test final (\textit{test}).
+\end{itemize}
+
+Le découpage est réalisé de manière \textbf{stratifiée}, c’est-à-dire en conservant les proportions relatives des différentes classes dans chaque sous-ensemble.
+
+\subsection*{Étape 1 : séparation test}
+
+Dans un premier temps, \(20\,\%\) des événements sont extraits aléatoirement pour constituer l’échantillon de test indépendant :
+
+\[
+\text{test} = 20\%, \qquad \text{reste} = 80\%.
+\]
+
+Cet ensemble n’intervient ni dans l’entraînement du modèle, ni dans le choix des hyperparamètres.
+
+\subsection*{Étape 2 : séparation validation}
+
+Les \(80\,\%\) restants sont ensuite redivisés afin d’extraire un ensemble de validation représentant \(20\,\%\) de cette portion :
+
+\[
+\text{validation} = 0.20 \times 80\% = 16\%,
+\]
+
+ce qui conduit à la répartition finale suivante :
+
+\[
+\text{train} = 64\%, \qquad
+\text{validation} = 16\%, \qquad
+\text{test} = 20\%.
+\]
+
+\subsection*{Rôle de chaque ensemble}
+
+\begin{itemize}
+    \item \textbf{Train} : utilisé pour ajuster les paramètres internes du modèle ;
+    \item \textbf{Validation} : utilisé pendant l’apprentissage pour surveiller la convergence et déclencher l’\emph{early stopping} ;
+    \item \textbf{Test} : utilisé une seule fois à la fin pour estimer les performances physiques réelles du classificateur.
+\end{itemize}
+
+\subsection*{Reproductibilité}
+
+Le découpage repose sur une graine pseudo-aléatoire fixée :
+
+\[
+\texttt{random\_state}=42,
+\]
+
+ce qui garantit la reproductibilité exacte des ensembles utilisés d’un lancement à l’autre.
+
+\section{Rééquilibrage des classes par SMOTE}
+\label{app:pid_smote}
+
+Bien que les échantillons simulés soient globalement de tailles comparables, de légères fluctuations statistiques peuvent apparaître après les étapes de nettoyage et de découpage. Afin d’éviter qu’une classe soit sous-représentée durant l’apprentissage, un rééquilibrage est appliqué sur l’ensemble d’entraînement.
+
+\subsection*{Principe}
+
+La méthode utilisée est \textbf{SMOTE} (\emph{Synthetic Minority Over-sampling TEchnique}). Elle consiste à générer artificiellement de nouveaux exemples dans les régions peu peuplées de l’espace des variables.
+
+Pour une observation minoritaire \(\mathbf{x}_i\), un voisin proche \(\mathbf{x}_j\) de même classe est sélectionné, puis un point synthétique est construit par interpolation :
+
+\[
+\mathbf{x}_{\mathrm{new}}
+=
+\mathbf{x}_i
++
+\lambda(\mathbf{x}_j-\mathbf{x}_i),
+\qquad
+\lambda \in [0,1].
+\]
+
+Ainsi, la densité de la classe minoritaire est renforcée sans simple duplication d’événements existants.
+
+\subsection*{Application dans le pipeline}
+
+Le rééquilibrage est appliqué \textbf{uniquement sur l’ensemble d’entraînement} :
+
+\[
+(\text{train}) \rightarrow \text{SMOTE}
+\]
+
+Les ensembles de validation et de test sont laissés inchangés afin de conserver une estimation réaliste des performances.
+
+\subsection*{Avantages}
+
+Cette stratégie présente plusieurs intérêts :
+
+\begin{itemize}
+    \item meilleure stabilité de l’apprentissage ;
+    \item réduction du biais vers la classe majoritaire ;
+    \item amélioration possible du rappel (\emph{recall}) des classes minoritaires ;
+    \item absence de fuite d’information vers validation/test.
+\end{itemize}
+
+\subsection*{Remarque physique}
+
+Dans le cas présent, les données simulées sont relativement équilibrées. L’utilisation de SMOTE agit donc surtout comme une mesure de robustesse méthodologique plutôt qu’une correction indispensable.
+
+\section{Architecture du modèle LightGBM}
+\label{app:pid_model}
+
+Le classificateur utilisé dans ce travail est basé sur \texttt{LightGBM} (\emph{Light Gradient Boosting Machine}), une méthode d’apprentissage supervisé fondée sur l’agrégation séquentielle d’arbres de décision.
+
+\subsection*{Principe général du boosting}
+
+L’idée du \emph{gradient boosting} consiste à construire une somme de modèles faibles (arbres peu profonds), chacun venant corriger les erreurs résiduelles du précédent.
+
+À l’itération \(m\), la prédiction s’écrit :
+
+\[
+F_m(\mathbf{x})
+=
+F_{m-1}(\mathbf{x})
++
+\eta\,h_m(\mathbf{x}),
+\]
+
+où :
+
+\begin{itemize}
+    \item \(F_{m-1}\) est le modèle courant,
+    \item \(h_m\) est le nouvel arbre ajouté,
+    \item \(\eta\) est le taux d’apprentissage (\emph{learning rate}).
+\end{itemize}
+
+Le modèle final est donc une combinaison additive de nombreux arbres.
+
+\subsection*{Spécificités de LightGBM}
+
+\texttt{LightGBM} introduit plusieurs optimisations par rapport aux implémentations classiques :
+
+\begin{itemize}
+    \item croissance feuille par feuille (\emph{leaf-wise}) plutôt que niveau par niveau ;
+    \item histogrammes rapides pour les coupures ;
+    \item parallélisation efficace ;
+    \item faible consommation mémoire ;
+    \item excellente performance sur grands jeux tabulaires.
+\end{itemize}
+
+Ces propriétés en font un choix particulièrement adapté aux descripteurs physiques issus du SDHCAL.
+
+\subsection*{Mode multiclasse}
+
+Le modèle est utilisé sous la forme :
+
+\begin{center}
+\texttt{LGBMClassifier(objective = multiclass)}
+\end{center}
+
+avec :
+
+\[
+N_{\mathrm{classes}} = 3
+\]
+
+dans la version initiale :
+
+\[
+\pi^-,\quad p,\quad K^0_L.
+\]
+
+Pour chaque événement, le classificateur retourne un vecteur de probabilités :
+
+\[
+\mathbf{p} =
+\left(
+p_{\pi},
+p_{p},
+p_{K}
+\right),
+\qquad
+\sum_k p_k = 1.
+\]
+
+La classe prédite est simplement :
+
+\[
+\hat{y} = \arg\max_k p_k.
+\]
+
+\subsection*{Pourquoi ce choix ?}
+
+LightGBM présente plusieurs avantages dans ce contexte :
+
+\begin{itemize}
+    \item très performant sur données tabulaires structurées ;
+    \item peu sensible à l’échelle des variables ;
+    \item robuste aux corrélations entre observables ;
+    \item rapide à entraîner ;
+    \item interprétable via l’importance des variables ;
+    \item facilement exportable pour une utilisation future.
+\end{itemize}
+
+Il constitue ainsi une excellente baseline pour le PID hadronique avant l’emploi éventuel de méthodes plus complexes (CNN, GNN, Transformers).
+
+\section{Hyperparamètres d’entraînement}
+\label{app:pid_hyperparams}
+
+Les performances d’un modèle \texttt{LightGBM} dépendent fortement du choix de ses hyperparamètres, qui contrôlent à la fois sa capacité d’apprentissage et son niveau de régularisation.
+
+Dans cette étude, les valeurs suivantes ont été retenues :
+
+\begin{align*}
+\texttt{learning\_rate} &= 0.01, \\
+\texttt{n\_estimators} &= 1000, \\
+\texttt{num\_leaves} &= 63, \\
+\texttt{max\_depth} &= -1, \\
+\texttt{min\_child\_samples} &= 30, \\
+\texttt{subsample} &= 0.8, \\
+\texttt{colsample\_bytree} &= 0.8, \\
+\texttt{reg\_alpha} &= 0.1, \\
+\texttt{reg\_lambda} &= 0.1.
+\end{align*}
+
+\subsection*{Interprétation physique et statistique}
+
+\begin{itemize}
+    \item \textbf{learning\_rate} : contrôle l’amplitude de correction apportée par chaque nouvel arbre. Une valeur faible améliore généralement la généralisation.
+
+    \item \textbf{n\_estimators} : nombre maximal d’arbres construits durant l’apprentissage.
+
+    \item \textbf{num\_leaves} : nombre maximal de feuilles par arbre. Plus cette valeur est grande, plus les séparations peuvent être fines.
+
+    \item \textbf{max\_depth} : profondeur maximale. La valeur \(-1\) signifie non contrainte explicite.
+
+    \item \textbf{min\_child\_samples} : nombre minimal d’événements requis dans une feuille terminale.
+
+    \item \textbf{subsample} : fraction aléatoire d’événements utilisée à chaque itération.
+
+    \item \textbf{colsample\_bytree} : fraction des variables candidate à chaque arbre.
+
+    \item \textbf{reg\_alpha} et \textbf{reg\_lambda} : pénalisations \(L_1\) et \(L_2\), réduisant le surapprentissage.
+\end{itemize}
+
+\subsection*{Compromis retenu}
+
+Le choix adopté privilégie :
+
+\begin{itemize}
+    \item une bonne puissance de séparation entre espèces ;
+    \item une robustesse face au bruit statistique ;
+    \item un temps d’entraînement raisonnable ;
+    \item une bonne stabilité entre différents splits.
+\end{itemize}
+
+\subsection*{Recherche automatique optionnelle}
+
+Le script permet également d’activer une recherche d’hyperparamètres par grille (\texttt{GridSearchCV}) sur plusieurs valeurs de :
+
+\[
+\texttt{num\_leaves},\quad
+\texttt{max\_depth},\quad
+\texttt{learning\_rate},\quad
+\texttt{n\_estimators}.
+\]
+
+La métrique utilisée pour cette optimisation est le score :
+
+\[
+F1_{\mathrm{macro}},
+\]
+
+mieux adapté qu’une simple accuracy lorsque plusieurs classes sont présentes.
+
+\section{Fonction de coût et arrêt anticipé}
+\label{app:pid_loss}
+
+L’apprentissage du classificateur repose sur la minimisation d’une fonction de coût adaptée au problème multiclasse. Cette optimisation est réalisée itérativement par ajout successif d’arbres de décision.
+
+\subsection*{Log-vraisemblance multiclasse}
+
+Pour un événement \(i\), le modèle prédit un vecteur de probabilités :
+
+\[
+\mathbf{p}_i =
+(p_{i1},p_{i2},\dots,p_{iK}),
+\qquad
+\sum_{k=1}^{K} p_{ik}=1,
+\]
+
+où \(K\) est le nombre de classes.
+
+La perte utilisée est la \textbf{cross-entropy multiclasse} (ou log-loss) :
+
+\[
+\mathcal{L}
+=
+-\frac{1}{N}
+\sum_{i=1}^{N}
+\sum_{k=1}^{K}
+y_{ik}\log(p_{ik}),
+\]
+
+où :
+
+\begin{itemize}
+    \item \(y_{ik}=1\) si l’événement \(i\) appartient à la classe \(k\),
+    \item \(y_{ik}=0\) sinon.
+\end{itemize}
+
+Cette quantité pénalise fortement les prédictions confiantes mais incorrectes.
+
+\subsection*{Interprétation}
+
+La minimisation de cette fonction conduit le modèle à :
+
+\begin{itemize}
+    \item augmenter la probabilité de la vraie classe ;
+    \item réduire les ambiguïtés entre espèces proches ;
+    \item mieux calibrer les probabilités de sortie.
+\end{itemize}
+
+Dans le contexte pion/proton, cela revient à apprendre les régions de l’espace des observables où les deux signatures hadroniques se chevauchent partiellement.
+
+\subsection*{Arrêt anticipé (\emph{early stopping})}
+
+Afin d’éviter le surapprentissage, la perte est suivie sur l’ensemble de validation au cours des itérations.
+
+L’entraînement est interrompu si aucune amélioration de la métrique de validation n’est observée pendant :
+
+\[
+50
+\]
+
+itérations consécutives.
+
+Le modèle conservé est alors celui correspondant à la meilleure performance observée sur validation.
+
+\subsection*{Avantages}
+
+Cette stratégie permet :
+
+\begin{itemize}
+    \item d’éviter une complexification inutile du modèle ;
+    \item de limiter l’overfitting ;
+    \item de réduire le temps de calcul ;
+    \item de sélectionner automatiquement le nombre optimal d’arbres.
+\end{itemize}
+
+\subsection*{Suivi de convergence}
+
+Le pipeline sauvegarde également les courbes :
+
+\begin{center}
+loss(train) \quad et \quad loss(validation)
+\end{center}
+
+en fonction du nombre d’itérations, ce qui permet de vérifier visuellement la qualité de l’apprentissage.
+
+%
+\section{Métriques d’évaluation}
+\label{app:pid_metrics}
+
+Les performances du classificateur sont évaluées exclusivement sur l’ensemble de test indépendant, jamais utilisé pendant l’apprentissage ni lors du réglage des hyperparamètres.
+
+Plusieurs métriques complémentaires sont utilisées afin de caractériser à la fois la qualité globale de classification et le comportement probabiliste du modèle.
+
+\subsection*{Accuracy}
+
+L’accuracy mesure la fraction d’événements correctement classés :
+
+\[
+\mathrm{Accuracy}
+=
+\frac{1}{N_{\mathrm{test}}}
+\sum_{i=1}^{N_{\mathrm{test}}}
+\mathbf{1}(\hat{y}_i = y_i),
+\]
+
+où :
+
+\begin{itemize}
+    \item \(y_i\) est la vraie classe,
+    \item \(\hat{y}_i\) la classe prédite.
+\end{itemize}
+
+Elle donne une mesure intuitive des performances globales.
+
+\subsection*{Matrice de confusion}
+
+La matrice de confusion permet d’identifier précisément les erreurs entre espèces.
+
+Pour trois classes, elle s’écrit :
+
+\[
+C_{ij}
+=
+\#(\text{vraie classe}=i,\ \text{classe prédite}=j).
+\]
+
+Une normalisation ligne par ligne est généralement appliquée afin d’obtenir des probabilités conditionnelles.
+
+Cette représentation est particulièrement utile pour visualiser :
+
+\begin{itemize}
+    \item les confusions \(\pi^- / p\),
+    \item les confusions avec les \(K^0_L\),
+    \item les asymétries entre classes.
+\end{itemize}
+
+\subsection*{AUC ROC One-vs-Rest}
+
+La capacité de séparation probabiliste est quantifiée via l’aire sous la courbe ROC :
+
+\[
+\mathrm{AUC}.
+\]
+
+Dans le cas multiclasse, une approche \emph{One-vs-Rest} est utilisée : chaque classe est comparée au reste, puis les scores sont moyennés.
+
+Une valeur :
+
+\[
+\mathrm{AUC}=0.5
+\]
+
+correspond à une séparation aléatoire, tandis que :
+
+\[
+\mathrm{AUC}=1
+\]
+
+correspond à une séparation parfaite.
+
+\subsection*{Multi-logloss}
+
+La log-vraisemblance négative sur test est également calculée :
+
+\[
+\mathrm{LogLoss}
+=
+-\frac{1}{N}
+\sum_i \sum_k y_{ik}\log(p_{ik}).
+\]
+
+Contrairement à l’accuracy, cette métrique tient compte du niveau de confiance des probabilités prédites.
+
+\subsection*{Pourquoi plusieurs métriques ?}
+
+Aucune métrique unique ne résume complètement les performances :
+
+\begin{itemize}
+    \item l’accuracy mesure le taux de succès global ;
+    \item la matrice de confusion localise les erreurs ;
+    \item l’AUC mesure la séparabilité ;
+    \item la log-loss mesure la calibration probabiliste.
+\end{itemize}
+
+L’utilisation combinée de ces observables donne donc une vision plus complète du comportement du PID.
+
+\section{Sorties du pipeline et figures produites}
+\label{app:pid_outputs}
+
+Le script d’entraînement génère automatiquement plusieurs fichiers permettant le suivi des performances, la reproductibilité des résultats et l’analyse a posteriori du modèle.
+
+\subsection*{Sauvegarde du modèle}
+
+Le classificateur entraîné est exporté au format \texttt{joblib} :
+
+\begin{center}
+\texttt{results\_with\_time/models/lgbm\_model\_<run\_id>.joblib}
+\end{center}
+
+Chaque exécution reçoit un identifiant unique (\texttt{run\_id}), ce qui permet de conserver plusieurs versions du modèle.
+
+\subsection*{Figures de contrôle}
+
+Trois visualisations principales sont produites automatiquement.
+
+\paragraph{1. Courbe d’apprentissage}
+
+Évolution de la perte sur :
+
+\begin{itemize}
+    \item ensemble d’entraînement,
+    \item ensemble de validation.
+\end{itemize}
+
+Cette figure permet de vérifier :
+
+\begin{itemize}
+    \item la convergence ;
+    \item l’absence de divergence train/validation ;
+    \item l’effet de l’early stopping.
+\end{itemize}
+
+\paragraph{2. Matrice de confusion}
+
+Une matrice de confusion normalisée est générée afin de visualiser les migrations entre classes.
+
+Elle permet d’identifier rapidement les canaux dominants de confusion, par exemple :
+
+\[
+\pi^- \leftrightarrow p.
+\]
+
+\paragraph{3. Histogrammes de probabilités}
+
+Des distributions des probabilités prédites sont tracées pour plusieurs classes :
+
+\begin{itemize}
+    \item probabilité proton ;
+    \item probabilité kaon ;
+    \item comparaisons inter-classes.
+\end{itemize}
+
+Ces figures donnent une vision plus fine de la séparation probabiliste que la simple accuracy.
+
+\subsection*{Fichiers de logs}
+
+Le pipeline alimente automatiquement plusieurs fichiers CSV :
+
+\begin{itemize}
+    \item \texttt{run\_parameters.csv} : hyperparamètres utilisés ;
+    \item \texttt{hadron\_performances.csv} : accuracy, AUC, logloss ;
+    \item \texttt{run\_comments.csv} : remarques associées au run.
+\end{itemize}
+
+\subsection*{Export du jeu de test}
+
+Les variables du jeu de test sont également sauvegardées :
+
+\begin{center}
+\texttt{X\_test\_<run\_id>.csv}
+\end{center}
+
+Cet export a été prévu pour des analyses futures d’interprétabilité du modèle, par exemple :
+
+\begin{itemize}
+    \item SHAP values ;
+    \item importance locale des variables ;
+    \item étude événement par événement.
+\end{itemize}
+
+\subsection*{Intérêt méthodologique}
+
+Cette organisation systématique des sorties permet :
+
+\begin{itemize}
+    \item la traçabilité complète des résultats ;
+    \item la comparaison rigoureuse entre différents entraînements ;
+    \item la reproductibilité ;
+    \item la préparation d’analyses avancées ultérieures.
+\end{itemize}
+
+\section{Discussion et remarques pratiques}
+\label{app:pid_discussion}
+
+L’utilisation de \texttt{LightGBM} pour le PID hadronique s’est révélée particulièrement adaptée au cadre de cette étude. Les données disponibles sont en effet structurées sous forme tabulaire, avec un nombre modéré de variables physiques déjà informatives.
+
+\subsection*{Forces de l’approche}
+
+Plusieurs avantages ont été observés en pratique :
+
+\begin{itemize}
+    \item temps d’entraînement très court, même sur de grands échantillons ;
+    \item excellente stabilité numérique ;
+    \item faible sensibilité à l’échelle des variables ;
+    \item robustesse face aux corrélations entre observables ;
+    \item bonnes performances sans réglages excessifs ;
+    \item interprétabilité naturelle via l’importance des variables.
+\end{itemize}
+
+Ces propriétés en font un excellent choix comme baseline pour l’identification de particules dans le SDHCAL.
+
+\subsection*{Limites}
+
+Malgré ses performances, cette approche présente également certaines limitations.
+
+\begin{itemize}
+    \item Le modèle travaille uniquement sur des variables résumées, et non sur l’information hit-par-hit complète.
+    \item Certaines corrélations spatiales fines entre cellules voisines peuvent être perdues.
+    \item Les performances dépendent directement de la qualité des descripteurs construits en amont.
+    \item L’interprétation physique globale reste plus indirecte qu’avec une paramétrisation analytique.
+\end{itemize}
+
+\subsection*{Confusions physiques attendues}
+
+Les principales ambiguïtés observées concernent généralement la séparation :
+
+\[
+\pi^- \leftrightarrow p
+\]
+
+notamment à basse énergie, où les gerbes contiennent peu de hits et présentent des signatures proches.
+
+À plus haute énergie, la multiplication des observables exploitables améliore naturellement la séparabilité.
+
+\subsection*{Pourquoi LightGBM avant un réseau profond ?}
+
+Dans ce travail, LightGBM constitue une étape méthodologiquement rationnelle avant l’usage de réseaux plus complexes :
+
+\begin{itemize}
+    \item mise en place rapide ;
+    \item besoin réduit en ressources GPU ;
+    \item interprétation plus simple ;
+    \item benchmark solide pour comparer CNN ou GNN.
+\end{itemize}
+
+\subsection*{Perspectives}
+
+Plusieurs extensions sont envisageables :
+
+\begin{itemize}
+    \item classification binaire pion/proton dédiée ;
+    \item calibration des probabilités (\emph{Platt scaling}, isotonic regression) ;
+    \item optimisation bayésienne des hyperparamètres ;
+    \item utilisation conjointe avec un estimateur d’énergie ;
+    \item fusion avec CNN/GNN dans une approche hybride.
+\end{itemize}
+
+\subsection*{Bilan}
+
+En résumé, \texttt{LightGBM} fournit un compromis très favorable entre simplicité, rapidité et performance physique. Il constitue une solution robuste pour la chaîne PID utilisée dans ce mémoire.
+
+\section{Conclusion}
+
+Cette annexe a présenté le pipeline complet de classification hadronique basé sur \texttt{LightGBM}, utilisé comme brique principale d’identification des particules dans ce travail.
+
+À partir des descripteurs extraits par \texttt{ShowerAnalyzer}, le modèle apprend à distinguer les signatures de gerbes associées aux différentes espèces hadroniques. Le pipeline inclut :
+
+\begin{itemize}
+    \item la préparation rigoureuse des jeux de données ;
+    \item le nettoyage et le prétraitement des variables ;
+    \item un découpage strict train / validation / test ;
+    \item un rééquilibrage du train par \texttt{SMOTE} ;
+    \item un entraînement régularisé avec arrêt anticipé ;
+    \item une évaluation multi-métriques ;
+    \item une sauvegarde systématique des résultats.
+\end{itemize}
+
+L’ensemble constitue une chaîne robuste, reproductible et facilement extensible.
+
+Dans la suite du mémoire, ce classificateur joue un rôle central dans les scénarios réalistes sur données mixtes, où l’identification correcte de la particule conditionne directement la qualité de la reconstruction d’énergie.
+
+Enfin, cette approche fournit également une base solide pour des développements futurs vers des méthodes plus avancées exploitant directement la granularité complète du détecteur, telles que les réseaux convolutifs 3D ou les réseaux de neurones sur graphes.
+
+\clearpage

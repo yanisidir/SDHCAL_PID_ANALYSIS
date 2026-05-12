@@ -1,0 +1,118 @@
+\chapter{Identification hadronique : physique et enjeux expérimentaux}
+\label{chap:pid_physique}
+
+Ce chapitre précise les raisons physiques et expérimentales qui motivent l'identification hadronique dans le SDHCAL. Après avoir rappelé l'intérêt du PID, nous discutons les différences attendues entre pions, protons et kaons neutres longs, puis les conséquences de cette séparation pour la reconstruction calorimétrique.
+
+\section{Pourquoi distinguer les hadrons ?}
+
+L'identification des particules (\emph{Particle Identification}, PID) constitue une étape importante dans les expériences de physique des hautes énergies. Dans les états finals hadroniques, les particules produites forment souvent des jets issus de la fragmentation de quarks et de gluons. Une mauvaise identification des espèces peut conduire à une association incorrecte des dépôts d'énergie, à une calibration inadéquate ou à une dégradation de la résolution globale \cite{pdg2024}.
+
+Le besoin de PID apparaît aussi dans les campagnes de faisceaux-tests. Les faisceaux secondaires utilisés pour calibrer les calorimètres ne sont pas parfaitement purs : un faisceau nominalement composé de pions peut contenir des protons, des muons ou d'autres composantes parasites. Si toutes les particules sont traitées comme une seule espèce de référence, la réponse moyenne du détecteur peut être biaisée.
+
+Dans le cas du SDHCAL, la haute granularité spatiale et la lecture semi-digitale à trois seuils fournissent une information plus riche qu'un simple signal intégré. La morphologie tridimensionnelle des gerbes devient alors exploitable pour différencier les espèces hadroniques événement par événement.
+
+\section{Différences physiques entre pions, protons et kaons neutres longs}
+\label{sec:differences-physiques}
+
+Les trois espèces étudiées présentent des propriétés fondamentales différentes, résumées dans le Tableau~\ref{tab:proprietes-pid}. Ces différences influencent leur mode d'interaction avec la matière et donc la structure moyenne de leurs gerbes.
+
+\begin{table}[!ht]
+    \centering
+    \caption{Propriétés fondamentales des trois espèces hadroniques étudiées et conséquences calorimétriques attendues \cite{pdg2024}.}
+    \label{tab:proprietes-pid}
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabularx}{\textwidth}{lccc>{\raggedright\arraybackslash}X}
+        \hline
+        \textbf{Espèce} & \textbf{Masse} & \textbf{Charge} & \textbf{Nature} &
+        \textbf{Conséquence principale} \\
+        \hline
+        $\pi^-$   & 139.6~MeV & $-1$ & Méson   &
+            Ionisation initiale ; composante EM souvent marquée \\
+        $p$       & 938.3~MeV & $+1$ & Baryon  &
+            Gerbe plus hadronique et plus profonde \\
+        $K^0_L$   & 497.6~MeV & $0$  & Méson neutre &
+            Pas d'ionisation initiale ; départ de gerbe variable \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+\subsection{Pions chargés \texorpdfstring{$\pi^-$}{pi-}}
+
+Les pions chargés sont des mésons légers. Avant leur première interaction nucléaire, ils déposent de l'énergie par ionisation dans les premières couches du calorimètre. Lors du développement de la gerbe, la production de pions neutres secondaires, suivie de la désintégration $\pi^0 \to \gamma\gamma$, alimente la composante électromagnétique de la cascade. Les gerbes de pions présentent ainsi souvent un développement relativement précoce et un cœur électromagnétique marqué.
+
+\subsection{Protons \texorpdfstring{$p$}{p}}
+
+Les protons sont des baryons stables de masse plus élevée. Leur nature baryonique modifie la dynamique de la cascade, notamment à travers la conservation du nombre baryonique. À énergie identique, leurs gerbes tendent en moyenne à être plus hadroniques, plus profondes et plus diffuses que celles des pions, avec une fraction électromagnétique généralement plus faible.
+
+\subsection{Kaons neutres longs \texorpdfstring{$K^0_L$}{KL0}}
+
+Les kaons neutres longs ne portent pas de charge électrique. Ils ne déposent donc pas d'énergie par ionisation avant leur première interaction nucléaire. Le point de départ de leur gerbe est gouverné par leur libre parcours moyen dans le matériau, ce qui rend leur développement longitudinal plus variable. Leur contenu en étrangeté implique également des voies de réaction différentes de celles des pions et des protons.
+
+\section{Signatures calorimétriques attendues}
+\label{sec:comparaison-signatures}
+
+Les différences de masse, de charge et de structure interne se traduisent par des signatures calorimétriques moyennes distinctes. Ces tendances restent statistiques, car les gerbes hadroniques présentent de fortes fluctuations événement par événement.
+
+\begin{table}[!ht]
+    \centering
+    \caption{Comparaison qualitative des signatures calorimétriques moyennes attendues dans le SDHCAL.}
+    \label{tab:comparaison-signatures}
+    \renewcommand{\arraystretch}{1.4}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccc}
+        \hline
+        \textbf{Caractéristique} &
+        \textbf{Pion $\pi^-$} &
+        \textbf{Proton $p$} &
+        \textbf{Kaon neutre long $K^0_L$} \\
+        \hline
+        Signal d'ionisation avant gerbe    & Oui               & Oui               & Non \\
+        Fraction électromagnétique moyenne & Élevée            & Plus faible       & Variable \\
+        Profondeur de première interaction & Plutôt précoce    & Plutôt précoce    & Plus variable \\
+        Développement longitudinal         & Relativement précoce & Plus profond   & Variable \\
+        Extension transverse               & Modérée           & Plus large        & Variable \\
+        Fluctuations événement/événement   & Importantes       & Importantes       & Très importantes \\
+        \hline
+    \end{tabular}%
+    }
+\end{table}
+
+Ces différences suggèrent que des observables de morphologie, telles que le profil longitudinal, la compacité transverse, la profondeur du premier dépôt ou la répartition entre seuils, peuvent porter une information discriminante exploitable pour le PID.
+
+\section{Conséquences pour la reconstruction calorimétrique}
+\label{sec:consequences-reco}
+
+L'identification de l'espèce incidente ne constitue pas seulement un problème de classification. Elle peut également améliorer la reconstruction de l'énergie.
+
+En effet, si deux espèces présentent des réponses moyennes différentes dans le calorimètre, l'application d'une calibration unique introduit un biais. Une calibration ajustée sur des pions peut par exemple ne pas être optimale pour des protons ou des kaons. Le PID permet alors de router les événements vers une calibration adaptée à l'espèce prédite, ou au minimum de mieux contrôler les effets liés aux mélanges d'espèces.
+
+Dans ce travail, cette idée est étudiée à travers trois scénarios :
+
+\begin{enumerate}[label=(\roman*)]
+    \item une calibration pion appliquée à toutes les espèces ;
+    \item une calibration assistée par PID, utilisant la classe prédite ;
+    \item une calibration idéale, utilisant la vérité issue de la simulation.
+\end{enumerate}
+
+Cette comparaison permet d'évaluer quantitativement dans quelle mesure le PID peut rapprocher la reconstruction réelle d'une situation idéale où l'espèce incidente serait parfaitement connue.
+
+\section{Lien avec le SDHCAL}
+\label{sec:lien-sdhcal-pid}
+
+Le SDHCAL est particulièrement adapté à cette problématique grâce à sa granularité fine et à sa lecture semi-digitale. Ces caractéristiques donnent accès à plusieurs familles d'observables :
+
+\begin{itemize}
+    \item observables longitudinales : profondeur du premier dépôt, position du maximum, extension de la gerbe ;
+    \item observables transverses : compacité, rayon effectif, dispersion spatiale ;
+    \item observables de densité : nombre de hits, répartition entre les seuils 1, 2 et 3 ;
+    \item observables temporelles éventuelles : distribution des temps de dépôt.
+\end{itemize}
+
+L'exploitation conjointe de ces informations par des méthodes d'apprentissage supervisé constitue le cœur de l'étude d'identification hadronique présentée dans la suite du mémoire.
+
+\section{Conclusion}
+\label{sec:conclusion-pid-physique}
+
+La séparation entre pions, protons et kaons neutres longs repose sur des différences physiques réelles : charge électrique, masse, nature mésonique ou baryonique, et dynamique d'interaction hadronique. Ces différences se traduisent par des signatures calorimétriques distinctes, notamment sur le développement longitudinal, la compacité transverse et la fraction électromagnétique moyenne.
+
+Cependant, les fortes fluctuations des gerbes hadroniques rendent cette séparation non triviale. Les signatures des différentes espèces se recouvrent partiellement, ce qui justifie l'utilisation de méthodes multivariées et d'apprentissage automatique capables d'exploiter simultanément plusieurs observables de gerbe.

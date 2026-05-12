@@ -96,6 +96,7 @@ The repository assumes ROOT trees containing either per-hit detector information
 |-- PID_RECONSTRUCTION/              PID-aware vs non-PID energy reconstruction studies
 |-- tools/                           Utility scripts for visualization and track counting
 |-- results/                         Curated result and plot folders moved with git mv
+|-- report/                          M2 internship LaTeX report and compiled PDF
 |-- docs/                            Human-readable project documentation
 |-- CITATION.cff                     Suggested citation metadata
 `-- LICENSE.md                       Non-binding license selection note
@@ -108,6 +109,12 @@ See also:
 - [Model summary](docs/model_summary.md)
 - [Results summary](docs/results_summary.md)
 - [Repository map](docs/repository_map.md)
+
+## Internship Report
+
+The M2 internship report is included in [report/](report/) as a LaTeX project with its compiled PDF, [report/main.pdf](report/main.pdf). The report provides the longer scientific narrative behind the code: SDHCAL detector context, semi-digital calorimetry, hadronic shower variables, PID methods, energy reconstruction, and PID-energy coupling studies.
+
+See [report/README.md](report/README.md) for the report structure and compilation instructions.
 
 ## Data Availability
 

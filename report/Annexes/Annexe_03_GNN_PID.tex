@@ -1,0 +1,540 @@
+\chapter{Classification hadronique par réseau de neurones graphique}
+\label{app:gnn}
+
+\section{Introduction}
+
+Les calorimètres hautement granulaires, tels que le SDHCAL, produisent une information événementielle naturellement structurée sous forme d’un ensemble discret de hits localisés dans l’espace et dans le temps. Chaque événement peut ainsi être décrit comme un nuage de points irrégulier, dont la topologie dépend directement du développement de la gerbe hadronique.
+
+Dans ce contexte, les approches classiques fondées sur des variables globales résument l’événement à travers un nombre limité de descripteurs physiques (multiplicités, barycentres, densités, profils longitudinaux, etc.). Bien que performantes, ces méthodes ne conservent qu’une partie de l’information géométrique fine disponible dans le détecteur.
+
+Les \emph{Graph Neural Networks} (GNN) constituent une alternative moderne particulièrement adaptée à ce type de données. Contrairement aux réseaux convolutifs classiques, qui nécessitent une représentation régulière sur grille, les GNN opèrent directement sur des structures irrégulières où chaque hit devient un nœud relié à ses voisins par des arêtes définissant la connectivité locale de la gerbe.
+
+L’objectif de cette étude est d’évaluer la faisabilité d’une classification hadronique supervisée à l’aide d’un réseau de neurones graphique appliqué aux événements simulés du SDHCAL. Trois espèces sont considérées : les pions chargés \((\pi^-)\), les protons \((p)\) et les kaons neutres \((K^0)\).
+
+Cette étude doit être considérée comme une \textbf{preuve de concept exploratoire}. Elle vise principalement à valider la chaîne complète de traitement (préparation des graphes, apprentissage, inférence, métriques) et à estimer le potentiel de cette famille de modèles pour de futures analyses sur des jeux de données plus volumineux.
+
+\section{Jeu de données et construction des échantillons}
+
+Les données utilisées proviennent de trois fichiers au format \texttt{CSV}, correspondant respectivement aux événements simulés de pions, protons et kaons. Chaque ligne représente un hit individuel du détecteur et contient notamment les coordonnées spatiales, l’information temporelle ainsi que le seuil semi-digital franchi.
+
+Les trois classes sont encodées selon la convention suivante :
+\[
+\pi^- \rightarrow 0, \qquad
+p \rightarrow 1, \qquad
+K^0 \rightarrow 2.
+\]
+
+Afin de garantir l’indépendance statistique entre apprentissage et évaluation, les séparations \emph{train / validation / test} sont effectuées au niveau des \textbf{événements} et non au niveau des hits. Chaque événement reçoit un identifiant unique construit à partir du numéro d’événement et de l’espèce considérée. Cette précaution évite qu’une partie des hits d’un même événement apparaisse simultanément dans plusieurs sous-échantillons.
+
+Le découpage est réalisé de manière stratifiée (\texttt{StratifiedShuffleSplit}) afin de conserver des proportions similaires entre classes dans chaque ensemble :
+
+\begin{itemize}
+    \item \textbf{Entraînement} : 70\,\% des événements ;
+    \item \textbf{Validation} : 10\,\% des événements ;
+    \item \textbf{Test} : 20\,\% des événements.
+\end{itemize}
+
+Les valeurs manquantes éventuelles sont supprimées avant la phase de construction des graphes. Par ailleurs, la variable temporelle est discrétisée au centième d’unité :
+
+\[
+t \longrightarrow \frac{\lfloor 100\,t \rfloor}{100},
+\]
+
+ce qui permet de limiter les fluctuations numériques trop fines tout en conservant l’information utile à la séparation des classes.
+
+Chaque sous-échantillon est ensuite converti en une collection de graphes indépendants, un graphe représentant un événement complet du calorimètre.
+
+\section{Prétraitement des nœuds}
+
+Chaque événement est représenté par un graphe dont les nœuds correspondent aux hits enregistrés dans le calorimètre. Avant la construction des arêtes, un prétraitement est appliqué aux variables décrivant chaque hit afin d’homogénéiser les échelles numériques et de faciliter l’apprentissage.
+
+Pour un hit donné, les informations brutes disponibles sont :
+
+\[
+(x,\; y,\; z,\; t,\; \mathrm{thr}),
+\]
+
+où \((x,y,z)\) désignent la position spatiale, \(t\) le temps associé au hit, et \(\mathrm{thr}\in\{1,2,3\}\) le seuil semi-digital franchi.
+
+\subsection*{Normalisation spatiale}
+
+Les coordonnées spatiales sont transformées à l’aide d’un \texttt{RobustScaler}, ajusté uniquement sur l’échantillon d’entraînement. Ce choix repose sur la médiane et l’intervalle interquartile, ce qui le rend moins sensible aux valeurs extrêmes qu’une standardisation classique.
+
+On obtient ainsi :
+
+\[
+(x,y,z)\;\longrightarrow\;(x',y',z').
+\]
+
+\subsection*{Transformation temporelle}
+
+La variable temporelle présente généralement des distributions non gaussiennes. Afin de la rendre plus régulière, un \texttt{QuantileTransformer} est appliqué, avec une sortie imposée suivant une loi normale centrée réduite :
+
+\[
+t \longrightarrow t'.
+\]
+
+Cette transformation améliore la stabilité numérique et limite l’influence d’éventuelles queues de distribution.
+
+\subsection*{Encodage du seuil}
+
+Le seuil semi-digital \(\mathrm{thr}\) est converti en représentation \emph{one-hot} sur trois composantes :
+
+\[
+1 \rightarrow (1,0,0), \qquad
+2 \rightarrow (0,1,0), \qquad
+3 \rightarrow (0,0,1).
+\]
+
+Cela évite d’introduire artificiellement une relation linéaire entre les trois seuils.
+
+\subsection*{Vecteur final de caractéristiques}
+
+Après transformation, chaque nœud est décrit par un vecteur de dimension 7 :
+
+\[
+\mathbf{x}_i =
+(x'_i,\; y'_i,\; z'_i,\; t'_i,\; e^{(1)}_i,\; e^{(2)}_i,\; e^{(3)}_i).
+\]
+
+Ce vecteur constitue l’entrée du réseau neuronal graphique pour chaque hit du calorimètre.
+
+\section{Construction du graphe}
+
+Une fois les nœuds définis, chaque événement est converti en graphe orienté en reliant les hits selon un critère de proximité spatiale et de causalité longitudinale. L’objectif est de reconstruire une topologie cohérente avec la propagation de la gerbe hadronique dans le calorimètre.
+
+\subsection*{Voisinage de type \(k\)-plus proches voisins}
+
+Pour chaque nœud \(i\), on recherche ses \(k\) voisins les plus proches parmi les hits situés en amont du développement de la gerbe. Le paramètre utilisé dans cette étude est :
+
+\[
+k = 8.
+\]
+
+La distance entre deux hits \(i\) et \(j\) est calculée à partir des coordonnées spatiales normalisées :
+
+\[
+d_{ij}^{2} =
+(x'_i-x'_j)^2 + (y'_i-y'_j)^2 + (z'_i-z'_j)^2.
+\]
+
+Les huit voisins minimisant cette distance sont retenus.
+
+\subsection*{Contrainte causale en profondeur}
+
+Afin de préserver un sens physique de propagation, seuls les hits vérifiant :
+
+\[
+z_j < z_i
+\]
+
+peuvent être connectés au hit \(i\). Ainsi, un nœud n’est relié qu’à des dépôts situés plus tôt dans la profondeur du détecteur.
+
+Cette contrainte évite la création d’arêtes non physiques entre régions tardives et précoces de la gerbe.
+
+\subsection*{Fenêtre temporelle}
+
+Une sélection supplémentaire est appliquée sur la différence temporelle entre hits connectés :
+
+\[
+|t_i - t_j| < \Delta t,
+\qquad
+\Delta t = 2.0.
+\]
+
+Les arêtes incompatibles avec cette fenêtre sont supprimées. Cette étape renforce la cohérence spatio-temporelle du graphe.
+
+\subsection*{Structure finale}
+
+Le graphe obtenu pour chaque événement est donc défini par :
+
+\begin{itemize}
+    \item un ensemble de nœuds correspondant aux hits ;
+    \item un vecteur de caractéristiques associé à chaque nœud ;
+    \item un ensemble d’arêtes reliant localement les hits voisins compatibles en profondeur et en temps.
+\end{itemize}
+
+Cette représentation permet au réseau de neurones graphique d’exploiter directement la morphologie tridimensionnelle de la gerbe sans imposer de discrétisation régulière de l’espace.
+
+\section{Architecture du modèle}
+
+Le classificateur utilisé repose sur une architecture hybride combinant plusieurs opérateurs de convolution sur graphe. L’objectif est de capturer à la fois les corrélations locales entre hits voisins, les motifs directionnels de la gerbe ainsi que des structures plus globales à l’échelle de l’événement.
+
+\subsection*{Projection initiale}
+
+Le vecteur d’entrée de dimension 7 associé à chaque nœud est d’abord projeté dans un espace latent de dimension plus élevée au moyen d’une couche linéaire suivie d’une activation \texttt{GELU} :
+
+\[
+\mathbf{h}^{(0)} = \mathrm{GELU}(W_0 \mathbf{x} + b_0),
+\]
+
+avec une dimension cachée fixée à :
+
+\[
+d_{\mathrm{hidden}} = 64.
+\]
+
+\subsection*{Bloc d’attention graphique}
+
+Une première couche \texttt{GATConv} (\emph{Graph Attention Network}) est ensuite appliquée avec quatre têtes d’attention. Ce mécanisme permet au réseau d’attribuer des poids différents aux voisins d’un nœud selon leur importance dans la structure locale de la gerbe.
+
+La sortie est ensuite normalisée par une couche \texttt{GraphNorm}, puis activée par une fonction ReLU.
+
+\subsection*{Bloc convolutif polynomial}
+
+La seconde étape repose sur une couche \texttt{TAGConv} (\emph{Topology Adaptive Graph Convolution}), capable d’agréger l’information issue de plusieurs ordres de voisinage. Cette opération permet d’étendre le champ réceptif du réseau et de capturer des corrélations à moyenne portée.
+
+La sortie est également suivie d’une normalisation \texttt{GraphNorm} puis d’une activation ReLU.
+
+\subsection*{Bloc de convolution finale}
+
+Une troisième couche \texttt{GraphConv} est utilisée pour raffiner la représentation latente des nœuds avant l’agrégation globale.
+
+\subsection*{Lecture globale de l’événement}
+
+Les embeddings de nœuds sont convertis en une représentation unique de l’événement par concaténation de deux opérations de pooling :
+
+\[
+\mathbf{g} =
+\left[
+\mathrm{MaxPool}(\mathbf{h}),
+\;
+\mathrm{MeanPool}(\mathbf{h})
+\right].
+\]
+
+Le \emph{max pooling} capte les signatures locales dominantes, tandis que le \emph{mean pooling} encode l’activité moyenne de la gerbe.
+
+\subsection*{Classifieur final}
+
+Le vecteur global est transmis à un perceptron multicouche comprenant :
+
+\begin{itemize}
+    \item une couche linéaire,
+    \item un \texttt{Dropout}(0.3),
+    \item une activation \texttt{GELU},
+    \item une couche de sortie à trois neurones.
+\end{itemize}
+
+La sortie finale est normalisée par une fonction \(\log\)-softmax produisant les probabilités des trois classes :
+
+\[
+(\pi^-,\, p,\, K^0).
+\]
+
+\subsection*{Résumé}
+
+Cette architecture combine attention locale, propagation multi-échelle et agrégation globale, ce qui en fait un candidat naturel pour l’analyse de gerbes hadroniques dans un calorimètre fortement granulaire.
+
+\section{Stratégie d'entraînement}
+
+L’apprentissage du réseau est réalisé de manière supervisée à partir des graphes étiquetés correspondant aux trois espèces hadroniques considérées. Les paramètres du modèle sont ajustés par minimisation d’une fonction de coût multiclasses sur l’échantillon d’entraînement.
+
+\subsection*{Fonction de coût}
+
+La sortie du réseau étant exprimée sous forme de \(\log\)-probabilités, la perte utilisée est la \texttt{Negative Log-Likelihood Loss} :
+
+\[
+\mathcal{L}
+=
+-\frac{1}{N}
+\sum_{i=1}^{N}
+\log p_{\theta}(y_i \mid G_i),
+\]
+
+où \(G_i\) désigne le graphe de l’événement \(i\), \(y_i\) sa classe vraie, et \(p_{\theta}\) la probabilité prédite par le modèle paramétré par \(\theta\).
+
+\subsection*{Optimiseur}
+
+L’optimisation est effectuée avec l’algorithme \texttt{AdamW}, combinant descente de gradient adaptative et régularisation de type décroissance des poids :
+
+\[
+\mathrm{lr} = 10^{-3}, \qquad
+\lambda_{\mathrm{wd}} = 10^{-4}.
+\]
+
+Ce choix offre en pratique une convergence stable pour les architectures profondes sur graphe.
+
+\subsection*{Mini-lots et durée maximale}
+
+Les graphes sont regroupés en mini-lots de taille :
+
+\[
+\texttt{batch\_size} = 64.
+\]
+
+Le nombre maximal d’époques est fixé à :
+
+\[
+N_{\mathrm{epochs}} = 50.
+\]
+
+L’entraînement est exécuté sur processeur graphique (\texttt{CUDA}) lorsque celui-ci est disponible.
+
+\subsection*{Planification du taux d’apprentissage}
+
+Un scheduler de type \texttt{ReduceLROnPlateau} est appliqué sur la perte de validation. Lorsque celle-ci cesse de diminuer pendant trois époques consécutives, le taux d’apprentissage est réduit d’un facteur deux :
+
+\[
+\mathrm{lr} \rightarrow \frac{\mathrm{lr}}{2}.
+\]
+
+Cette stratégie permet de raffiner l’optimisation à l’approche du minimum.
+
+\subsection*{Early stopping}
+
+Afin d’éviter le surapprentissage, un mécanisme d’arrêt anticipé est utilisé. Le meilleur modèle est défini comme celui maximisant l’accuracy sur l’échantillon de validation. Si aucune amélioration n’est observée pendant :
+
+\[
+10 \text{ époques}
+\]
+
+consécutives, l’apprentissage est interrompu.
+
+Les poids correspondants à la meilleure époque sont sauvegardés puis rechargés pour l’évaluation finale sur l’ensemble de test.
+
+\subsection*{Reproductibilité}
+
+Les principales sources d’aléa sont fixées par une graine numérique constante :
+
+\[
+\texttt{seed} = 42.
+\]
+
+Les séparations des données, l’initialisation du réseau et les opérations stochastiques sont ainsi rendues reproductibles.
+
+\section{Métriques d’évaluation et résultats obtenus}
+
+Les performances du modèle sont évaluées exclusivement sur l’ensemble de test, totalement indépendant des données utilisées pour l’apprentissage et la validation. Plusieurs indicateurs complémentaires sont retenus afin de quantifier la qualité de la classification multiclasses.
+
+\subsection*{Accuracy globale}
+
+La métrique principale utilisée dans cette étude est l’accuracy :
+
+\[
+\mathrm{Acc}
+=
+\frac{1}{N}
+\sum_{i=1}^{N}
+\mathbf{1}\!\left(\hat{y}_i = y_i\right),
+\]
+
+où \(\hat{y}_i\) est la classe prédite et \(y_i\) la vérité générateur.
+
+Elle mesure la fraction totale d’événements correctement identifiés parmi les trois espèces hadroniques.
+
+\subsection*{Matrice de confusion}
+
+Une matrice de confusion est également construite afin d’identifier les principales ambiguïtés entre classes. Elle permet notamment d’étudier :
+
+\begin{itemize}
+    \item la séparation pion / proton ;
+    \item la confusion entre kaons neutres et autres hadrons ;
+    \item les asymétries de classification entre espèces.
+\end{itemize}
+
+Cette représentation est particulièrement informative lorsque les classes présentent des signatures proches dans le calorimètre.
+
+\subsection*{Courbes d’apprentissage}
+
+Au cours de l’entraînement, les grandeurs suivantes sont enregistrées à chaque époque :
+
+\begin{itemize}
+    \item perte d’entraînement ;
+    \item perte de validation ;
+    \item accuracy de validation.
+\end{itemize}
+
+Leur évolution permet de vérifier la stabilité de l’optimisation ainsi que l’apparition éventuelle d’un surapprentissage.
+
+\subsection*{Résultats globaux}
+
+Les performances obtenues montrent qu’un réseau de neurones graphique est capable d’extraire une information discriminante directement à partir de la topologie des hits, sans recours explicite à des variables reconstruites manuellement.
+
+Les résultats restent cependant modérés dans cette configuration exploratoire, ce qui s’explique par plusieurs facteurs :
+
+\begin{itemize}
+    \item taille limitée de l’échantillon d’apprentissage ;
+    \item architecture volontairement compacte ;
+    \item complexité intrinsèque de la séparation hadronique multiclasses ;
+    \item recouvrement partiel des signatures calorimétriques entre espèces.
+\end{itemize}
+
+Néanmoins, la convergence observée et la capacité du modèle à dépasser une séparation aléatoire démontrent la pertinence de l’approche.
+
+\subsection*{Interprétation}
+
+Ces résultats doivent être interprétés comme une \textbf{preuve de faisabilité}. Ils montrent que les GNN constituent une voie crédible pour exploiter la granularité native du SDHCAL, en particulier dans des contextes où les méthodes fondées sur des observables globales atteignent leurs limites.
+
+\section{Limites observées et perspectives d’amélioration}
+
+Bien que fonctionnelle, l’implémentation présentée dans cette étude demeure volontairement exploratoire et plusieurs axes d’amélioration peuvent être identifiés. Les performances obtenues ne doivent donc pas être interprétées comme une limite intrinsèque des réseaux de neurones graphiques, mais comme un premier point de référence.
+
+\subsection*{Volume statistique}
+
+La performance d’un modèle profond dépend fortement de la taille de l’échantillon d’apprentissage. Dans le cas présent, l’augmentation du nombre d’événements disponibles constituerait l’un des leviers les plus directs pour améliorer la généralisation du réseau et réduire les fluctuations statistiques.
+
+Une montée en statistique permettrait également l’emploi d’architectures plus expressives, actuellement susceptibles de surapprendre sur un jeu de données restreint.
+
+\subsection*{Richesse des variables d’entrée}
+
+Le modèle exploite uniquement les informations élémentaires associées à chaque hit : position, temps et seuil semi-digital. Des variables supplémentaires pourraient être introduites, par exemple :
+
+\begin{itemize}
+    \item indices de couche ou coordonnées discrètes \((I,J,K)\) ;
+    \item informations locales de densité ;
+    \item voisinages multi-rayons ;
+    \item temps recalibrés ou résolus plus finement ;
+    \item descripteurs hybrides issus de \texttt{ShowerAnalyzer}.
+\end{itemize}
+
+Une approche combinant features expertes et apprentissage profond pourrait offrir un compromis particulièrement performant.
+
+\subsection*{Topologie du graphe}
+
+Le schéma actuel repose sur un voisinage \(k\)-NN causal avec \(k=8\). D’autres constructions peuvent être envisagées :
+
+\begin{itemize}
+    \item graphes dynamiques recalculés à chaque couche ;
+    \item rayon fixe en distance physique ;
+    \item connectivité hiérarchique entre couches ;
+    \item arêtes pondérées par distance ou compatibilité temporelle.
+\end{itemize}
+
+La définition optimale du graphe constitue souvent un facteur déterminant dans les performances finales.
+
+\subsection*{Architecture neuronale}
+
+Le réseau employé reste relativement compact. Des variantes plus avancées pourraient être testées :
+
+\begin{itemize}
+    \item architectures plus profondes ;
+    \item blocs résiduels ;
+    \item transformers sur graphes ;
+    \item attention multi-échelle ;
+    \item modèles spatio-temporels dédiés.
+\end{itemize}
+
+Ces approches sont particulièrement prometteuses pour les détecteurs hautement granulaires.
+
+\subsection*{Objectifs physiques futurs}
+
+Au-delà de la simple classification hadronique, les GNN pourraient être appliqués à des tâches plus ambitieuses :
+
+\begin{itemize}
+    \item identification pion / proton à haute énergie ;
+    \item séparation hadrons / leptons ;
+    \item régression directe de l’énergie ;
+    \item reconstruction de sous-structures de gerbes ;
+    \item Particle Flow dans les futurs collisionneurs.
+\end{itemize}
+
+\subsection*{Bilan}
+
+Cette première étude valide l’intérêt méthodologique des réseaux de neurones graphiques pour le SDHCAL. Avec davantage de statistiques, une topologie optimisée et une architecture plus avancée, cette famille de modèles pourrait devenir une composante importante des futures chaînes de reconstruction calorimétrique.
+
+\section{Conclusion}
+
+Cette annexe a présenté la mise en œuvre d’un pipeline complet de classification hadronique fondé sur les réseaux de neurones graphiques appliqués à des événements simulés du SDHCAL. Chaque événement est représenté sous forme de graphe, les hits constituant les nœuds et leur voisinage physique définissant les arêtes.
+
+L’étude montre qu’il est possible d’exploiter directement la structure tridimensionnelle et temporelle des gerbes sans recourir exclusivement à des variables globales construites manuellement. Cette propriété constitue l’un des principaux atouts des approches GNN dans le cadre des calorimètres hautement granulaires.
+
+Les performances obtenues dans cette configuration demeurent exploratoires, mais elles confirment la faisabilité technique de la méthode ainsi que sa capacité à extraire une information discriminante pertinente. Elles doivent être considérées comme une première étape vers des développements plus ambitieux.
+
+À moyen terme, l’augmentation de la statistique disponible, l’optimisation de la connectivité des graphes et l’utilisation d’architectures plus avancées devraient permettre d’améliorer significativement les résultats.
+
+Ainsi, les réseaux de neurones graphiques apparaissent comme une voie particulièrement prometteuse pour les futures stratégies d’identification de particules et de reconstruction d’énergie dans les détecteurs calorimétriques de nouvelle génération.
+
+
+\section{Tableau récapitulatif}
+
+\begin{table}[H]
+\centering
+\caption{Résumé du pipeline de classification hadronique par réseau de neurones graphique.}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm}X}
+\toprule
+\textbf{Élément} & \textbf{Description} \\
+\midrule
+
+Objectif &
+Classification supervisée de trois espèces hadroniques :
+\(\pi^-\), proton, \(K^0\). \\
+
+Type de données &
+Événements SDHCAL convertis en graphes, un graphe par événement. \\
+
+Nœuds &
+Hits individuels du calorimètre. \\
+
+Features des nœuds &
+Coordonnées spatiales normalisées, temps transformé, encodage one-hot du seuil semi-digital. \\
+
+Dimension d’entrée &
+7 variables par nœud. \\
+
+Construction des arêtes &
+Voisinage \(k\)-NN causal avec \(k=8\), contrainte en profondeur et fenêtre temporelle \(\Delta t = 2.0\). \\
+
+Prétraitement &
+\texttt{RobustScaler} pour l’espace, \texttt{QuantileTransformer} pour le temps. \\
+
+Architecture &
+Projection linéaire + \texttt{GATConv} + \texttt{TAGConv} + \texttt{GraphConv}. \\
+
+Pooling global &
+Concaténation \texttt{global max pool} + \texttt{global mean pool}. \\
+
+Classifieur final &
+MLP avec \texttt{Dropout}(0.3) et sortie à trois classes. \\
+
+Fonction de coût &
+Negative Log-Likelihood multiclasses. \\
+
+Optimiseur &
+\texttt{AdamW}, taux initial \(10^{-3}\), weight decay \(10^{-4}\). \\
+
+Régularisation &
+Scheduler \texttt{ReduceLROnPlateau} + early stopping (patience = 10). \\
+
+Découpage des données &
+70\,\% entraînement, 10\,\% validation, 20\,\% test. \\
+
+Métriques &
+Accuracy, matrice de confusion, courbes d’apprentissage. \\
+
+Forces &
+Exploitation directe de la topologie 3D des gerbes, pas de features manuelles obligatoires. \\
+
+Limites &
+Étude exploratoire, statistique limitée, architecture compacte. \\
+
+Perspective &
+PID avancé, régression d’énergie, Particle Flow, modèles spatio-temporels. \\
+
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section*{Bilan de l’annexe}
+\phantomsection
+\addcontentsline{toc}{section}{Bilan de l’annexe}
+
+Cette annexe a présenté une approche moderne d’identification hadronique reposant sur les réseaux de neurones graphiques, particulièrement adaptés aux calorimètres hautement granulaires tels que le SDHCAL.
+
+Contrairement aux méthodes classiques fondées sur des variables globales construites manuellement, le GNN exploite directement l’organisation spatiale et temporelle des hits au sein de chaque événement. Cette propriété permet d’accéder à une information topologique riche, difficile à résumer par un nombre limité d’observables expertes.
+
+L’étude réalisée ici constitue avant tout une preuve de faisabilité. Malgré une configuration volontairement compacte et un volume statistique limité, le modèle apprend des signatures discriminantes pertinentes entre pions, protons et kaons neutres.
+
+Les résultats obtenus confirment donc plusieurs points essentiels :
+
+\begin{itemize}
+\item la pertinence d’une représentation en graphe pour les gerbes hadroniques ;
+\item la capacité des GNN à traiter des événements de taille variable ;
+\item le potentiel de ces méthodes pour dépasser les approches tabulaires classiques ;
+\item l’intérêt stratégique de poursuivre ce développement sur des jeux de données plus vastes.
+\end{itemize}
+
+À plus long terme, les réseaux de neurones graphiques pourraient devenir des outils centraux pour l’identification de particules, la reconstruction d’énergie et les stratégies de \emph{Particle Flow} dans les futurs détecteurs de physique des hautes énergies.
+
+
+\clearpage

@@ -1,0 +1,760 @@
+% \captionsetup{font=small}
+% \section*{Annexes}
+% \addcontentsline{toc}{section}{Annexes}
+
+% \section{Calcul d\'etaill\'e des descripteurs (\texttt{ShowerAnalyzer})}
+% \label{sec:details-showeranalyzer}
+
+% Cette section d\'ecrit la m\'ethode de calcul de chaque observable extraite \`a partir des hits semi-digitaux du SDHCAL. On note, pour un \'ev\'enement, les vecteurs d'entr\'ees
+% \(\{(I_i,J_i,K_i,x_i,y_i,z_i,t_i,{\tt thr}_i)\}_{i=1}^{N_{\rm hits}}\),
+% o\`u \((I,J,K)\) sont les indices de cellule/couche, \((x,y,z)\) les positions (mm), \(t\) le temps (ns) et \({\tt thr}\in\{1,2,3\}\) le seuil franchi.
+
+% \subsection{Poids par seuil et comptages}
+% \label{subsec:thr-weights}
+% On associe un poids aux seuils pour approcher la charge relative :
+% \[
+% w({\tt thr})=\begin{cases}
+% 1 & \text{si }{\tt thr}=1,\\
+% 5000/110 \simeq 45.45 & \text{si }{\tt thr}=2,\\
+% 15000/110 \simeq 136.36 & \text{si }{\tt thr}=3.
+% \end{cases}
+% \]
+% On d\'efinit:
+% \[
+% N_k=\#\{i\mid {\tt thr}_i=k\},\quad
+% {\tt Thr}k=\frac{100\,N_k}{N_{\rm hits}}\ (\%),\quad
+% {\tt ratioThr23}=\begin{cases}
+% \dfrac{{\tt Thr}2+{\tt Thr}3}{{\tt Thr}1} & \text{si }{\tt Thr}1>0,\\[4pt]
+% 0 & \text{sinon.}
+% \end{cases}
+% \]
+
+% \subsection{Moments longitudinaux \(Z_{\rm bary},\,Z_{\rm rms}\)}
+% \label{subsec:zbary-zrms}
+% On utilise l’indice de couche \(K\) comme proxy de profondeur:
+% \[
+% Z_{\rm bary}=\frac{1}{N_{\rm hits}}\sum_{i} K_i,\qquad
+% Z_{\rm rms}=\sqrt{\frac{1}{N_{\rm hits}}\sum_{i}(K_i-Z_{\rm bary})^2}.
+% \]
+% En cas d’absence de hit: \(Z_{\rm bary}=Z_{\rm rms}=0\).
+
+% \subsection{\texttt{Begin} : estimation du d\'ebut de gerbe}
+% \label{subsec:begin}
+% On compte les hits par couche \(h(K)=\#\{i\mid K_i=K\}\). \texttt{Begin} est la premi\`ere couche \(L\) telle que \(h(L),h(L+1),h(L+2),h(L+3)\ge 4\). Si aucune s\'equence n’existe, \texttt{Begin}\(=48\).
+
+% \subsection{Rayon effectif transverse \texttt{Radius}}
+% \label{subsec:radius}
+% On regroupe les hits par couche et on retient les \(10\) premi\`eres couches instrument\'ees de l’\'ev\'enement. Pour chaque couche \(K\), on forme le barycentre \((\bar x_K,\bar y_K,\bar z_K)\). On ajuste deux droites \(\bar x(z)=a_1 z+b_1\), \(\bar y(z)=a_2 z+b_2\) par r\'egression lin\'eaire (ROOT \texttt{TGraph}/\texttt{TF1}). L’axe de gerbe estim\'e \((x_0(z),y_0(z),z)\) permet de calculer pour chaque hit la distance minimale au brin:
+% \[
+% t_i=\frac{a_1 x_i+a_2 y_i+z_i-a_1 b_1-a_2 b_2}{a_1^2+a_2^2+1},\quad
+% (x_0,y_0)=(a_1 t_i+b_1,\ a_2 t_i+b_2),
+% \]
+% puis \(\mathrm{d}_i^2=(x_i-x_0)^2+(y_i-y_0)^2\). Enfin
+% \[
+% {\tt Radius}=\sqrt{\frac{1}{N_{\rm hits}}\sum_i \mathrm{d}_i^2}.
+% \]
+% Si moins de deux couches: \texttt{Radius}\(=0\).
+
+% \subsection{Densit\'e locale pond\'er\'ee \texttt{Density}}
+% \label{subsec:density}
+% On calcule la densit\'e locale sur chaque hit en sommant les poids \(w({\tt thr})\) dans un voisinage \(3\times 3\) de la \emph{m\^eme couche} (indices \((I,J)\) \`a \(\pm 1\)). Si \(C_i\) est cette somme locale,
+% \[
+% {\tt Density}=\frac{\sum_i C_i}{\sum_i w({\tt thr}_i)}.
+% \]
+% Si \(\sum_i w=0\) ou aucun hit: \texttt{Density}\(=0\).
+
+% \subsection{Anisotropie 2D : valeurs propres \(\lambda_1\ge\lambda_2\)}
+% \label{subsec:lambdas}
+% On calcule le barycentre transverse \((\bar x,\bar y)\) puis la matrice de covariance \(2\times 2\):
+% \[
+% \mathbf{C}=\frac{1}{N_{\rm hits}}\sum_i
+% \begin{pmatrix}
+% (x_i-\bar x)^2 & (x_i-\bar x)(y_i-\bar y)\\
+% (x_i-\bar x)(y_i-\bar y) & (y_i-\bar y)^2
+% \end{pmatrix}.
+% \]
+% Les valeurs propres \(\lambda_{1,2}\) (ferm\'ees analytiquement) quantifient l’\'etalement principal et secondaire.
+
+% \subsection{Clustering intra-couche (4-connexit\'e) et indicateurs}
+% \label{subsec:clusters}
+% Pour chaque couche \(K\), on construit les amas 2D par 4-connexit\'e sur la grille \((I,J)\) (parcours DFS). On collecte :
+% \[
+% {\tt NClusters}=\sum_{K}\#\text{amas}(K),\quad
+% {\tt MaxClustSize}=\max\text{taille d’amas},\quad
+% {\tt AvgClustSize}=\frac{1}{{\tt NClusters}}\sum \text{taille d’amas},
+% \]
+% et \texttt{PlanesWithClusmore2} = nombre de couches contenant au moins deux amas.
+
+% \subsection{Fraction pr\'ecoce \texttt{PctHitsFirst10}}
+% \label{subsec:pct-first10}
+% Fraction (en \%) de hits dont \(K\in[0,9]\):
+% \[
+% {\tt PctHitsFirst10}=100\times\frac{\#\{i\mid 0\le K_i\le 9\}}{N_{\rm hits}}.
+% \]
+
+% \subsection{Statistiques temporelles}
+% \label{subsec:time-stats}
+% Si des temps sont disponibles, on renvoie
+% \[
+% t_{\min}=\min_i t_i,\quad t_{\max}=\max_i t_i,\quad
+% t_{\rm mean}=\frac{1}{N_t}\sum_i t_i,\quad
+% t_{\rm spread}=t_{\max}-t_{\min}.
+% \]
+% En absence de mesures: 0.
+
+% \subsection{Profil longitudinal et ajustement de Gaisser--Hillas}
+% \label{subsec:long-prof}
+% \paragraph{Graphe de connectivit\'e et \'elagage.}
+% On construit un graphe de 6-connexit\'e en espace d’indices \((I,J,K)\) (adjacent si \(|\Delta I|+|\Delta J|+|\Delta K|=1\)). On \'elague it\'erativement les \emph{feuilles} dont la cha\^ine (longueur mesur\'ee par BFS) est \(<5\) ou dont le poids \({\tt thr}<0.1\).
+
+% \paragraph{Point de d\'epart et histogramme en profondeur.}
+% On regroupe les noeuds restants par couche et on d\'efinit le \emph{start layer} comme la premi\`ere couche \(L\) telle que, pour \(j=0\ldots 3\), on ait \(\#\mathrm{hits}(L+j)\ge 3\) (sinon la premi\`ere couche non vide). Sur chaque couche \(K\), on somme \(\sum {\tt thr}\) comme \emph{proxy d’\'energie}. On ne conserve que \(K\in[L,\,K_{\max}]\) avec \(K_{\max}=29\). On lisse la s\'erie par moyenne glissante (fen\^etre 5).
+
+% \paragraph{Fit Gaisser--Hillas.}
+% On ajuste le profil \((z,\,E)\) par la forme
+% \[
+% E(z)=N_{\max}\left(\frac{z-z_0}{X_{\max}-z_0}\right)^{\frac{X_{\max}-z_0}{\lambda}}
+% \!\!\exp\!\left(\frac{X_{\max}-z}{\lambda}\right),
+% \]
+% o\`u \(z=K\times d\) avec \(d=10~\mathrm{mm}\). On extrait \(\{N_{\max},z_0,X_{\max},\lambda\}\). Si moins de 5 points utilisables, le fit est omis.
+
+% \subsection{Excentricit\'e 3D}
+% \label{subsec:ecc3d}
+% On calcule la covariance \(3\times 3\) sur \((x,y,z)\) centr\'e au barycentre \((\bar x,\bar y,\bar z)\),
+% \[
+% \mathbf{C}_{3\mathrm{D}}=\frac{1}{N_{\rm hits}}\sum_i
+% \begin{pmatrix}
+% \Delta x_i\\ \Delta y_i\\ \Delta z_i
+% \end{pmatrix}
+% \!\!\begin{pmatrix}
+% \Delta x_i& \Delta y_i& \Delta z_i
+% \end{pmatrix},
+% \]
+% puis ses valeurs propres ordonn\'ees \(e_1\le e_2\le e_3\). L’excentricit\'e 3D est
+% \[
+% {\tt eccentricity3D}=\frac{e_3}{e_1+e_2+e_3}\in[0,1],
+% \]
+% qui mesure la lin\'earit\'e/filamentation spatiale.
+
+% \subsection{Segments quasi-lin\'eaires (\texttt{nTrackSegments})}
+% \label{subsec:tracks}
+% \paragraph{Clustering 2D par couche.}
+% Pour chaque couche, on forme des clusters par 8-connexit\'e sur \((I,J)\) et on en d\'eduit leurs barycentres \((x_c,y_c,z_c)\).
+
+% \paragraph{Filtrage des clusters.}
+% On rejette les clusters trop gros (\(>15\) hits) et ceux dans des zones trop denses (plus de 4 voisins \`a \(|\Delta x|,|\Delta y|<50~\mathrm{mm}\) ou plus de 2 voisins ``larges'' \(>5\) hits).
+
+% \paragraph{Hough en $(z,x)$ puis $(z,y)$.}
+% On remplit un accumu\-lateur Hough \(\mathrm{TH2I}\) en \((\theta,\rho)\) avec \(\rho=z\cos\theta+x\sin\theta\) (\(100\times 100\) bins, \(\rho\in[0,1500]~\mathrm{mm}\)). On s\'electionne les maxima locaux (\(>2\) entr\'ees) et on retient les clusters \(\{c\}\) dans une fen\^etre \(|\rho(c)-\rho_0|\le \Delta\rho_x\) avec \(\Delta\rho_x=(k_{\rm bins}+0.5)\,\delta\rho\), \(k_{\rm bins}=2\). Exiger au moins \(5\) clusters. On verrouille la direction 3D par un second Hough en \((z,y)\) sur ce sous-ensemble.
+
+% \paragraph{Nettoyage topologique et qualit\'e.}
+% On retire les orphelins (exige au moins 1 voisin en \(K\pm 1\)). Coups de qualit\'e:
+% \[
+% \text{spanK}\ge 6,\quad \text{maxGapK}\le 3,\quad
+% \langle|r_{xz}|\rangle\le 1.5\,\Delta\rho_x,\quad
+% \langle|r_{yz}|\rangle\le 1.5\,\Delta\rho_y,\quad
+% {\rm early\%}(K\le 8)\le 60\%.
+% \]
+% Chaque ensemble qui passe ces coupes compte pour un segment; le total donne \texttt{nTrackSegments}.
+
+% \subsection{Valeurs par d\'efaut et cas limites}
+% \label{subsec:defaults}
+% \begin{itemize}
+% \item Aucune donn\'ee (\(N_{\rm hits}=0\)) \(\Rightarrow\) toutes les quantit\'es scalaires retourn\'ees \`a 0, \texttt{Begin}\(=48\).
+% \item Profondeur et \'echelle: \(d=10~\mathrm{mm}\) par couche, \(K_{\max}=29\) pour les profils longitudinaux.
+% \item Les fits (\texttt{Radius}, Gaisser--Hillas) sont silencieux et peuvent \^etre omis si pas assez de points.
+% \end{itemize}
+
+% \subsection{R\'ecapitulatif des observables retourn\'ees}
+% \label{subsec:recap}
+% \(\{\) \({\tt Thr1,Thr2,Thr3,ratioThr23}\), \(N_1,N_2,N_3\), \(Z_{\rm bary},Z_{\rm rms}\), \texttt{Begin}, \texttt{Radius}, \texttt{Density}, \(\lambda_1,\lambda_2\), \texttt{NClusters}, \texttt{MaxClustSize}, \texttt{AvgClustSize}, \texttt{PlanesWithClusmore2}, \texttt{PctHitsFirst10}, \(t_{\min},t_{\max},t_{\rm mean},t_{\rm spread}\), \(N_{\max},z_0,X_{\max},\lambda\), \texttt{eccentricity3D}, \texttt{nTrackSegments} \(\}\).
+
+
+% \begin{table}[!h]
+% \centering
+% \renewcommand{\arraystretch}{1.3}
+% \setlength{\tabcolsep}{6pt}
+% \begin{tabular}{|l|p{11cm}|}
+% \hline
+% \textbf{Feature} & \textbf{Définition} \\
+% \hline
+% \multicolumn{2}{|c|}{\textbf{Composition en seuils (proxy d'énergie locale)}} \\
+% \hline
+% \texttt{Thr1}, \texttt{Thr2}, \texttt{Thr3} & Fractions de hits aux seuils 1, 2 et 3. \\
+% \texttt{N1}, \texttt{N2}, \texttt{N3} & Nombres de hits à chaque seuil. \\
+% \texttt{ratioThr23} & $(\texttt{Thr2}+\texttt{Thr3})/(\texttt{Thr1})$, indicateur de la « dureté » de la gerbe. \\
+% \hline
+% \multicolumn{2}{|c|}{\textbf{Descripteurs longitudinaux}} \\
+% \hline
+% \texttt{Zbary} & Barycentre longitudinal. \\
+% \texttt{Zrms} & Étalement longitudinal (RMS). \\
+% \texttt{Begin} & Première couche $L$ telle que $L,\ldots,L+3$ contiennent chacun $\geq 4$ hits (sinon $48$). \\
+% \texttt{PctHitsFirst10} & Fraction de hits dans les 10 premières couches. \\
+% \texttt{Nmax}, \texttt{z0\_fit}, \texttt{Xmax}, \texttt{lambda} & Paramètres de l’ajustement Gaisser--Hillas \cite{gaisser1977hillas} (profil longitudinal). \\
+% \hline
+% \multicolumn{2}{|c|}{\textbf{Topologie transverse}} \\
+% \hline
+% \texttt{Radius} & RMS des distances à l’axe de la gerbe (régression $(x(z),y(z))$ sur les $\leq 10$ premières couches effectives). \\
+% \texttt{lambda1}, \texttt{lambda2} & Valeurs propres de la matrice de covariance $(x,y)$ centrée. \\
+% \texttt{eccentricity3D} & $\lambda^{(3D)}_{\max}/\sum_{k=1}^3\lambda^{(3D)}_k$. \\
+% \hline
+% \multicolumn{2}{|c|}{\textbf{Densité locale}} \\
+% \hline
+% \texttt{Density} & Moyenne des sommes de poids $w(\texttt{thr})$ dans un voisinage $3\times3$ (indices $I,J$) sur une même couche $K$, normalisée par 9. \\
+% \hline
+% \multicolumn{2}{|c|}{\textbf{Clustering intra-couche (4-connexité)}} \\
+% \hline
+% \texttt{NClusters} & Nombre total d’amas 2D. \\
+% \texttt{MaxClustSize}, \texttt{AvgClustSize} & Tailles maximale et moyenne des amas. \\
+% \texttt{PlanesWithAtLeast2Clusters} & Nombre de plans contenant au moins deux amas. \\
+% \hline
+% \multicolumn{2}{|c|}{\textbf{Segments quasi-linéaires}} \\
+% \hline
+% \texttt{nTrackSegments} & Segments rectilignes détectés par clustering 2D (8-connexité) puis transformée de Hough en $(z,x)$ et $(z,y)$. \\
+% \hline
+% \multicolumn{2}{|c|}{\textbf{Temps}} \\
+% \hline
+% \texttt{tMin}, \texttt{tMax}, \texttt{tMean}, \texttt{tSpread} & Variables temporelles décrivant l’étalement temporel, avec $\texttt{tSpread} = \texttt{tMax}-\texttt{tMin}$ (après alignement BCID/ASIC). \\
+% \hline
+% \end{tabular}
+% \caption{Résumé des descripteurs physiques utilisés pour l'identification et la régression d’énergie.}
+% \label{tab:features}
+% \end{table}
+
+
+% \section{Entraînement du classificateur PID (LightGBM)}
+% \label{sec:pid-training}
+
+% L'identification des particules (\emph{PID}) repose sur un classificateur
+% \emph{gradient boosting} par arbres (LightGBM) entraîné à distinguer trois
+% espèces hadroniques $\{\pi^-,\,p,\,K^0\}$ à partir des descripteurs de gerbe
+% introduits en Sec.~\ref{sec:details-showeranalyzer}. Le pipeline complet ---
+% préparation des données, entraînement et évaluation --- est décrit ci-dessous.
+
+% %--------------------------------------------------------------------
+% \subsection{Jeux de données et variables d'entrée}
+% \label{subsec:pid-data}
+
+% Les événements sont chargés depuis trois fichiers \texttt{ROOT}
+% (${\sim}1{,}3\times10^5$ événements par espèce) et concaténés en un unique
+% ensemble. Les 26 descripteurs retenus sont :
+% \begin{align*}
+% \mathcal{X} = \bigl[
+%   &\texttt{Thr1, Thr2, Thr3, Begin, Radius, Density, NClusters,}\\
+%   &\texttt{ratioThr23, Zbary, Zrms, PctHitsFirst10,}\\
+%   &\texttt{PlanesWithClusmore2, AvgClustSize, MaxClustSize,}\\
+%   &\texttt{lambda1, lambda2, tMin, tMax, tMean, tSpread,}\\
+%   &\texttt{Nmax, z0\_fit, Xmax, lambda, nTrackSegments, eccentricity3D}
+% \bigr].
+% \end{align*}
+% La vérité générateur \texttt{particlePDG} est filtrée sur
+% $\{-211,\,2212,\,311\}$ et recodée en labels entiers $\{0,1,2\}$
+% (pour $\pi^-$, $p$ et $K^0$ respectivement). Les valeurs infinies sont
+% remplacées par \texttt{NaN}, puis les événements incomplets sont supprimés.
+
+% \paragraph{Smearing temporel.}
+% Afin de rapprocher la simulation d'une résolution réaliste et d'améliorer la
+% robustesse du modèle, un bruit gaussien indépendant de variance
+% $\sigma^2 = 0{,}01$ est ajouté aux variables temporelles
+% $\texttt{tMin}$, $\texttt{tMax}$ et $\texttt{tSpread}$ :
+% \[
+%   t \;\leftarrow\; t + \varepsilon, \qquad
+%   \varepsilon \sim \mathcal{N}(0,\,\sigma^2),\quad \sigma = 0{,}1.
+% \]
+% La graine pseudo-aléatoire est fixée pour garantir la reproductibilité.
+
+% %--------------------------------------------------------------------
+% \subsection{Découpage train / validation / test et rééchantillonnage}
+% \label{subsec:pid-split}
+
+% Le jeu de données est divisé de façon stratifiée (proportions de classes
+% conservées) selon le schéma suivant :
+% \begin{enumerate}
+%   \item \textbf{Holdout de test} : 20\,\% des événements sont mis de côté et
+%         ne participent ni à l'entraînement ni au réglage des hyperparamètres.
+%   \item \textbf{Validation} : parmi les 80\,\% restants, 20\,\% sont réservés
+%         au suivi de la convergence, soit une répartition finale
+%         train\,/\,val\,/\,test de 64\,/\,16\,/\,20\,\%.
+% \end{enumerate}
+
+% Pour limiter l'impact d'un éventuel déséquilibre résiduel des classes,
+% \textbf{SMOTE} (\emph{Synthetic Minority Over-sampling TEchnique}) est appliqué
+% \emph{exclusivement} à l'ensemble d'entraînement : des exemples synthétiques
+% sont générés par interpolation dans l'espace des descripteurs. La validation et
+% le test conservent la distribution originale, ce qui garantit l'absence de
+% fuite d'information (\emph{data leakage}).
+
+% %--------------------------------------------------------------------
+% \subsection{Architecture du modèle et fonction de coût}
+% \label{subsec:pid-model}
+
+% On utilise \texttt{LGBMClassifier} en configuration \texttt{multiclass}
+% (\texttt{num\_class}\,=\,3). Les hyperparamètres sont :
+% \begin{align*}
+%   \texttt{learning\_rate} &= 0{,}01, \quad
+%   \texttt{n\_estimators}   = 1000,   \quad
+%   \texttt{num\_leaves}     = 63,     \\
+%   \texttt{subsample}       &= 0{,}8, \quad
+%   \texttt{colsample\_bytree} = 0{,}8, \quad
+%   \texttt{min\_child\_samples} = 30, \\
+%   \texttt{reg\_alpha}      &= \texttt{reg\_lambda} = 0{,}1, \quad
+%   \texttt{max\_depth} = -1 \;(\text{non contraint}).
+% \end{align*}
+% Aucune normalisation préalable n'est nécessaire : les forêts d'arbres sont
+% invariantes aux transformations affines des variables.
+
+% La fonction de coût minimisée est la \textbf{log-vraisemblance négative
+% multiclasse} :
+% \[
+%   \mathcal{L}_{\rm multi}
+%   = -\frac{1}{N}\sum_{i=1}^{N}\sum_{k=1}^{3}
+%     y_{ik}\,\log p_{ik},
+% \]
+% où $p_{ik}$ désigne la probabilité prédite pour la classe $k$ et $y_{ik}$
+% l'encodage \emph{one-hot} de la vraie étiquette.
+
+% \paragraph{Arrêt anticipé.}
+% L'entraînement est interrompu si la perte de validation ne s'améliore pas
+% pendant 50 itérations consécutives (\emph{early stopping}). Le modèle est
+% ensuite figé à la meilleure itération observée, prévenant ainsi le
+% surapprentissage sans contraindre arbitrairement le nombre d'arbres.
+
+% \paragraph{Optimisation des hyperparamètres (optionnelle).}
+% Une recherche par grille (\texttt{GridSearchCV}, 5 plis stratifiés,
+% critère \texttt{f1\_macro}) peut être activée. Les hyperparamètres sélectionnés
+% sont réinjectés avant un ré-entraînement final avec arrêt anticipé sur
+% l'ensemble (train, validation).
+
+% %--------------------------------------------------------------------
+% \subsection{Métriques d'évaluation}
+% \label{subsec:pid-metrics}
+
+% Les performances sont mesurées \emph{exclusivement} sur le set de test. On
+% rapporte :
+% \begin{itemize}
+%   \item \textbf{Accuracy} :
+%         $\mathrm{Acc} = N_{\rm test}^{-1}\sum_i \mathbb{1}\{\hat{y}_i = y_i\}$ ;
+%   \item \textbf{AUC One-vs-Rest (OvR)} : moyenne des AUC binaires par classe ;
+%   \item \textbf{Log-loss de test} : $\mathcal{L}_{\rm multi}$ évaluée sur les
+%         prédictions finales.
+% \end{itemize}
+
+% Les visualisations produites sont : (i) la courbe de convergence
+% ($\mathcal{L}_{\rm train}$ et $\mathcal{L}_{\rm valid}$ en fonction du nombre
+% d'arbres), (ii) la matrice de confusion normalisée par ligne, et (iii) les
+% histogrammes de probabilités par classe, qui permettent d'apprécier la
+% séparabilité (p.~ex. $P(\text{classe}=p)$ pour les vrais $\pi^-$ et les vrais
+% $p$).
+
+% %--------------------------------------------------------------------
+% \subsection{Résumé des garanties méthodologiques}
+% \label{subsec:pid-practices}
+
+% \begin{itemize}
+%   \item \textbf{Absence de fuite d'information} : SMOTE et ajustement des
+%         hyperparamètres sont réalisés strictement sur les données d'entraînement.
+%   \item \textbf{Robustesse à la simulation} : le smearing temporel atténue
+%         la sensibilité aux artefacts fins de la simulation.
+%   \item \textbf{Reproductibilité} : toutes les sources d'aléa (découpage,
+%         SMOTE, bruit gaussien) utilisent une graine fixée.
+%   \item \textbf{Régularisation} : \texttt{num\_leaves}, \texttt{subsample},
+%         \texttt{colsample\_bytree} et l'arrêt anticipé contrôlent conjointement
+%         la variance du modèle.
+% \end{itemize}
+
+
+
+% \section{Classification pion/proton avec GNN}
+% \label{sec:gnn}
+
+% \paragraph{Jeu de données et scission.}
+% Nous concaténons deux fichiers CSV (\texttt{pion}, \texttt{proton}), puis
+% attribuons un label binaire ($y{=}0$ pour $\pi$, $y{=}1$ pour $p$). Les lignes
+% sont regroupées par identifiant d'événement \verb|event_id|; la scission
+% \emph{train/validation/test} est effectuée \emph{par événements}, de manière
+% stratifiée: $20\,\%$ pour le test, puis $10\,\%$ de validation sur le
+% reste.\footnote{Gr\^ace \`a \texttt{train\_test\_split} avec \texttt{random\_state=42}.}
+% Un \emph{smearing} gaussien optionnel (écart-type \(\sigma_{\text{gaus}}\)) peut
+% s’appliquer aux temps; par défaut \(\sigma_{\text{gaus}}=0\). Les temps sont
+% tronqués à $10$\,ps: \(\tilde{t}=\lfloor 100\,t\rfloor/100\).
+
+% \paragraph{Prétraitement des nœuds.}
+% Pour chaque événement, on construit un graphe dont les nœuds sont les hits.
+% On applique les normalisations suivantes (apprises sur l’entraînement) :
+% \begin{itemize}
+%   \item \textbf{Spatial robuste} sur $(x,y,z)$ par \texttt{RobustScaler}:
+%   \( \mathbf{s}=\text{Robust}([x,y,z])\).
+%   \item \textbf{Temps gaussien} par \texttt{QuantileTransformer}:
+%   \( t'=\Phi^{-1}(F_t(t))\), où \(F_t\) est la CDF empirique.
+%   \item \textbf{Profondeur par couche} : on discrétise $z$ en
+%   \(N_z=\texttt{layer\_z\_bins}\) tranches; pour chaque bin $b$ on ajuste
+%   \(z_b^{\text{norm}}=\text{Robust}_b(z)\).
+%   \item \textbf{Seuils one-hot} pour \(\texttt{thr}\in\{1,2,3\}\):
+%   \(\mathbf{e}_{\text{thr}}\in\mathbb{R}^3\).
+% \end{itemize}
+% Le vecteur de caractéristiques par nœud est
+% \[
+% \mathbf{x}=\big[\underbrace{s_x,s_y,s_z}_{\text{spatial}},\underbrace{t'}_{\text{temps}},
+% \underbrace{z_b^{\text{norm}}}_{\text{couche}},\underbrace{\mathbf{e}_{\text{thr}}}_{\text{one-hot}}\big]
+% \in\mathbb{R}^{8}.
+% \]
+
+% \paragraph{Construction des arêtes.}
+% On relie les nœuds par un $k$NN \emph{causal} en $z$ (ou en $t$ selon
+% \texttt{mode}): pour chaque nœud $i$, on ne considère que les voisins $j$
+% tels que \(z_j<z_i\) (masque causal), puis on sélectionne les $k$
+% plus proches selon la distance quadratique
+% \(d_{ij}=\|\mathbf{r}_i-\mathbf{r}_j\|_2^2\) (ou \(d_{ij}=(t_i-t_j)^2\) en
+% mode temporel). Un filtre sur la fenêtre temporelle
+% \(\lvert t_i-t_j\rvert<\Delta t\) (\texttt{time\_window}) supprime les arêtes
+% incompatibles en timing. On symétrise le graphe et on ajoute des \emph{self-loops}.
+
+% \paragraph{Architecture.}
+% Le modèle \texttt{ParticleGNN} est un réseau \emph{mixte} (attention + filtres
+% polynomiaux + convolution simple) :
+% \[
+% \mathbf{h}^{(0)}=\phi\!\big(W_{\text{enc}}\mathbf{x}\big),\quad
+% \mathbf{h}^{(1)}=\text{GAT}(\mathbf{h}^{(0)}),\quad
+% \mathbf{h}^{(2)}=\text{TAGConv}(\mathbf{h}^{(1)}),\quad
+% \mathbf{h}^{(3)}=\text{GraphConv}(\mathbf{h}^{(2)}),
+% \]
+% avec normalisation \texttt{GraphNorm} après \(\text{GAT}\) et \(\text{TAGConv}\),
+% puis un \emph{readout} par agrégations \(\big[\text{maxpool},\text{meanpool}\big]\)
+% concaténées et un classifieur MLP avec \texttt{Dropout}(0.3).
+% La sortie est un \(\log\)-softmax sur 2 classes.
+
+% \paragraph{Entraînement et arrêt anticipé.}
+% Nous optimisons la log-vraisemblance négative (\texttt{NLLLoss}) avec
+% \texttt{AdamW} (\(\text{lr}={\tt lr}\), \(\lambda_{L2}=10^{-3}\)).
+% Un scheduler \texttt{ReduceLROnPlateau} diminue \(\text{lr}\) d’un facteur 2
+% si la \emph{loss de validation} stagne (patience interne 3). Le meilleur
+% modèle est sélectionné par l’\textbf{AUC} de validation; on applique un
+% \emph{early-stopping} si l’AUC ne s’améliore pas pendant \texttt{patience}
+% époques. Les lots ont taille \texttt{batch\_size} et l’entraînement se fait
+% sur \texttt{cuda} si disponible.
+
+% \paragraph{Évaluation et artefacts.}
+% Sur le test, on reporte \textbf{loss}, \textbf{accuracy} et \textbf{AUC}\,ROC.
+% Les courbes (perte/accuracy vs époque), l’histogramme des probabilités
+% et la matrice de confusion sont sauvegardés, ainsi que le meilleur modèle
+% (\texttt{.pt}) et des journaux CSV (\texttt{run\_parameters.csv},
+% \texttt{run\_comments.csv}, \texttt{GNN\_performances.csv}).
+
+% \begin{table}[t]
+% \centering
+% \caption{Hyperparamètres et options du pipeline GNN utilisés dans ce travail.}
+% \label{tab:gnn-hparams}
+% \begin{tabular}{ll}
+% \hline
+% Paramètre & Valeur \\
+% \hline
+% Nombre de caractéristiques par nœud & \(\texttt{nb\_features}=8\) \\
+% Classes & \(\texttt{nb\_classes}=2\) (pion vs proton) \\
+% $k$ du $k$NN causal & \(\texttt{knn\_k}=1\) \\
+% Fenêtre temporelle & \(\Delta t=\texttt{time\_window}=2.0\) \\
+% Binning en $z$ & \(\texttt{layer\_z\_bins}=10\) \\
+% Dimension cachée & \(\texttt{hidden\_dim}=64\) \\
+% Taille de lot & \(\texttt{batch\_size}=64\) \\
+% Taux d’apprentissage & \(\texttt{lr}=10^{-3}\) (\texttt{AdamW}) \\
+% Époques max & \(\texttt{epochs}=50\) \\
+% Patience (early-stopping) & \(\texttt{patience}=10\) (sur AUC valid.) \\
+% Régularisation poids & \(\lambda_{L2}=10^{-3}\) \\
+% Mode de voisinage & \(\texttt{mode}=\) \texttt{"route"} (distance en $xyz$) \\
+% Smearing des temps & \(\sigma_{\text{gaus}}=0\) (ici désactivé) \\
+% Graine & \(\texttt{seed}=42\) \\
+% \hline
+% \end{tabular}
+% \end{table}
+
+% \paragraph{Fonction de coût et métriques.}
+% La perte est
+% \(
+% \mathcal{L}=-\frac{1}{B}\sum_{b=1}^{B}\log p_\theta(y_b\mid G_b)
+% \),
+% avec \(p_\theta\) la sortie \(\log\)-softmax du GNN. Les métriques reportées
+% sont l’accuracy \(\frac{1}{N}\sum \mathbb{1}[\hat{y}=y]\), l’AUC (OVR binaire)
+% et la matrice de confusion normalisée par lignes.
+
+% \paragraph{Remarques pratiques.}
+% (i) Le masque causal \(z_j<z_i\) (ou temporel) stabilise la topologie en
+% évacuant des arcs non physiques; (ii) le binning en $z$ suivi d’une
+% normalisation robuste par couche aide à compenser des distributions hétérogènes
+% de profondeur; (iii) la concaténation \(\text{max}\,\|\,\text{mean}\) au readout
+% capture à la fois des signatures \emph{crêtes} et \emph{moyennes} d’activité.
+
+% \paragraph{Résultats.}
+% Sur l’ensemble de test, le modèle atteint une accuracy modeste
+% (\(\approx 57\,\%\)) et une AUC d’environ 0.64, ce qui indique
+% une séparation partielle mais encore insuffisante entre les
+% classes pion et proton. Ces chiffres reflètent la difficulté
+% du problème avec une architecture simple et un jeu de données
+% limité (\(\sim 2000\) événements).
+
+% \begin{table}[h]
+% \centering
+% \caption{Performances du GNN sur le test (run\_id=28).}
+% \label{tab:gnn-perf}
+% \begin{tabular}{lccc}
+% \hline
+% Run ID & Test Loss & Test Accuracy & Test AUC \\
+% \hline
+% 28 & 0.702 & 0.571 & 0.644 \\
+% \hline
+% \end{tabular}
+% \end{table}
+
+% \paragraph{Hyperparamètres du run.}
+% Le tableau~\ref{tab:gnn-hparams-run} récapitule les valeurs
+% utilisées pour ce run particulier. On remarque que
+% \texttt{nb\_features}=7 (et non 8 comme prévu dans la config
+% initiale), ce qui correspond probablement à une omission ou
+% un encodage différent lors de la préparation des graphes.
+
+% \begin{table}[h]
+% \centering
+% \caption{Hyperparamètres du run GNN (ID=28).}
+% \label{tab:gnn-hparams-run}
+% \begin{tabular}{ll}
+% \hline
+% Paramètre & Valeur \\
+% \hline
+% Date & 2025\_07\_21-14\_50 \\
+% Nombre de données & 2k événements \\
+% Caractéristiques par nœud & 7 \\
+% Classes & 2 (pion/proton) \\
+% Mode voisinage & route (basé sur $z$) \\
+% Fenêtre temporelle & 2.0 \\
+% Dimension cachée & 256 \\
+% Taille de lot & 64 \\
+% Taux d’apprentissage & 0.001 \\
+% Époques max & 50 \\
+% Seed & 42 \\
+% Patience (early-stopping) & 10 \\
+% \hline
+% \end{tabular}
+% \end{table}
+
+
+
+
+% \section{Régression de l'énergie avec LightGBM}
+% \label{sec:energy-lgbm}
+
+% Cette section décrit le pipeline de \emph{régression} de l'énergie des hadrons (\(\pi, K, p\)) fondé sur LightGBM. Le flux est identique pour chaque espèce et produit des artefacts individuels ainsi que des figures combinées multi-particules.
+
+% \subsection{Entrées, variables et préparation}
+% \label{subsec:energy-data}
+
+% \subsubsection*{Variables d’entrée (features)}
+% Le jeu de \textbf{features} est conçu pour capturer la structure et la forme des gerbes, et a été sélectionné à l’aide d’une analyse d’importance permutationnelle.  
+% \begin{itemize}
+%   \item \textbf{Variables dominantes} :
+%     \begin{itemize}
+%       \item \textbf{Temps minimal} $t_{\min}$, variable la plus discriminante et sensible à la précocité du dépôt.
+%       \item \textbf{Somme totale des seuils} \texttt{sumThrTotal}, corrélée à l’énergie totale déposée.
+%       \item \textbf{Comptages multi-seuils} : $N_{1}$, $N_{3}$ et leur somme $N_{\text{hit}}$, traçant la multiplicité des dépôts.
+%       \item \textbf{Densité} de hits et \textbf{barycentre longitudinal} $Z_{\text{bary}}$, indicateurs de la compacité et de la profondeur de la gerbe.
+%       \item \textbf{Taille moyenne des amas} (\texttt{AvgClustSize}), reliée à la fragmentation spatiale.
+%     \end{itemize}
+%   \item \textbf{Variables secondaires} (faible poids mais conservées pour comparaison) :
+%     $N_2$, $N_{\max}$, $Z_{\mathrm{rms}}$, paramètres de forme type Gaisser--Hillas, fraction précoce (\texttt{PctHitsFirst10}), rayon effectif, etc.
+% \end{itemize}
+% \noindent
+% Des observables supplémentaires (\emph{e.g.} excentricité 3D, $t_{\max}$, $t_{\text{spread}}$, \texttt{ratioThr23}) ont été testées mais jugées négligeables dans ce contexte et écartées afin de réduire la dimensionnalité \emph{sans perte de performance}.
+
+% \subsubsection*{Données et prétraitements}
+% Les événements sont lus depuis des arbres \texttt{ROOT} (\texttt{paramsTree}) spécifiques à chaque particule (\(\pi\), \(K\), \(p\)), avec l’énergie vraie \(\texttt{primaryEnergy}\) comme cible.  
+% Le nettoyage consiste en la suppression des valeurs infinies/NA et en l’application d’une \emph{smearing} gaussienne sur $t_{\min}$ (\(\sigma=0.1\)) afin d’atténuer la sensibilité aux micro-fluctuations temporelles.  
+
+% Le jeu est scindé en \(\textbf{test}=20\%\) et \(\textbf{train}=80\%\) (graine fixée pour reproductibilité), avec une validation interne extraite du train (\(\sim 12.5\%\)).  
+% Par homogénéisation inter-pipelines, un \texttt{StandardScaler} est ajusté sur \emph{train} puis appliqué à \emph{train}, \emph{val} et \emph{test}, bien que les arbres n’exigent pas explicitement de centrage-réduction.
+
+% \subsection{Apprentissage en espace log et objectif}
+% \label{subsec:energy-log}
+% L’apprentissage direct sur l’énergie $E$ avec une perte quadratique entraîne un biais : les événements de haute énergie dominent la fonction de coût, puisque $(\hat{E}-E)^2 \propto E^2$.  
+% Or, ce qui importe physiquement n’est pas l’erreur absolue mais l’erreur relative $\tfrac{\hat{E}-E}{E}$, représentative de la qualité de reconstruction.
+
+% Pour corriger cela, la régression est menée en \textbf{log-espace}. On définit
+% \[
+% y=\log(E+\epsilon),\qquad \hat{y}=f_\theta(\mathbf{x}),\qquad \hat{E}=\exp(\hat{y}),
+% \]
+% avec $\epsilon=10^{-9}$ pour éviter $\log 0$.  
+
+% Dans ce formalisme, l’écart en log
+% \[
+% \Delta y = \hat{y} - y = \log(\hat{E}) - \log(E)
+% \]
+% se traduit directement en erreur relative :
+% \[
+% \frac{\hat{E}}{E} = \exp(\Delta y) \approx 1 + \Delta y \quad \text{si } \Delta y \ll 1.
+% \]
+% Ainsi, minimiser la MSE sur $\log E$ revient à homogénéiser les erreurs relatives indépendamment de l’échelle, ce qui réduit l’hétéroscédasticité et stabilise l’apprentissage.
+
+% Le modèle est un \texttt{LGBMRegressor} (objectif \texttt{regression}, métrique \texttt{l2}) configuré avec :
+% \begin{align*}
+% \texttt{learning\_rate} &= 0.05, \quad 
+% \texttt{n\_estimators} = 2000, \quad 
+% \texttt{num\_leaves} = 127, \\
+% \texttt{subsample} &= 0.8, \quad 
+% \texttt{colsample\_bytree} = 0.8, \quad 
+% \texttt{min\_child\_samples} = 20, \\
+% \texttt{max\_depth} &= -1, \quad 
+% \texttt{reg\_alpha} = 0.0, \quad 
+% \texttt{reg\_lambda} = 0.1.
+% \end{align*}
+% Un \emph{early stopping} (patience 50 itérations) est activé sur la validation, avec journalisation des pertes.  
+% Graines fixées pour assurer la reproductibilité.
+
+% \paragraph{Métrique personnalisée.}
+% Outre la MSE en log-espace, on suit la métrique relative en linéaire :
+% \[
+% \text{rel-RMSE}=\sqrt{\frac{1}{N}\sum_i \Big(\frac{\hat{E}_i-E_i}{E_i}\Big)^2},
+% \]
+% mesurant directement la dispersion relative des prédictions (en \%).
+
+% \paragraph{Recherche d’hyperparamètres.}
+% En option, une grille (\texttt{GridSearchCV}, KFold=5, score \texttt{neg\_RMSE} en log-espace) permet d’optimiser \texttt{num\_leaves}, \texttt{min\_child\_samples}, \texttt{subsample}, etc.  
+% Les meilleurs hyperparamètres sont ensuite ré-entraînés avec \emph{early stopping}.
+
+% \subsection{Évaluation}
+% \label{subsec:energy-eval}
+% Les prédictions sont re-projetées en linéaire \(\hat{E}=\exp(\hat{y})\) et évaluées sur le \textbf{test} uniquement :
+% \[
+% \text{RMSE}=\sqrt{\tfrac{1}{N}\sum_i(\hat{E}_i-E_i)^2},\quad
+% \text{MAE}=\tfrac{1}{N}\sum_i|\hat{E}_i-E_i|,\quad
+% R^2=1-\frac{\sum_i(\hat{E}_i-E_i)^2}{\sum_i(E_i-\overline{E})^2}.
+% \]
+% La \textbf{résolution globale} est définie comme la RMS relative :
+% \[
+% \frac{\sigma(E)}{E}\;=\;\sqrt{\frac{1}{N}\sum_i \Big(\frac{\hat{E}_i-E_i}{E_i}\Big)^2}.
+% \]
+
+% \paragraph{Résolution vs énergie.}
+% Pour tracer $\sigma(E)/E$ en fonction de $E$, on effectue un binning en $E_{\text{true}}$ (typiquement $N_{\rm bins}=20$).  
+% Dans chaque bin, on calcule soit le RMS des résidus relatifs, soit une version tronquée (fraction centrale 90\,\%) pour limiter l’effet des queues non gaussiennes :
+% \[
+% r=\frac{\hat{E}-E}{E},\qquad \sigma_{\rm bin}=
+% \begin{cases}
+% \sqrt{\langle r^2\rangle} & \text{(RMS)}\\
+% \sqrt{\langle r^2\rangle_{\text{fraction }0.9}} & \text{(RMS tronquée)}
+% \end{cases}.
+% \]
+
+% \subsection{Figures et importance des variables}
+% \label{subsec:energy-plots}
+% Le pipeline sauvegarde automatiquement :
+% \begin{itemize}
+%   \item \textbf{Courbe d’entraînement} (\(\ell_2\) train/val vs itération).
+%   \item \textbf{Linéarité} : profil $\langle \hat{E}\rangle$ vs $E$ (barres d’erreur = SEM) avec diagonale idéale.
+%   \item \textbf{Résolution} : courbe $\sigma(E)/E$ vs $E$.
+%   \item \textbf{Biais relatif} : $(\langle \hat{E}\rangle-E)/E$ vs $E$.
+%   \item \textbf{Combo} linéarité + biais sur un même canevas.
+%   \item \textbf{Importance des variables} (gain total LightGBM).
+% \end{itemize}
+% Des versions \emph{multi-particules} sont produites lorsque plusieurs espèces sont traitées, avec des couleurs dédiées.
+
+% \subsection{Bonnes pratiques et remarques}
+% \label{subsec:energy-notes}
+% \begin{itemize}
+%   \item \textbf{Log-espace} : stabilise la dynamique et rend la métrique relative plus naturelle; l’inférence revient en linéaire par exponentielle.
+%   \item \textbf{Validation \(\neq\) test} : l’\emph{early stopping} se fait sur validation, les performances sont reportées uniquement sur test.
+%   \item \textbf{Échelle des features} : le scaling est conservé pour cohérence inter-pipelines; il n’est pas requis par les arbres.
+%   \item \textbf{Binning} : l’utilisation d’un RMS tronqué (90\%) est conseillée pour réduire l’influence des queues non gaussiennes.
+%   \item \textbf{Reproductibilité} : toutes les graines sont fixées; les splits train/test/val sont déterministes.
+% \end{itemize}
+
+% \section{Minimisation du \texorpdfstring{$\chi^2$}{chi2} pour la reconstruction d'énergie}
+% \label{sec:chi2-energyreco}
+
+% \subsection{Principe de la méthode}
+% Afin de relier le nombre de coups enregistrés au seuil 1, 2 et 3 (\(N_1, N_2, N_3\)) à l'énergie primaire du faisceau \(E_{\rm beam}\), nous avons introduit une paramétrisation polynomiale des coefficients de pondération \(\alpha, \beta, \gamma\) :
+% \[
+% \alpha(N) = a_0 + a_1 N + a_2 N^2, \qquad
+% \beta(N)  = b_0 + b_1 N + b_2 N^2, \qquad
+% \gamma(N) = c_0 + c_1 N + c_2 N^2,
+% \]
+% où \(N = N_1+N_2+N_3\) est le nombre total de hits. L'énergie reconstruite est alors donnée par
+% \[
+% E_{\rm reco} = \alpha(N)\,N_1 + \beta(N)\,N_2 + \gamma(N)\,N_3.
+% \]
+
+% Les neuf paramètres libres \((a_i,b_i,c_i)\) sont ajustés par minimisation du \(\chi^2\) :
+% \[
+% \chi^2 = \sum_{i=1}^{N_{\rm evt}}
+% \frac{(E_{\rm reco}^{(i)} - E_{\rm beam}^{(i)})^2}{E_{\rm beam}^{(i)}}.
+% \]
+% Cette forme pondère chaque événement par son énergie vraie, limitant l’influence des événements de basse énergie.
+
+% \subsection{Implémentation avec Minuit}
+% La minimisation a été effectuée avec \texttt{TMinuit} (algorithme \texttt{MIGRAD}).  
+% Les étapes principales sont :
+% \begin{itemize}
+%   \item extraction des événements en excluant ceux dont la gerbe atteint la couche la plus profonde (\(K=47\)) afin d’éviter les fuites longitudinales ;
+%   \item initialisation des paramètres à partir de valeurs proches d’un pré-ajustement (spécifiques à chaque particule) ;
+%   \item définition des pas et bornes adaptés, en particulier pour \(c_0\) contraint à \([0,10^{-10}]\) ;
+%   \item exécution de \texttt{MIGRAD}, suivie de \texttt{HESSE} pour l’estimation des incertitudes.
+% \end{itemize}
+
+% \subsection{Résultats numériques}
+% Les minimisations convergent rapidement pour les trois espèces de hadrons. Les résultats globaux sont résumés dans le Tableau~\ref{tab:chi2-fit}.
+
+% \begin{table}[h]
+% \centering
+%   \begin{tabular}{lcccc}
+%     \toprule
+%     Espèce & $\chi^2_{\min}$ & ndf & $\chi^2/\mathrm{ndf}$ & Évts vetotés (plan 47) \\
+%     \midrule
+%     $\pi^-$   & $39258.1$ & $57993$ & $0.677$ & $71998$ \\
+%     $K^0_L$   & $80455.8$ & $56786$ & $1.417$ & $73205$ \\
+%     $p$       & $30221.5$ & $57060$ & $0.530$ & $72931$ \\
+%     \bottomrule
+%   \end{tabular}
+% \caption{Valeurs minimales du $\chi^2$, degrés de liberté (NDF) et rapport $\chi^2$/NDF pour chaque espèce.}
+% \label{tab:chi2-fit}
+% \end{table}
+
+% \begin{table*}[t]
+% \centering
+% \small
+% \begin{tabular}{lccc}
+% \hline
+% Paramètre & $\pi^{-}$ & $K^{0}$ & $p$ \\
+% \hline
+% $a_{0}$ & $4.30851\!\cdot\!10^{-2}\ \pm\ 1.15108\!\cdot\!10^{-3}$ & $5.60298\!\cdot\!10^{-2}\ \pm\ 1.52489\!\cdot\!10^{-3}$ & $4.35267\!\cdot\!10^{-2}\ \pm\ 1.08512\!\cdot\!10^{-3}$ \\
+% $a_{1}$ & $-3.50665\!\cdot\!10^{-5}\ \pm\ 4.16951\!\cdot\!10^{-6}$ & $-4.58223\!\cdot\!10^{-5}\ \pm\ 5.03015\!\cdot\!10^{-6}$ & $-1.89745\!\cdot\!10^{-5}\ \pm\ 3.84288\!\cdot\!10^{-6}$ \\
+% $a_{2}$ & $1.94847\!\cdot\!10^{-8}\ \pm\ 2.87172\!\cdot\!10^{-9}$ & $1.90941\!\cdot\!10^{-8}\ \pm\ 3.26151\!\cdot\!10^{-9}$ & $1.07039\!\cdot\!10^{-8}\ \pm\ 2.54851\!\cdot\!10^{-9}$ \\
+% $b_{0}$ & $1.07201\!\cdot\!10^{-1}\ \pm\ 4.50183\!\cdot\!10^{-3}$ & $8.00358\!\cdot\!10^{-2}\ \pm\ 5.42477\!\cdot\!10^{-3}$ & $1.22286\!\cdot\!10^{-1}\ \pm\ 4.27768\!\cdot\!10^{-3}$ \\
+% $b_{1}$ & $-6.36403\!\cdot\!10^{-5}\ \pm\ 1.48551\!\cdot\!10^{-5}$ & $-7.76142\!\cdot\!10^{-5}\ \pm\ 1.73627\!\cdot\!10^{-5}$ & $-4.93952\!\cdot\!10^{-5}\ \pm\ 1.39078\!\cdot\!10^{-5}$ \\
+% $b_{2}$ & $1.20235\!\cdot\!10^{-8}\ \pm\ 9.90239\!\cdot\!10^{-9}$ & $4.58240\!\cdot\!10^{-8}\ \pm\ 1.10728\!\cdot\!10^{-8}$ & $5.45074\!\cdot\!10^{-9}\ \pm\ 8.93486\!\cdot\!10^{-9}$ \\
+% $c_{0}$ & $1.91862\!\cdot\!10^{-13}\ \pm\ 6.88592\!\cdot\!10^{-11}$ & $9.83127\!\cdot\!10^{-15}\ \pm\ 5.41631\!\cdot\!10^{-11}$ & $2.60494\!\cdot\!10^{-13}\ \pm\ 9.89608\!\cdot\!10^{-11}$ \\
+% $c_{1}$ & $7.35489\!\cdot\!10^{-4}\ \pm\ 6.29901\!\cdot\!10^{-6}$ & $7.97643\!\cdot\!10^{-4}\ \pm\ 6.12363\!\cdot\!10^{-6}$ & $4.77430\!\cdot\!10^{-4}\ \pm\ 7.87514\!\cdot\!10^{-6}$ \\
+% $c_{2}$ & $-3.00925\!\cdot\!10^{-7}\ \pm\ 5.58125\!\cdot\!10^{-9}$ & $-3.56930\!\cdot\!10^{-7}\ \pm\ 5.45222\!\cdot\!10^{-9}$ & $-1.68624\!\cdot\!10^{-7}\ \pm\ 6.33591\!\cdot\!10^{-9}$ \\
+% \hline
+% \end{tabular}
+% \caption{Paramètres du modèle $E_{\rm reco}=\alpha(N)N_1+\beta(N)N_2+\gamma(N)N_3$ avec
+% $\alpha=a_0+a_1N+a_2N^2$, $\beta=b_0+b_1N+b_2N^2$, $\gamma=c_0+c_1N+c_2N^2$,
+% ajustés par minimisation de $\chi^2$ (incertitudes $1\sigma$ de \texttt{HESSE}). 
+% On note que $c_0$ n'est pas bien contraint (erreur $\gg$ valeur) pour les trois espèces.}
+% \label{tab:params-minuit}
+% \end{table*}
+
+% On observe :
+% \begin{itemize}
+%   \item pour les \textbf{pions}, un ajustement de bonne qualité avec $\chi^2$/NDF $\simeq 0.68$ ;
+%   \item pour les \textbf{protons}, un ajustement encore meilleur ($\chi^2$/NDF $\simeq 0.53$) ;
+%   \item pour les \textbf{kaons}, une valeur plus élevée ($\chi^2$/NDF $\simeq 1.42$), traduisant une description moins précise des données.
+% \end{itemize}
+
+% \subsection{Figures de validation}
+% Les figures suivantes ont été produites pour chaque particule :
+% \begin{itemize}
+%   \item comparaison des distributions $E_{\rm beam}$ vs $E_{\rm reco}$ ;
+%   \item profil de linéarité $\langle E_{\rm reco}\rangle$ en fonction de $E_{\rm beam}$ avec diagonale idéale ;
+%   \item corrélation événement-par-événement $E_{\rm reco}$ vs $E_{\rm beam}$ ;
+%   \item résolution relative $\sigma(E)/E$ extraite par ajustement gaussien des résidus $\Delta E = E_{\rm reco} - E_{\rm beam}$ dans des intervalles d’énergie.
+% \end{itemize}
+
+% \subsection{Discussion}
+% Les faibles valeurs de $\chi^2$/NDF obtenues pour $\pi^-$ et $p$ confirment la robustesse du modèle quadratique choisi. La valeur plus élevée pour les $K^0$ peut refléter soit un nombre plus réduit d’événements effectifs après filtrage, soit des effets physiques non capturés par la paramétrisation (différences de développement de gerbes). Globalement, la linéarité est satisfaisante jusqu’à 100~GeV et la résolution suit la tendance attendue $\sigma(E)/E \propto 1/\sqrt{E}$.
+
+
