@@ -7,8 +7,10 @@ This repository contains my M2 internship research software for studying particl
 - Particle-physics data analysis with ROOT/C++, LCIO-derived detector outputs, and shower observables.
 - Supervised learning for hadron PID using LightGBM BDTs, scikit-learn MLPs, and exploratory graph neural networks.
 - Energy reconstruction with both ML regressors and a semi-digital chi2/TMinuit calibration approach.
-- Reproducible research organization: parameter logs, performance tables, plots, and method comparisons.
+- Reproducible research organization: seeded splits, per-run configuration records, performance tables, and method comparisons.
 - Scientific communication through documented pipelines, result summaries, and portfolio-oriented repository structure.
+- Critical review of one's own analysis: the defects found in this code and what was done about them are documented in
+  [docs/corrections.md](docs/corrections.md).
 
 ## Project Overview
 
@@ -59,48 +61,65 @@ The repository assumes ROOT trees containing either per-hit detector information
 
 - ROOT/C++ event loop over digitized hits.
 - Computation of threshold counts, shower start, barycentre, RMS, density, radius, clustering, longitudinal-profile quantities, timing summaries, and topology features.
-- Main code: `ShowerAnalyzer/`.
+- Also written per event: `eventNumber`, so a held-out sample can be proved disjoint from the training events, and `touchesLastLayer`, so the machine-learning chain can apply the same containment cut as the chi2 chain.
+- Main code: `analysis/1_shower_features/`.
 
 **Particle identification**
 
-- LightGBM BDT classifiers using engineered shower variables.
-- scikit-learn MLP baselines with standardization and SMOTE in selected scripts.
+- LightGBM BDT classifiers using engineered shower variables: `analysis/3_pid/bdt/LGBM_classifier_PID.py`.
+- Class imbalance handled by SMOTE on the training split only, or by LightGBM class weights; when hyper-parameters are searched, the resampling runs inside each cross-validation fold.
+- scikit-learn MLP baselines with standardization: `analysis/3_pid/mlp/`.
 - Exploratory PyTorch Geometric GNN models using hit-level or graph-like shower representations.
-- Main code: `PID/`.
+- Main code: `analysis/3_pid/`.
 
 **Energy reconstruction**
 
-- LightGBM and MLP regression models trained on derived shower parameters.
-- ROOT/C++ chi2 calibration with TMinuit using semi-digital hit counts N1, N2, and N3.
-- Main code: `Energy_reconstruction_ml/` and `energy_reconstruction_Tminuit/`.
+- LightGBM and MLP regressors trained on derived shower parameters, in log(E) with a bias-corrected back-transform: `hadron_energy_reco_lgbm.py` and `mlp_energy_reco.py`, both taking `--particles pi|kaon|proton|mixed|all`.
+- Semi-digital weighted least-squares calibration with TMinuit on the threshold multiplicities N1, N2, N3, fitted on a training split and evaluated on a held-out one.
+- Main code: `analysis/4_energy/` and `analysis/4_energy/chi2_tminuit/`.
 
 **PID-energy coupling**
 
-- Comparisons of reconstruction performance with and without PID-informed model selection.
-- Main code: `PID_RECONSTRUCTION/`.
+- Three cases, quoted together: no PID at all (one inclusive regressor), perfect PID (routing by the true particle) and real PID (routing by the classifier).
+- Main code: `analysis/5_pid_energy/pid_energy_coupling.py`, driven by `--pid` and `--reco`. See [its README](analysis/5_pid_energy/README.md).
 
 ## Repository Structure
 
 ```text
 .
-|-- ShowerAnalyzer/                  ROOT/C++ shower-parameter extraction
-|-- PID/                             PID studies with BDT, MLP, GNN, RF, CNN variants
-|   |-- BDT/                         LightGBM PID classifiers and interpretation plots
-|   |-- MLP/                         scikit-learn MLP PID classifiers
-|   `-- GNN/                         exploratory PyTorch Geometric PID studies
-|-- Energy_reconstruction_ml/        ML-based energy reconstruction
-|   |-- BDT/                         LightGBM regressors and plots
-|   `-- MLP/                         MLP energy-regression studies
-|-- energy_reconstruction_Tminuit/   ROOT/TMinuit chi2 energy reconstruction
-|-- compare_parameters/              ROOT macros and figures comparing shower variables
-|-- PID_RECONSTRUCTION/              PID-aware vs non-PID energy reconstruction studies
-|-- tools/                           Utility scripts for visualization and track counting
-|-- results/                         Curated result and plot folders moved with git mv
-|-- report/                          M2 internship LaTeX report and compiled PDF
-|-- docs/                            Human-readable project documentation
-|-- CITATION.cff                     Suggested citation metadata
-`-- LICENSE.md                       Non-binding license selection note
+├── src/sdhcal/              Shared Python library, installed with `pip install -e .`
+│                              paths  rootio  smearing  splits  metrics  target  runlog  calib
+├── cpp/                     Shared C++ used by the ROOT stages
+│   ├── include/                ShowerAnalyzer.h, SdhcalPaths.h
+│   └── src/                    ShowerAnalyzer.cpp
+│
+├── analysis/                THE CHAIN, one directory per stage
+│   ├── 1_shower_features/      digitized hits -> shower variables  (C++/ROOT)
+│   ├── 2_variable_study/       how the variables differ by species (ROOT macros)
+│   ├── 3_pid/                  bdt/ mlp/ randomforest/ gnn/ cnn/
+│   ├── 4_energy/               ml_bdt/ ml_mlp/ chi2_tminuit/
+│   └── 5_pid_energy/           does identifying first help?
+│
+├── calibration/             chi2 coefficients: one file, read by C++ and Python
+├── tools/                   utilities outside the chain (held-out sample, log repair)
+├── tests/                   test suite for the shared library
+├── docs/                    documentation, including the record of corrections
+├── results/                 curated figures referenced by the report
+├── report/                  M2 internship LaTeX report and compiled PDF (self-contained)
+├── data/                    detector data, not versioned
+│
+├── Makefile                 make check, and one target per stage
+├── pyproject.toml           package metadata, pytest and ruff configuration
+├── requirements.txt         Python dependencies
+├── CITATION.cff             Suggested citation metadata
+└── LICENSE.md               Non-binding license selection note
 ```
+
+The numbering of `analysis/` gives the reading order of the analysis chain.
+Stages 3 and 4 are independent branches off stage 1 and stage 5 joins them; see
+[analysis/README.md](analysis/README.md) for the diagram and the conventions
+every stage shares.
+
 
 See also:
 
@@ -109,6 +128,7 @@ See also:
 - [Model summary](docs/model_summary.md)
 - [Results summary](docs/results_summary.md)
 - [Repository map](docs/repository_map.md)
+- [Corrections](docs/corrections.md) - defects found in this code, and what was done
 
 ## Internship Report
 
@@ -122,56 +142,136 @@ The raw, digitized, converted ROOT files, generated CSV tables, trained models, 
 
 In principle, the data chain depends on external tools such as SDHCAL simulation, digitization, LCIO/Marlin processing, ROOT, and local storage paths. Lightweight figures and selected performance summaries are kept in the repository when useful for review.
 
-## Reproduction in Principle
+## Getting Started
 
-The repository is not packaged as a one-command reproduction workflow. A new user would need to:
+```bash
+make venv                 # create .venv, install the dependencies and the sdhcal package
+source .venv/bin/activate
+make check                # compile every source, run the tests, check the C++
+```
 
-1. Generate or obtain compatible SDHCAL simulated samples.
-2. Digitize the simulated events and convert them to ROOT trees.
-3. Run the ROOT/C++ shower-parameter extraction in `ShowerAnalyzer/`.
-4. Update hard-coded data paths in the PID and energy scripts.
-5. Install the relevant Python packages: `numpy`, `pandas`, `uproot`, `scikit-learn`, `lightgbm`, `imbalanced-learn`, `joblib`, `matplotlib`, and optionally `torch`/`torch_geometric`.
-6. Re-run only the desired PID or energy reconstruction study, keeping train/test splits and seeds fixed where possible.
+Data locations come from the environment rather than from paths written into the
+scripts:
 
-This documentation update did not recompile code, rerun training, regenerate plots, or modify scientific algorithms.
+```bash
+export SDHCAL_DATA_DIR=/path/to/root/files      # inputs   (default: ./data)
+export SDHCAL_MODEL_DIR=/path/to/models         # models   (default: ./models)
+export SDHCAL_OUT_DIR=/path/to/output           # outputs  (default: ./output)
+```
+
+A missing dataset raises an error naming the variable to set, instead of failing
+inside uproot. The expected layout under `SDHCAL_DATA_DIR` is declared in
+[`src/sdhcal/paths.py`](src/sdhcal/paths.py).
+
+## Running the Analyses
+
+One target per stage of the chain, in order:
+
+```bash
+make features     # 1. digitized hits -> shower variables           (C++/ROOT)
+make variables    # 2. compare the variables between species        (ROOT macros)
+make pid          # 3. hadron identification                        (LightGBM)
+make energy       # 4. energy reconstruction, ML and chi2
+make coupling     # 5. does identifying first help? the three cases
+```
+
+`make help` lists every target. Arguments can be overridden without editing
+anything:
+
+```bash
+make pid PID_ARGS="--no-timing"
+make energy ENERGY_ARGS="--particles pi --seeds 10 --require-contained"
+```
+
+Each target simply calls the stage's own script, so you can always call it
+directly:
+
+```bash
+# 3. identification, with and without the timing variables
+python analysis/3_pid/bdt/LGBM_classifier_PID.py --sigma-time 0.1 --seeds 5
+python analysis/3_pid/bdt/LGBM_classifier_PID.py --no-timing
+
+# 4. energy, per particle and with one inclusive regressor
+python analysis/4_energy/ml_bdt/hadron_energy_reco_lgbm.py --particles all --seeds 5
+python analysis/4_energy/ml_bdt/hadron_energy_reco_lgbm.py --particles mixed
+root -l -b -q 'analysis/4_energy/chi2_tminuit/EnergyReco.C("pi")' && make calibration
+
+# 5. the coupling study: these three numbers belong in the same table
+python analysis/5_pid_energy/pid_energy_coupling.py --pid none --reco bdt   # no PID
+python analysis/5_pid_energy/pid_energy_coupling.py --pid true --reco bdt   # perfect PID
+python analysis/5_pid_energy/pid_energy_coupling.py --pid bdt  --reco bdt   # real PID
+```
+
+Every run writes its full configuration - feature list, smearing width, seeds,
+git commit, package versions - to `$SDHCAL_OUT_DIR/<study>/runs/*.json`, so a
+figure can be traced back to the configuration that produced it. See
+[analysis/README.md](analysis/README.md) for the conventions every stage shares.
 
 ## Representative Results and Figures
 
-The figures below are examples of outputs currently stored in the repository. They are included as visual evidence of the analysis workflow, not as a claim of publication-level performance.
+The figures below are examples of outputs currently stored in the repository. They are visual evidence of the analysis workflow, not a claim of publication-level performance, and they predate the corrections in [docs/corrections.md](docs/corrections.md) - see [Limitations](#limitations).
 
 <p align="center">
   <img src="results/pid-energy-coupling/summary/confusion_matrix_pid_LGBM.png" width="31%" alt="Example PID confusion matrix">
-  <img src="Energy_reconstruction_ml/BDT/plots/Lin_n_Dev_all_LGBM.png" width="31%" alt="Example ML energy reconstruction linearity and deviation">
+  <img src="analysis/4_energy/ml_bdt/plots/Lin_n_Dev_all_LGBM.png" width="31%" alt="Example ML energy reconstruction linearity and deviation">
   <img src="results/energy-reconstruction/chi2-tminuit/summary-plots/Lin_n_Dev_all_chi2.png" width="31%" alt="Example chi2/TMinuit energy reconstruction linearity and deviation">
 </p>
 
 Additional useful figure locations:
 
 - `results/pid/bdt/feature-interpretation/` - LightGBM feature-importance, SHAP-style summaries, and tree visualizations.
-- `PID/GNN/plots/` - GNN training and confusion-matrix plots.
-- `Energy_reconstruction_ml/BDT/plots/` - ML energy linearity, relative deviation, and resolution plots.
-- `Energy_reconstruction_ml/MLP/results_*_energy_reco/plots/` - MLP regression curves by particle category.
+- `analysis/3_pid/gnn/plots/` - GNN training and confusion-matrix plots.
+- `analysis/4_energy/ml_bdt/plots/` - ML energy linearity, relative deviation, and resolution plots.
+- `analysis/4_energy/ml_mlp/results_*_energy_reco/plots/` - MLP regression curves. The per-particle folders are not trustworthy: the three scripts that wrote them were identical and all read the pion file.
 - `results/energy-reconstruction/chi2-tminuit/summary-plots/` - chi2/TMinuit reconstruction profiles and diagnostics.
 - `results/shower-variables/plots/` - shower-variable overlays and comparisons.
 - `results/pid-energy-coupling/summary/` - PID-energy coupling summary confusion matrices.
-- `PID_RECONSTRUCTION/*/plots/` - comparisons of PID-aware and non-PID energy reconstruction.
+- `analysis/5_pid_energy/*/plots/` - coupling comparisons. What is labelled "no PID" there is in fact perfect PID; see [analysis/5_pid_energy/README.md](analysis/5_pid_energy/README.md).
 
 ## Limitations
 
-- The repository does not include the large input datasets needed for direct reruns.
-- Several scripts contain absolute paths from the internship computing environment.
-- The workflows are research scripts rather than a single maintained package or command-line interface.
-- Some studies are exploratory and compare multiple model variants without a final unified benchmark table.
-- Existing figures should be interpreted in the context of the specific simulated samples, splits, and configuration files used at the time.
+Read these before quoting any number from this repository.
+
+- **The stored figures predate the corrections.** Everything under `results/`
+  and in `report/` was produced by the code as it stood before the review
+  recorded in [docs/corrections.md](docs/corrections.md). Several of those
+  corrections change a quoted quantity: in particular the resolution curves
+  understate sigma by about 21 %, because the 90 %-truncated RMS was never
+  corrected for the truncation, and the chi2 coefficients were fitted and
+  evaluated on the same events.
+- **The chi2-versus-ML comparison is not yet like-for-like.** The chi2 fit now
+  splits train and test, but it has to be re-run; until then the committed
+  coefficients are flagged `fitted_on_train_split: false`.
+- **The PID-agnostic baseline has never been measured.** The scripts named
+  `noPID_*` routed events by the true particle, so what was compared was real
+  PID against perfect PID. `--pid none` now exists and needs to be run.
+- **The held-out sample has not been verified.** Whether `val_set.root` shares
+  events with the training files was never established. `tools/build_holdout.py
+  --check` answers the question; if it fails, the end-to-end numbers are
+  optimistic by an unknown amount.
+- **Per-particle MLP energy results should be disregarded.** The three scripts
+  that were supposed to produce them were byte-identical, read the pion file,
+  and did not run at all.
+- **No figure in the repository can be attributed to a configuration**, because
+  the feature list and the smearing width were never logged and the run logs
+  were column-shifted. The logs are repaired and new runs record everything, but
+  the older figures cannot be reconstructed after the fact.
+- The large input datasets are not included, so direct reruns need the
+  simulation chain.
+- The GNN and CNN studies are exploratory and no result in the report depends on
+  them.
 
 ## Future Improvements
 
-- Replace hard-coded data paths with configuration files or command-line arguments across all scripts.
-- Add a small public toy sample or synthetic fixture for smoke tests.
-- Add environment files for Python and ROOT versions.
-- Consolidate metrics into one reproducible summary table.
-- Add lightweight tests for feature extraction and data-loading assumptions.
-- Record exact dataset provenance and split identifiers for every reported figure.
+- Re-run every study with the corrected estimators and publish a single
+  benchmark table with uncertainties from the multi-seed runs.
+- Add a small synthetic fixture so the pipelines, not just the shared package,
+  can be smoke-tested in CI.
+- Scan the timing resolution instead of fixing sigma = 0.1 ns, now that the
+  smearing is independent per variable and configurable.
+- Record a container or lock file for the ROOT and Python versions.
+- Treat `Begin = 48` as a categorical "not found" flag for the neural models
+  rather than an extreme numerical value.
 
 ## Citation
 

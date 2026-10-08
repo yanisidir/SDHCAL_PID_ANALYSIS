@@ -1,0 +1,62 @@
+{
+  "model": "quadratic_in_nhit",
+  "formula": "Ereco = (a0+a1*N+a2*N^2)*N1 + (b0+b1*N+b2*N^2)*N2 + (c0+c1*N+c2*N^2)*N3, N = N1+N2+N3",
+  "comment": [
+    "Single source of truth for the semi-digital chi2 calibration coefficients.",
+    "Written by energy_reconstruction_Tminuit/EnergyReco.C and read by sdhcal.calib,",
+    "so the C++ and the Python reconstructions can no longer drift apart.",
+    "The values below are the ones recovered from the internship code. They are",
+    "flagged fitted_on_train_split=false because the original fit used every event",
+    "and then drew its linearity and resolution curves on those same events; rerun",
+    "EnergyReco.C to replace them with coefficients fitted on the training split only."
+  ],
+  "particles": {
+    "pi": {
+      "a0": 0.0430851,
+      "a1": -3.50665e-05,
+      "a2": 1.94847e-08,
+      "b0": 0.107201,
+      "b1": -6.36402e-05,
+      "b2": 1.20235e-08,
+      "c0": 1.81865e-13,
+      "c1": 0.000735489,
+      "c2": -3.00925e-07,
+      "source": "legacy: startParams of EnergyReco.C at commit dbaf683",
+      "fitted_on_train_split": false,
+      "selection": "events with no hit in layer 47, primaryEnergy > 0",
+      "energy_range_gev": [1, 130]
+    },
+    "kaon": {
+      "a0": 0.0560298,
+      "a1": -4.58223e-05,
+      "a2": 1.90941e-08,
+      "b0": 0.0800358,
+      "b1": -7.76142e-05,
+      "b2": 4.5824e-08,
+      "c0": 1.22381e-14,
+      "c1": 0.000797643,
+      "c2": -3.5693e-07,
+      "source": "legacy: startParams of EnergyReco.C at commit dbaf683",
+      "fitted_on_train_split": false,
+      "selection": "events with no hit in layer 47, primaryEnergy > 0",
+      "energy_range_gev": [1, 130],
+      "note": "the Python copy in PID_RECONSTRUCTION used c0=9.83127e-15 for this particle; the C++ value is kept"
+    },
+    "proton": {
+      "a0": 0.0435267,
+      "a1": -1.89745e-05,
+      "a2": 1.07039e-08,
+      "b0": 0.122286,
+      "b1": -4.93952e-05,
+      "b2": 5.45074e-09,
+      "c0": 2.61942e-13,
+      "c1": 0.00047743,
+      "c2": -1.68624e-07,
+      "source": "legacy: startParams of EnergyReco.C at commit dbaf683",
+      "fitted_on_train_split": false,
+      "selection": "events with no hit in layer 47, primaryEnergy > 0",
+      "energy_range_gev": [1, 130],
+      "note": "the Python copy in PID_RECONSTRUCTION used c0=2.60494e-13 for this particle; the C++ value is kept"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+# Python dependencies of the SDHCAL PID and energy-reconstruction analysis.
+#
+#   python -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# ROOT itself is not installable from PyPI. The C++ stages need a ROOT
+# installation, and so do four Python scripts that import its bindings
+# (tools/shower_visualisation.py, analysis/4_energy/ml_bdt/energy_plots.py and
+# the two analysis/5_pid_energy/*/figures.py). Every other Python script reads
+# the ROOT trees through uproot and needs no ROOT.
+#
+# Lower bounds are those the code actually relies on; they are not upper-pinned
+# so the analysis keeps working on a newer stack. The versions a given run used
+# are recorded per run by sdhcal.runlog.
+
+# Core
+numpy>=1.24
+pandas>=2.0
+
+# ROOT I/O without ROOT (uproot pulls in awkward itself)
+uproot>=5.0
+
+# Models
+scikit-learn>=1.3     # 1.6 removed mean_squared_error(squared=False); the code no longer uses it
+lightgbm>=4.0
+imbalanced-learn>=0.11
+joblib>=1.3
+
+# Figures
+matplotlib>=3.7
+seaborn>=0.12
+
+# Optional: SHAP summaries in analysis/3_pid/bdt/plot_trees.py, which runs
+# without it. Install with `pip install -e ".[interpret]"`.
+# shap>=0.44
+
+# Development
+pytest>=7.4
+ruff>=0.4

@@ -1,0 +1,76 @@
+name: CI
+
+# Everything here runs without the detector data: the ROOT inputs are not
+# versioned, so the pipelines themselves cannot be exercised. What is checked is
+# that every source compiles, that the shared package behaves as its tests say,
+# and that the committed calibration file is readable - which is what used to
+# break silently.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Every Python file compiles
+        run: make compile
+
+      - name: Test suite
+        run: python -m pytest tests/ -q
+
+      - name: The committed calibration file loads
+        run: |
+          python -c "
+          from sdhcal import calib
+          entries = calib.load_all()
+          print('particles:', sorted(entries))
+          for name, coefficients in entries.items():
+              assert coefficients.values.shape == (9,), name
+              print(f'  {name}: in-sample={coefficients.fitted_in_sample}')
+          "
+
+      - name: Run logs are not column-shifted
+        run: python tools/repair_run_logs.py --dry-run
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check src tools tests
+      - run: ruff format --check src tests
+
+  cpp:
+    name: C++ / ROOT
+    runs-on: ubuntu-latest
+    container: rootproject/root:6.32.02-ubuntu24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check the ROOT sources
+        run: make cpp

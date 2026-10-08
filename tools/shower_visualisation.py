@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-import ROOT
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import random
+
+import matplotlib.pyplot as plt
+import numpy as np
+import ROOT
+
+# Data and model locations come from the environment (SDHCAL_DATA_DIR,
+# SDHCAL_MODEL_DIR) instead of the absolute paths of the internship machine.
+# sdhcal_paths.legacy() keeps the original literal visible while resolving it
+# at run time; see src/sdhcal/paths.py.
+from sdhcal import paths as sdhcal_paths
 
 # ── PARAMÈTRES ───────────────────────────
 files_info = {
-    "Kaon":   "/gridgroup/ilc/midir/Timing/files/root/100k_kaon_E1to100_digitized.root",    
-    "Pion":   "/gridgroup/ilc/midir/Timing/files/root/100k_pi_E1to100_digitized.root",
-    "Proton": "/gridgroup/ilc/midir/Timing/files/root/100k_proton_E1to100_digitized.root"
+    "Kaon":   str(sdhcal_paths.legacy("/gridgroup/ilc/midir/Timing/files/root/100k_kaon_E1to100_digitized.root")),
+    "Pion":   str(sdhcal_paths.legacy("/gridgroup/ilc/midir/Timing/files/root/100k_pi_E1to100_digitized.root")),
+    "Proton": str(sdhcal_paths.legacy("/gridgroup/ilc/midir/Timing/files/root/100k_proton_E1to100_digitized.root"))
 }
 treename = "tree"
 
@@ -31,7 +37,7 @@ for idx, (label, filename) in enumerate(files_info.items(), 1):
     ys  = np.array([tree.y[i]   for i in range(tree.y.size())])
     zs  = np.array([tree.z[i]   for i in range(tree.z.size())])
     ths = np.array([int(tree.thr[i]) for i in range(tree.thr.size())])
-    event_number = tree.eventNumber  
+    event_number = tree.eventNumber
 
     # Ajout d’un subplot 3D
     ax = fig.add_subplot(1, 3, idx, projection='3d')

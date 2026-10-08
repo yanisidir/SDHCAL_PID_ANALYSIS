@@ -37,26 +37,64 @@ The central derived-data product is a ROOT tree of shower variables. Typical var
 - clustering and topology: `NClusters`, `AvgClustSize`, `MaxClustSize`, `nTrackSegments`;
 - timing summaries where available: `tMin`, `tMax`, `tMean`, `tSpread`.
 
-These variables are extracted mainly through `ShowerAnalyzer/`.
+These variables are extracted mainly through `analysis/1_shower_features/`.
+
+## Per-event bookkeeping branches
+
+Besides the shower observables, `ShowerAnalyzer` writes two branches that exist
+for the integrity of the analysis rather than for the physics:
+
+| Branch | Why it exists |
+|---|---|
+| `eventNumber` | Lets a held-out sample be proved disjoint from the training events. Without it the coupling study could not tell generalisation from training performance. Taken from the input tree when present, otherwise the row index, with a warning. |
+| `touchesLastLayer` | Flags showers reaching the last active layer (`K == 47`). The chi2 chain rejects them; exposing the flag lets the ML chain apply the identical cut, so the two methods are compared on the same events. |
+
+`Begin` carries the sentinel value 48 when no shower start is found - one past
+the last layer, deliberately outside the physical range. It is a "not found"
+marker, not a depth.
 
 ## Reproduction Notes
 
-To reproduce the full analysis in principle, a user would need:
+To reproduce the full analysis, a user would need:
 
 - an SDHCAL-compatible simulation and digitization environment;
-- ROOT and C++ build support;
+- ROOT and C++ build support (`make shower-analyzer`);
 - LCIO/Marlin conversion tools if starting from `.slcio`;
-- Python packages for ML workflows;
-- local replacements for the absolute input paths currently present in scripts;
+- the Python packages in `requirements.txt` (`make venv`);
 - enough storage for ROOT files and generated model artifacts.
 
-No commands in this documentation update recompiled code, reran training, or regenerated scientific results.
+Data locations are no longer written into the scripts. Set:
 
-## Path Hygiene for Future Work
+```bash
+export SDHCAL_DATA_DIR=/path/to/root/files      # inputs   (default: ./data)
+export SDHCAL_MODEL_DIR=/path/to/models         # models   (default: ./models)
+export SDHCAL_OUT_DIR=/path/to/output           # outputs  (default: ./output)
+```
 
-For a more reusable release, the next step would be to replace hard-coded paths with one of:
+The expected layout under `SDHCAL_DATA_DIR` is declared once, in
+`src/sdhcal/paths.py`:
 
-- a `config.yaml` file;
-- command-line arguments;
-- environment variables such as `SDHCAL_DATA_DIR`;
-- a small loader module shared by PID and energy scripts.
+```text
+$SDHCAL_DATA_DIR/
+|-- params/130k_<particle>_E1to130_params.root
+|-- merged_primaryEnergy/130k_<particle>_E1to130_params_merged.root
+|-- digitized/130k_<particle>_E1to130_digitized.root
+|-- raw/130k_<particle>_E1to130.root
+`-- val_set.root                                 built by tools/build_holdout.py
+```
+
+A missing file raises an error naming the variable to set, instead of failing
+inside uproot or returning an empty frame.
+
+## Building the Held-Out Sample
+
+The evaluation sample is not a leftover of a training split: it is carved out
+first, with a recorded seed, and the two halves are asserted disjoint.
+
+```bash
+python tools/build_holdout.py --fraction 0.15 --seed 20240601 --write-train-pool
+python tools/build_holdout.py --check      # verify an existing val_set.root
+```
+
+This writes `val_set_manifest.json` next to the data, recording the fraction,
+the seed, the per-particle counts and a digest of the held-out event numbers.

@@ -1,0 +1,16 @@
+# Optional dependencies of the exploratory graph-network PID studies (PID/GNN,
+# PID/CNN). They are kept apart from requirements.txt because torch and
+# torch-geometric are large, platform-specific, and needed by none of the
+# results in the report.
+#
+#   pip install -r requirements.txt -r requirements-gnn.txt
+#
+# torch-geometric wheels depend on the exact torch build; follow
+# https://pytorch-geometric.readthedocs.io for the index URL matching your
+# platform and CUDA version.
+
+-r requirements.txt
+
+torch>=2.0
+torch-geometric>=2.4
+tqdm>=4.65
