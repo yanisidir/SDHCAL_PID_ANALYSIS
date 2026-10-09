@@ -1,63 +1,20 @@
-\chapter{Calcul détaillé des descripteurs de gerbe avec \texttt{ShowerAnalyzer}}
+\chapter{Descripteurs de gerbe : définitions}
 \label{annexe:showeranalyzer}
 
-\section{Introduction}
+\section{Principe et inventaire}
 
-L’ensemble des études présentées dans ce mémoire repose sur l’extraction de variables physiques dérivées directement des hits enregistrés dans le calorimètre SDHCAL.  
-Ces observables, appelées ici \emph{descripteurs de gerbe}, ont été calculées à l’aide d’un outil dédié développé en C++, nommé \texttt{ShowerAnalyzer}.
-
-Le rôle de ce module est de transformer la description brute d’un événement,
-constituée d’une liste de hits élémentaires :
-
+Toutes les analyses de ce mémoire reposent sur des variables physiques dérivées des hits enregistrés dans le SDHCAL. Ces \emph{descripteurs de gerbe} sont calculés par un outil dédié développé en \texttt{C++}, \texttt{ShowerAnalyzer}, dont le rôle est de transformer la description brute d'un événement — une liste de hits élémentaires
 \[
 (I_i,\;J_i,\;K_i,\;x_i,\;y_i,\;z_i,\;t_i,\;\mathrm{thr}_i)
 \]
+— en un ensemble réduit d'observables caractérisant la composition en seuils semi-digitaux, la topologie spatiale, le développement longitudinal, la compacité transverse, la structure temporelle et les éventuelles sous-structures internes. Ces variables constituent les entrées des modèles de PID et de reconstruction d'énergie.
 
-en un ensemble réduit de variables synthétiques caractérisant :
+Les fichiers simulés sont lus au format \texttt{ROOT}, chaque événement fournissant les indices de cellule \texttt{I}, \texttt{J}, l'indice de couche \texttt{K}, les positions \texttt{x}, \texttt{y}, \texttt{z}, le temps du hit, le seuil franchi, ainsi que la vérité Monte-Carlo \texttt{particle1PDG}. Les variables calculées sont ajoutées comme nouvelles branches d'un arbre enrichi, qui alimente ensuite les analyses.
 
-\begin{itemize}
-    \item la composition en seuils semi-digitaux ;
-    \item la topologie spatiale de la gerbe ;
-    \item son développement longitudinal ;
-    \item sa compacité transverse ;
-    \item sa structure temporelle ;
-    \item la présence éventuelle de sous-structures internes.
-\end{itemize}
-
-Ces variables constituent ensuite les entrées des modèles de classification (PID) et de reconstruction d’énergie présentés dans les chapitres précédents.
-
-\section{Principe général du pipeline}
-
-Les fichiers simulés sont stockés au format \texttt{ROOT} sous forme d’arbres contenant, pour chaque événement, les branches natives du détecteur :
-
-\begin{itemize}
-    \item indices de cellule : \texttt{I}, \texttt{J} ;
-    \item indice de couche : \texttt{K} ;
-    \item positions physiques : \texttt{x}, \texttt{y}, \texttt{z} ;
-    \item temps du hit : \texttt{time} ;
-    \item seuil franchi : \texttt{thr} ;
-    \item vérité Monte-Carlo : \texttt{particle1PDG}.
-\end{itemize}
-
-Le programme \texttt{computeParams\_parallel.cpp} lit chaque événement, instancie la classe :
+Le pipeline produit les observables suivantes :
 
 \begin{center}
-\texttt{ShowerAnalyzer analyzer(...);}
-\end{center}
-
-puis appelle :
-
-\begin{center}
-\texttt{analyzer.analyze();}
-\end{center}
-
-Les variables calculées sont ensuite ajoutées comme nouvelles branches dans un arbre enrichi.
-
-\section{Variables produites}
-
-Le pipeline génère automatiquement les observables suivantes :
-
-\begin{center}
+\small
 \begin{tabular}{llll}
 \texttt{Thr1} & \texttt{Thr2} & \texttt{Thr3} & \texttt{Begin} \\
 \texttt{Radius} & \texttt{Density} & \texttt{NClusters} & \texttt{ratioThr23} \\
@@ -66,651 +23,232 @@ Le pipeline génère automatiquement les observables suivantes :
 \texttt{N1} & \texttt{N2} & \texttt{N3} & \texttt{tMin} \\
 \texttt{tMax} & \texttt{tMean} & \texttt{tSpread} & \texttt{Nmax} \\
 \texttt{z0\_fit} & \texttt{Xmax} & \texttt{lambda} & \texttt{nTrackSegments} \\
-\texttt{eccentricity3D} & \texttt{nHitsTotal} & \texttt{sumThrTotal}
+\texttt{eccentricity3D} & \texttt{nHitsTotal} & \texttt{sumThrTotal} & \\
 \end{tabular}
 \end{center}
 
-Dans les sections suivantes, chacune de ces familles de variables est détaillée physiquement et mathématiquement.
+Les sections suivantes définissent chaque famille : formule, notation employée dans le code, et sens physique.
 
 \section{Variables liées aux seuils semi-digitaux}
 \label{annexe:thrvars}
 
-Le SDHCAL repose sur une lecture \emph{semi-digitale} à trois seuils, permettant de distinguer différents niveaux de charge déposée dans une cellule active.  
-Chaque hit est donc associé à une valeur discrète :
+Le SDHCAL repose sur une lecture \emph{semi-digitale} à trois seuils, permettant de distinguer
+différents niveaux de charge déposée dans une cellule active. Chaque hit est associé à une valeur
+discrète \(\mathrm{thr}_i \in \{1,2,3\}\) correspondant à un dépôt faible, intermédiaire ou élevé.
+Cette information constitue une approximation de la densité locale d'ionisation, donc indirectement
+de l'intensité du dépôt d'énergie. Les variables construites à partir de ces seuils sont rassemblées
+dans le Tableau~\ref{tab:annexeA-seuils}.
 
-\[
-\mathrm{thr}_i \in \{1,2,3\}
-\]
+\begin{table}[!ht]
+    \centering
+    \caption{Descripteurs construits à partir de la lecture semi-digitale à trois seuils.
+             \(N_{\mathrm{hits}}\) désigne le nombre total de hits de l'événement.}
+    \label{tab:annexeA-seuils}
+    \small
+    \begin{tabularx}{\textwidth}{@{}l c X@{}}
+        \toprule
+        \textbf{Variable} & \textbf{Définition} & \textbf{Sens physique} \\
+        \midrule
+        \texttt{N1}, \texttt{N2}, \texttt{N3}
+            & \(N_j = \#\{i \mid \mathrm{thr}_i = j\}\)
+            & Répartition brute des hits selon leur intensité. \\[2pt]
+        \texttt{nHitsTotal}
+            & \(N_{\mathrm{hits}} = N_1 + N_2 + N_3\)
+            & Activité globale de la gerbe. \\[2pt]
+        \texttt{Thr1}, \texttt{Thr2}, \texttt{Thr3}
+            & \(100 \times N_j / N_{\mathrm{hits}}\)
+            & Composition relative de la gerbe, indépendante de la multiplicité totale. \\[2pt]
+        \texttt{ratioThr23}
+            & \(\dfrac{\texttt{Thr2}+\texttt{Thr3}}{\texttt{Thr1}}\)
+            & Variable de dureté : compare les hits « énergétiques » aux hits de faible
+              amplitude. Une valeur élevée traduit une gerbe plus dense, des dépôts plus
+              localisés, une composante électromagnétique plus marquée ou une interaction
+              hadronique plus violente. \\[2pt]
+        \texttt{sumThrTotal}
+            & \(N_1 + 2N_2 + 3N_3\)
+            & Estimateur simple de l'énergie visible totale, supérieur au simple comptage
+              \(N_{\mathrm{hits}}\) car il valorise les hits de seuil élevé. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
-où :
-
-\begin{itemize}
-    \item \textbf{seuil 1} : dépôt faible ;
-    \item \textbf{seuil 2} : dépôt intermédiaire ;
-    \item \textbf{seuil 3} : dépôt élevé.
-\end{itemize}
-
-Cette information constitue une approximation de la densité locale d’ionisation, donc indirectement de l’intensité du dépôt d’énergie.
-
-\subsection{Comptages absolus}
-
-Pour un événement contenant \(N_{\mathrm{hits}}\) coups enregistrés, on définit :
-
-\[
-N_1 = \#\{i \mid \mathrm{thr}_i = 1\}
-\]
-
-\[
-N_2 = \#\{i \mid \mathrm{thr}_i = 2\}
-\]
-
-\[
-N_3 = \#\{i \mid \mathrm{thr}_i = 3\}
-\]
-
-Ces trois variables mesurent la répartition brute des hits selon leur intensité.
-
-Le nombre total de hits vaut :
-
-\[
-N_{\mathrm{hits}} = N_1 + N_2 + N_3
-\]
-
-et correspond dans le code à :
-
-\begin{center}
-\texttt{nHitsTotal}
-\end{center}
-
-\subsection{Fractions relatives}
-
-Afin de rendre ces informations indépendantes de la multiplicité totale, on introduit :
-
-\[
-\texttt{Thr1} = 100 \times \frac{N_1}{N_{\mathrm{hits}}}
-\]
-
-\[
-\texttt{Thr2} = 100 \times \frac{N_2}{N_{\mathrm{hits}}}
-\]
-
-\[
-\texttt{Thr3} = 100 \times \frac{N_3}{N_{\mathrm{hits}}}
-\]
-
-Ces observables représentent la composition relative de la gerbe.
-
-\subsection{Variable de dureté}
-
-Une variable synthétique utile pour la discrimination hadronique est :
-
-\[
-\texttt{ratioThr23}=
-\frac{\texttt{Thr2}+\texttt{Thr3}}{\texttt{Thr1}}
-\]
-
-Elle compare la fraction de hits ``énergétiques'' aux hits de faible amplitude.
-
-Une valeur élevée traduit généralement :
-
-\begin{itemize}
-    \item une gerbe plus dense ;
-    \item des dépôts plus localisés ;
-    \item une composante électromagnétique plus marquée ;
-    \item ou une interaction hadronique plus violente.
-\end{itemize}
-
-\subsection{Somme pondérée des seuils}
-
-Le pipeline calcule également :
-
-\[
-\texttt{sumThrTotal}=N_1+2N_2+3N_3
-\]
-
-Cette quantité constitue un estimateur simple de l’énergie visible totale, supérieur au simple comptage \(N_{\mathrm{hits}}\), car elle valorise davantage les hits franchissant les seuils élevés.
-
-\subsection{Interprétation physique}
-
-Ces variables sont particulièrement utiles car elles conservent l’information spécifique au mode semi-digital du SDHCAL.  
-Elles permettent de distinguer :
-
-\begin{itemize}
-    \item des gerbes diffuses riches en seuil 1 ;
-    \item des gerbes compactes avec excès de seuils 2 et 3 ;
-    \item des événements peu énergétiques contenant peu de hits ;
-    \item des dépôts saturés à haute énergie.
-\end{itemize}
-
-Dans les modèles d’apprentissage supervisé présentés dans ce mémoire, \(N_1\), \(N_3\) et \texttt{sumThrTotal} figurent parmi les variables les plus importantes pour la reconstruction d’énergie.
+Ces variables conservent l'information spécifique au mode semi-digital du SDHCAL et permettent de
+distinguer les gerbes diffuses riches en seuil 1, les gerbes compactes présentant un excès de seuils
+2 et 3, les événements peu énergétiques contenant peu de hits, et les dépôts saturés à haute
+énergie. Dans les modèles d'apprentissage supervisé présentés dans ce mémoire, \(N_1\), \(N_3\) et
+\texttt{sumThrTotal} figurent parmi les variables les plus importantes pour la reconstruction
+d'énergie.
 
 \section{Descripteurs longitudinaux}
 \label{annexe:longitudinal}
 
-Le développement longitudinal d’une gerbe hadronique constitue une source majeure d’information physique.  
-La profondeur de première interaction, la vitesse de croissance de la cascade et son étalement dans le détecteur diffèrent selon la particule incidente et son énergie.
+Le développement longitudinal d'une gerbe hadronique constitue une source majeure d'information
+physique : la profondeur de première interaction, la vitesse de croissance de la cascade et son
+étalement dans le détecteur diffèrent selon la particule incidente et son énergie. Le
+\texttt{ShowerAnalyzer} calcule les observables du Tableau~\ref{tab:annexeA-long} à partir de
+l'indice de couche \(K\), utilisé comme proxy de la coordonnée en profondeur.
 
-Le \texttt{ShowerAnalyzer} calcule plusieurs observables basées sur l’indice de couche \(K\), utilisé comme proxy de la coordonnée en profondeur.
+\begin{table}[!ht]
+    \centering
+    \caption{Descripteurs du développement longitudinal. \(h(K)\) désigne le nombre de hits
+             enregistrés dans la couche \(K\).}
+    \label{tab:annexeA-long}
+    \small
+    \begin{tabularx}{\textwidth}{@{}l c X@{}}
+        \toprule
+        \textbf{Variable} & \textbf{Définition} & \textbf{Sens physique} \\
+        \midrule
+        \texttt{Zbary}
+            & \(\dfrac{1}{N_{\mathrm{hits}}}\displaystyle\sum_{i} K_i\)
+            & Profondeur moyenne de dépôt. Une valeur faible indique un développement précoce,
+              une valeur élevée une interaction plus tardive ou une pénétration plus
+              profonde. \\[4pt]
+        \texttt{Zrms}
+            & \(\sqrt{\tfrac{1}{N_{\mathrm{hits}}}\sum_i (K_i - Z_{\mathrm{bary}})^2}\)
+            & Largeur longitudinale de la gerbe : dépôt concentré (faible valeur) ou gerbe
+              étendue et fluctuante (grande valeur). \\[4pt]
+        \texttt{Begin}
+            & \(\min L\) tel que \(h(L{+}k)\ge 4,\ k=0..3\)
+            & Profondeur de première interaction hadronique, estimée par la première séquence de
+              quatre couches consécutives contenant chacune au moins quatre hits ; valeur
+              sentinelle \(48\) si aucune séquence n'est trouvée. Particulièrement
+              discriminante : les pions interagissent souvent plus tôt, les protons peuvent
+              pénétrer davantage, et les fluctuations hadroniques modulent fortement cette
+              profondeur. \\[4pt]
+        \texttt{PctHitsFirst10}
+            & \(100 \times \dfrac{\#\{i \mid 0 \le K_i \le 9\}}{N_{\mathrm{hits}}}\)
+            & Part initiale de la gerbe. Une valeur élevée signale une interaction rapide, un
+              fort dépôt initial ou une composante électromagnétique marquée. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
-\section*{Barycentre longitudinal}
-
-On définit la position moyenne des hits selon l’axe du calorimètre :
-
-\[
-Z_{\mathrm{bary}}=\frac{1}{N_{\mathrm{hits}}}\sum_{i=1}^{N_{\mathrm{hits}}} K_i
-\]
-
-Cette variable correspond à la profondeur moyenne de dépôt de la gerbe.
-
-\begin{itemize}
-    \item une valeur faible indique un développement précoce ;
-    \item une valeur élevée traduit une interaction plus tardive ou une pénétration plus profonde.
-\end{itemize}
-
-Dans les arbres ROOT enrichis, cette variable est stockée sous :
-
-\begin{center}
-\texttt{Zbary}
-\end{center}
-
-\section*{Étalement longitudinal}
-
-La dispersion autour du barycentre est donnée par :
-
-\[
-Z_{\mathrm{rms}}
-=
-\sqrt{
-\frac{1}{N_{\mathrm{hits}}}
-\sum_i
-(K_i-Z_{\mathrm{bary}})^2
-}
-\]
-
-Elle mesure la largeur longitudinale de la gerbe.
-
-\begin{itemize}
-    \item faible valeur : dépôt concentré ;
-    \item grande valeur : gerbe étendue ou fluctuante.
-\end{itemize}
-
-Variable stockée :
-
-\begin{center}
-\texttt{Zrms}
-\end{center}
-
-\section*{Couche de début de gerbe}
-
-La variable \texttt{Begin} estime la profondeur de première interaction hadronique.
-
-Le code recherche la première couche \(L\) telle que quatre couches consécutives contiennent chacune au moins quatre hits :
-
-\[
-h(L),h(L+1),h(L+2),h(L+3)\ge 4
-\]
-
-où \(h(K)\) est le nombre de hits dans la couche \(K\).
-
-Si aucune séquence n’est trouvée :
-
-\[
-\texttt{Begin}=48
-\]
-
-(valeur sentinelle).
-
-Cette variable est particulièrement discriminante :
-
-\begin{itemize}
-    \item les pions interagissent souvent plus tôt ;
-    \item les protons peuvent pénétrer davantage avant interaction ;
-    \item les fluctuations hadroniques modulent fortement cette profondeur.
-\end{itemize}
-
-\section*{Fraction précoce des hits}
-
-Le pourcentage de hits déposés dans les dix premières couches est défini par :
-
-\[
-\texttt{PctHitsFirst10}
-=
-100\times
-\frac{
-\#\{i \mid 0\le K_i\le 9\}
-}{
-N_{\mathrm{hits}}
-}
-\]
-
-Cette observable quantifie la part initiale de la gerbe.
-
-Une valeur élevée indique :
-
-\begin{itemize}
-    \item interaction rapide ;
-    \item fort dépôt initial ;
-    \item composante électromagnétique marquée.
-\end{itemize}
-
-\section*{Intérêt physique}
-
-Ces variables longitudinales sont centrales pour :
-
-\begin{itemize}
-    \item l’identification pion/proton ;
-    \item la séparation des espèces neutres/chargées ;
-    \item la reconstruction d’énergie ;
-    \item la détection de fuites longitudinales à haute énergie.
-\end{itemize}
-
-Dans les modèles LightGBM étudiés, \texttt{Begin}, \texttt{Zbary} et \texttt{PctHitsFirst10} apparaissent régulièrement parmi les descripteurs les plus informatifs.
-
+Ces variables longitudinales sont centrales pour l'identification pion/proton, la séparation des
+espèces neutres et chargées, la reconstruction d'énergie et la détection de fuites longitudinales à
+haute énergie. Dans les modèles LightGBM étudiés, \texttt{Begin}, \texttt{Zbary} et
+\texttt{PctHitsFirst10} apparaissent régulièrement parmi les descripteurs les plus informatifs.
 \section{Descripteurs transverses et géométriques}
 \label{annexe:transverse}
 
-Au-delà du développement longitudinal, la forme transverse d’une gerbe contient également une information importante.  
-Deux particules de même énergie peuvent présenter des signatures spatiales très différentes : gerbe compacte, diffuse, allongée, fragmentée ou multi-cœur.
+Au-delà du développement longitudinal, la forme transverse contient une information importante : deux particules de même énergie peuvent produire des signatures spatiales très différentes — gerbe compacte, diffuse, allongée, fragmentée ou multi-cœur. Les observables correspondantes sont définies dans le Tableau~\ref{tab:annexeA-transverse}.
 
-Le \texttt{ShowerAnalyzer} extrait plusieurs observables géométriques visant à quantifier cette structure.
+Le rayon effectif s'appuie sur un axe de gerbe reconstruit au préalable : les barycentres des premières couches actives sont ajustés par deux droites \(x(z)=a_1 z+b_1\) et \(y(z)=a_2 z+b_2\), qui définissent la trajectoire moyenne. La distance transverse de chaque hit à cet axe, \(d_i^2=(x_i-x_0)^2+(y_i-y_0)^2\), fournit ensuite le rayon quadratique moyen.
 
-\section*{Rayon effectif transverse}
+\begin{table}[!ht]
+    \centering
+    \caption{Descripteurs transverses et géométriques. \(\mathbf{C}\) désigne la matrice de
+             covariance transverse des hits et \((e_1 \le e_2 \le e_3)\) les valeurs propres de la
+             covariance complète sur \((x,y,z)\).}
+    \label{tab:annexeA-transverse}
+    \small
+    \begin{tabularx}{\textwidth}{@{}l c X@{}}
+        \toprule
+        \textbf{Variable} & \textbf{Définition} & \textbf{Sens physique} \\
+        \midrule
+        \texttt{Radius}
+            & \(\sqrt{\tfrac{1}{N_{\mathrm{hits}}}\sum_i d_i^2}\)
+            & Écartement moyen des hits autour de l'axe de gerbe : petite valeur pour une gerbe
+              étroite et collimatée, grande valeur pour une gerbe diffuse ou fortement
+              latérale. \\[4pt]
+        \texttt{lambda1}, \texttt{lambda2}
+            & valeurs propres de \(\mathbf{C}\), \(\lambda_1 \ge \lambda_2\)
+            & Forme du dépôt dans le plan transverse : \(\lambda_1 \simeq \lambda_2\) pour une
+              forme circulaire, \(\lambda_1 \gg \lambda_2\) pour une structure allongée, deux
+              valeurs faibles pour une gerbe compacte. \\[4pt]
+        \texttt{eccentricity3D}
+            & \(\dfrac{e_3}{e_1+e_2+e_3}\)
+            & Anisotropie tridimensionnelle, comprise entre 0 et 1 : proche de 1 pour une
+              structure quasi linéaire, plus faible pour un développement volumique étendu. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
-La variable \texttt{Radius} mesure l’écartement moyen des hits autour de l’axe principal de la gerbe.
-
-\subsection*{Construction de l’axe}
-
-Les barycentres des premières couches actives sont calculés, puis deux ajustements linéaires sont réalisés :
-
-\[
-x(z)=a_1 z+b_1
-\]
-
-\[
-y(z)=a_2 z+b_2
-\]
-
-Ces droites définissent une trajectoire moyenne de la gerbe.
-
-\subsection*{Distance des hits à l’axe}
-
-Pour chaque hit, on calcule la distance transverse minimale à cet axe :
-
-\[
-d_i^2=(x_i-x_0)^2+(y_i-y_0)^2
-\]
-
-Le rayon effectif vaut alors :
-
-\[
-\texttt{Radius}
-=
-\sqrt{
-\frac{1}{N_{\mathrm{hits}}}
-\sum_i d_i^2
-}
-\]
-
-\subsection*{Interprétation}
-
-\begin{itemize}
-    \item petite valeur : gerbe étroite et collimatée ;
-    \item grande valeur : gerbe diffuse ou fortement latérale.
-\end{itemize}
-
-\section*{Covariance transverse}
-
-Le barycentre dans le plan \((x,y)\) est :
-
-\[
-(\bar{x},\bar{y})
-\]
-
-Puis la matrice de covariance transverse est construite :
-
-\[
-\mathbf{C}=
-\frac{1}{N_{\mathrm{hits}}}
-\sum_i
-\begin{pmatrix}
-(x_i-\bar{x})^2 & (x_i-\bar{x})(y_i-\bar{y})\\
-(x_i-\bar{x})(y_i-\bar{y}) & (y_i-\bar{y})^2
-\end{pmatrix}
-\]
-
-Ses valeurs propres sont ordonnées :
-
-\[
-\lambda_1 \ge \lambda_2
-\]
-
-et stockées sous :
-
-\begin{center}
-\texttt{lambda1}, \texttt{lambda2}
-\end{center}
-
-\subsection*{Interprétation physique}
-
-\begin{itemize}
-    \item \(\lambda_1 \simeq \lambda_2\) : forme circulaire ;
-    \item \(\lambda_1 \gg \lambda_2\) : structure allongée ;
-    \item deux valeurs faibles : gerbe compacte.
-\end{itemize}
-
-\section*{Excentricité 3D}
-
-Le code calcule également la matrice de covariance complète sur \((x,y,z)\).  
-Ses valeurs propres \(e_1\le e_2\le e_3\) permettent de définir :
-
-\[
-\texttt{eccentricity3D}
-=
-\frac{e_3}{e_1+e_2+e_3}
-\]
-
-Cette grandeur varie entre 0 et 1.
-
-\begin{itemize}
-    \item proche de 1 : structure quasi linéaire ;
-    \item plus faible : développement volumique étendu.
-\end{itemize}
-
-\section*{Utilité pour l’analyse}
-
-Ces variables géométriques sont utiles pour :
-
-\begin{itemize}
-    \item distinguer une gerbe hadronique compacte d’une interaction diffuse ;
-    \item repérer des événements contenant plusieurs sous-gerbes ;
-    \item améliorer la reconstruction d’énergie via la corrélation forme/containment ;
-    \item caractériser la direction dominante du dépôt.
-\end{itemize}
-
-Elles complètent les simples compteurs de hits en introduisant une information morphologique inaccessible aux variables globales classiques.
+Ces variables permettent de distinguer une gerbe hadronique compacte d'une interaction diffuse, de repérer les événements contenant plusieurs sous-gerbes, de caractériser la direction dominante du dépôt et d'améliorer la reconstruction d'énergie via la corrélation entre forme et confinement.
 
 \section{Densité locale et structure en amas}
 \label{annexe:densityclusters}
 
-La simple multiplicité des hits ne suffit pas à décrire une gerbe hadronique.  
-Deux événements possédant le même nombre total de coups peuvent présenter des organisations internes très différentes : dépôt compact, structure fragmentée, zones vides ou multiplicité de sous-cœurs.
+La seule multiplicité des hits ne suffit pas à décrire une gerbe : deux événements de même nombre total de coups peuvent présenter des organisations internes très différentes — dépôt compact, structure fragmentée, zones vides, sous-cœurs multiples. Deux mécanismes sont utilisés pour capturer cette information.
 
-Pour capturer cette information, le \texttt{ShowerAnalyzer} calcule des variables de densité locale et de clustering intra-couche.
+La \textbf{densité locale pondérée} considère, pour chaque hit \(i\), les cellules voisines dans un carré \(3\times3\) de la même couche (\(|I_j-I_i|\le 1\), \(|J_j-J_i|\le 1\), \(K_j=K_i\)). Chaque voisin contribue avec un poids dépendant du seuil franchi, \(w=1\), \(45.45\) et \(136.36\) pour les seuils 1, 2 et 3 respectivement, ce qui reflète la charge typique associée à chaque niveau.
 
-\section*{Densité locale pondérée}
+Le \textbf{clustering intra-couche} traite chaque couche active comme une grille 2D indépendante et regroupe les hits adjacents en amas par 4-connexité, \((\Delta I,\Delta J)\in \{(\pm1,0),(0,\pm1)\}\), le regroupement étant réalisé par exploration de graphe. Les variables extraites sont rassemblées dans le Tableau~\ref{tab:annexeA-density}.
 
-Pour chaque hit \(i\), on considère les cellules voisines dans un carré \(3\times3\) de la même couche, c’est-à-dire :
+\begin{table}[!ht]
+    \centering
+    \caption{Descripteurs de densité locale et de structure en amas. \(\mathcal{V}(i)\) désigne le
+             voisinage \(3\times3\) du hit \(i\) dans sa couche, \(n_c\) le nombre de hits de
+             l'amas \(c\).}
+    \label{tab:annexeA-density}
+    \small
+    \begin{tabularx}{\textwidth}{@{}l c X@{}}
+        \toprule
+        \textbf{Variable} & \textbf{Définition} & \textbf{Sens physique} \\
+        \midrule
+        \texttt{Density}
+            & \(\dfrac{\sum_i C_i}{\sum_i w(\mathrm{thr}_i)}\),\quad
+              \(C_i=\sum_{j\in \mathcal{V}(i)} w(\mathrm{thr}_j)\)
+            & Densité locale moyenne : valeur élevée pour des zones denses et un cœur marqué,
+              faible pour une gerbe diffuse. Sensible aux concentrations locales d'énergie ; elle
+              s'est révélée importante dans plusieurs modèles de PID et de régression. \\[4pt]
+        \texttt{NClusters}
+            & \(\sum_K N_{\mathrm{clusters}}(K)\)
+            & Fragmentation globale de la gerbe. \\[2pt]
+        \texttt{MaxClustSize}
+            & \(\max_c\, n_c\)
+            & Taille du plus gros cœur local. \\[2pt]
+        \texttt{AvgClustSize}
+            & \(\tfrac{1}{N_{\mathrm{clusters}}}\sum_c n_c\)
+            & Taille typique des amas. \\[2pt]
+        \texttt{PlanesWithClusmore2}
+            & nombre de couches à \(\ge 2\) amas
+            & Multiplicité de sous-structures dans une même couche. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
-\[
-|I_j-I_i|\le 1,\qquad |J_j-J_i|\le 1,\qquad K_j=K_i
-\]
-
-Les hits voisins contribuent avec un poids dépendant du seuil :
-
-\[
-w(\mathrm{thr})=
-\begin{cases}
-1 & \text{seuil 1}\\
-45.45 & \text{seuil 2}\\
-136.36 & \text{seuil 3}
-\end{cases}
-\]
-
-La somme locale autour du hit \(i\) vaut :
-
-\[
-C_i=\sum_{j\in \mathcal{V}(i)} w(\mathrm{thr}_j)
-\]
-
-La densité moyenne de l’événement est ensuite :
-
-\[
-\texttt{Density}
-=
-\frac{\sum_i C_i}{\sum_i w(\mathrm{thr}_i)}
-\]
-
-\section*{Interprétation}
-
-\begin{itemize}
-    \item valeur élevée : zones denses, cœur marqué ;
-    \item valeur faible : gerbe diffuse ;
-    \item sensible aux concentrations locales d’énergie.
-\end{itemize}
-
-Cette variable s’est révélée importante dans plusieurs modèles de PID et de régression.
-
-\section*{Clustering intra-couche}
-
-Chaque couche active est traitée indépendamment comme une grille 2D.  
-Les hits adjacents sont regroupés en amas par connexité directe (4-connexité) :
-
-\[
-(\Delta I,\Delta J)\in \{(\pm1,0),(0,\pm1)\}
-\]
-
-Le regroupement est réalisé par exploration de graphe (DFS).
-
-\section*{Variables extraites}
-
-\subsection*{Nombre total d’amas}
-
-\[
-\texttt{NClusters}
-=
-\sum_K N_{\mathrm{clusters}}(K)
-\]
-
-Il mesure la fragmentation globale de la gerbe.
-
-\subsection*{Taille maximale}
-
-\[
-\texttt{MaxClustSize}
-=
-\max(\text{taille de tous les amas})
-\]
-
-Elle correspond à la taille du plus gros cœur local.
-
-\subsection*{Taille moyenne}
-
-\[
-\texttt{AvgClustSize}
-=
-\frac{1}{N_{\mathrm{clusters}}}
-\sum_c n_c
-\]
-
-où \(n_c\) est le nombre de hits de l’amas \(c\).
-
-\subsection*{Plans multi-amas}
-
-\[
-\texttt{PlanesWithClusmore2}
-\]
-
-désigne le nombre de couches contenant au moins deux amas distincts.
-
-\section*{Interprétation physique}
-
-Ces variables permettent de distinguer :
-
-\begin{itemize}
-    \item gerbes compactes dominées par un seul cœur ;
-    \item interactions secondaires multiples ;
-    \item topologies fragmentées ;
-    \item diffusion latérale importante.
-\end{itemize}
-
-Par exemple :
-
-\begin{itemize}
-    \item un proton peut produire une gerbe plus dense et structurée ;
-    \item un pion peut présenter davantage de fluctuations et sous-amas ;
-    \item des événements mal contenus montrent souvent plusieurs amas dispersés.
-\end{itemize}
-
-\section*{Intérêt pour les modèles ML}
-
-Dans les arbres boostés utilisés dans ce travail, \texttt{AvgClustSize}, \texttt{MaxClustSize} et \texttt{Density} apparaissent régulièrement parmi les variables utiles, car elles relient directement morphologie locale et nature de la particule incidente.
+Ces observables séparent les gerbes compactes dominées par un seul cœur des topologies fragmentées, des interactions secondaires multiples et des événements mal contenus, qui montrent souvent plusieurs amas dispersés. Un proton produit typiquement une gerbe plus dense et structurée, un pion davantage de fluctuations et de sous-amas. Dans les arbres boostés utilisés ici, \texttt{AvgClustSize}, \texttt{MaxClustSize} et \texttt{Density} figurent régulièrement parmi les variables utiles, car elles relient directement morphologie locale et nature de la particule incidente.
 
 \section{Variables temporelles}
 \label{annexe:timevars}
 
-L’un des atouts majeurs du SDHCAL simulé dans ce travail est la disponibilité d’une information temporelle hit par hit.  
-Le temps d’arrivée des signaux contient en effet des informations complémentaires à la topologie spatiale :
+La simulation fournit une information temporelle hit par hit, complémentaire de la topologie spatiale : temps de vol de la particule incidente, chronologie du développement hadronique, composantes retardées dues aux neutrons secondaires, étalement temporel de la gerbe. Quatre observables simples en sont extraites (Tableau~\ref{tab:annexeA-temps}).
 
-\begin{itemize}
-    \item temps de vol de la particule incidente ;
-    \item chronologie du développement hadronique ;
-    \item composantes retardées dues aux neutrons secondaires ;
-    \item étalement temporel de la gerbe.
-\end{itemize}
+\begin{table}[!ht]
+    \centering
+    \caption{Descripteurs temporels. \(N_t\) désigne le nombre de hits temporellement valides.}
+    \label{tab:annexeA-temps}
+    \small
+    \begin{tabularx}{\textwidth}{@{}l c X@{}}
+        \toprule
+        \textbf{Variable} & \textbf{Définition} & \textbf{Sens physique} \\
+        \midrule
+        \texttt{tMin}
+            & \(\min_i(t_i)\)
+            & Premier hit de l'événement : sensible au temps de vol initial, donc à la masse de la
+              particule à impulsion donnée, et corrélé à la profondeur de première interaction.
+              Figure parmi les variables les plus importantes de l'étude PID. \\[4pt]
+        \texttt{tMax}
+            & \(\max_i(t_i)\)
+            & Hit le plus tardif : sensible aux composantes lentes — diffusion neutronique,
+              interactions secondaires retardées, traînes temporelles longues. \\[4pt]
+        \texttt{tMean}
+            & \(\tfrac{1}{N_t}\sum_i t_i\)
+            & Position moyenne de la distribution temporelle. \\[2pt]
+        \texttt{tSpread}
+            & \(\texttt{tMax}-\texttt{tMin}\)
+            & Durée totale de l'activité : faible pour un dépôt rapide et compact, grande pour une
+              activité étalée dans le temps. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
-Le \texttt{ShowerAnalyzer} extrait quatre observables simples mais efficaces.
+Les différences pion/proton observées dans ce travail proviennent en partie de l'écart de masse \(m_p \gg m_\pi\), qui produit à énergie comparable des temps de vol distincts. Une réserve importante s'attache toutefois à ces variables : la résolution temporelle native de la simulation est extrêmement fine, et un \emph{smearing} gaussien a été appliqué dans plusieurs analyses afin de reproduire des conditions instrumentales réalistes. Ce point est déterminant pour \texttt{tMin}, dont une précision irréaliste renforce artificiellement les performances de classification — comme le montre l'étude GNN de la section~\ref{sec:pid-gnn}.
 
-\section*{Temps minimal}
-
-\[
-\texttt{tMin}=\min_i(t_i)
-\]
-
-Il correspond au premier hit observé dans l’événement.
-
-Cette variable s’est révélée particulièrement discriminante dans l’étude PID.
-
-\subsection*{Interprétation physique}
-
-\begin{itemize}
-    \item sensible au temps de vol initial ;
-    \item dépend de la masse de la particule à impulsion donnée ;
-    \item corrélée à la profondeur de première interaction.
-\end{itemize}
-
-Dans les résultats obtenus, \texttt{tMin} figure parmi les variables les plus importantes.
-
-\section*{Temps maximal}
-
-\[
-\texttt{tMax}=\max_i(t_i)
-\]
-
-Il représente le hit le plus tardif observé dans la gerbe.
-
-Il est sensible aux composantes lentes, notamment :
-
-\begin{itemize}
-    \item diffusion neutronique ;
-    \item interactions secondaires retardées ;
-    \item traînes temporelles longues.
-\end{itemize}
-
-\section*{Temps moyen}
-
-\[
-\texttt{tMean}
-=
-\frac{1}{N_t}\sum_i t_i
-\]
-
-où \(N_t\) est le nombre de hits temporellement valides.
-
-Cette grandeur résume la position moyenne de la distribution temporelle.
-
-\section*{Largeur temporelle}
-
-\[
-\texttt{tSpread}=\texttt{tMax}-\texttt{tMin}
-\]
-
-Elle quantifie la durée totale de l’activité mesurée.
-
-\begin{itemize}
-    \item faible valeur : dépôt rapide et compact ;
-    \item grande valeur : activité étalée dans le temps.
-\end{itemize}
-
-\section*{Intérêt physique pour l’identification}
-
-Les différences pion/proton observées dans ce travail proviennent en partie de la masse différente :
-
-\[
-m_p \gg m_\pi
-\]
-
-À énergie comparable, cela peut produire des temps de vol distincts, donc des signatures temporelles différentes.
-
-Les variables temporelles permettent également de sonder :
-
-\begin{itemize}
-    \item la rapidité de l’interaction primaire ;
-    \item la richesse en secondaires neutres ;
-    \item la structure interne de la cascade.
-\end{itemize}
-
-\section*{Remarque importante sur la simulation}
-
-Dans les données simulées, la résolution temporelle native peut être extrêmement fine.  
-Un \emph{smearing} gaussien a donc été appliqué dans plusieurs analyses afin de reproduire des conditions instrumentales plus réalistes.
-
-Cela est particulièrement important pour \texttt{tMin}, dont une précision irréaliste peut artificiellement renforcer les performances de classification.
-
-\section*{Rôle dans ce mémoire}
-
-Les variables temporelles ont joué un rôle central :
-
-\begin{itemize}
-    \item pour le PID pion/proton ;
-    \item pour l’étude exploratoire par GNN ;
-    \item pour la régression d’énergie via LightGBM.
-\end{itemize}
-
-Elles montrent qu’un calorimètre hautement granulaire doté d’un timing précis peut dépasser le simple rôle d’instrument énergétique et devenir également un détecteur d’identification.
-
-\section{Profil longitudinal avancé et ajustement de Gaisser--Hillas}
+\section{Profil longitudinal et ajustement de Gaisser--Hillas}
 \label{annexe:gaisserhillas}
 
-Au-delà des variables simples telles que \texttt{Begin} ou \texttt{Zbary}, il est possible de modéliser plus finement la forme longitudinale moyenne d’une gerbe hadronique.  
-Pour cela, le \texttt{ShowerAnalyzer} reconstruit un profil couche par couche puis ajuste une fonction inspirée du formalisme de Gaisser--Hillas, largement utilisé pour les cascades atmosphériques et calorimétriques.
-
-\section*{Construction du profil longitudinal}
-
-Pour chaque couche \(K\), les hits sont sommés afin d’obtenir une estimation de l’activité locale :
-
-\[
-E(K)\propto \sum_{i\in K} \mathrm{thr}_i
-\]
-
-Le seuil semi-digital est ici utilisé comme proxy du dépôt d’énergie.
-
-Le profil obtenu est donc une suite discrète :
-
-\[
-\{K,\;E(K)\}
-\]
-
-représentant l’évolution de la gerbe dans la profondeur du détecteur.
-
-\section*{Détermination du point de départ}
-
-Avant l’ajustement, un point de départ est estimé comme la première couche contenant une activité soutenue sur plusieurs plans successifs.
-
-Cela évite :
-
-\begin{itemize}
-    \item les hits isolés dus au bruit ;
-    \item les pré-coups marginaux ;
-    \item les fluctuations non représentatives du cœur de gerbe.
-\end{itemize}
-
-\section*{Lissage}
-
-Le profil peut être légèrement lissé par moyenne glissante afin de réduire les fluctuations statistiques couche à couche.
-
-\section*{Fonction de Gaisser--Hillas}
-
-Le profil est ajusté par :
+Au-delà de \texttt{Begin} ou \texttt{Zbary}, la forme longitudinale peut être modélisée finement. Un profil est reconstruit couche par couche en sommant les seuils, \(E(K)\propto \sum_{i\in K} \mathrm{thr}_i\), le seuil semi-digital servant de proxy du dépôt d'énergie. Un point de départ est estimé au préalable comme la première couche présentant une activité soutenue sur plusieurs plans successifs, ce qui écarte les hits isolés, les pré-coups marginaux et les fluctuations non représentatives ; le profil peut ensuite être lissé par moyenne glissante. Il est ajusté par une fonction inspirée du formalisme de Gaisser--Hillas :
 
 \[
 E(z)=
@@ -722,342 +260,66 @@ N_{\max}
 }
 \exp\!\left(
 \frac{X_{\max}-z}{\lambda}
-\right)
+\right),
 \]
 
-où :
+où \(z\) est la profondeur et \(z_0\) le point de départ effectif. Les quatre paramètres ajustés constituent les variables extraites (Tableau~\ref{tab:annexeA-gh}).
 
-\begin{itemize}
-    \item \(z\) : profondeur ;
-    \item \(z_0\) : point de départ effectif ;
-    \item \(X_{\max}\) : position du maximum ;
-    \item \(N_{\max}\) : amplitude maximale ;
-    \item \(\lambda\) : paramètre d’extension.
-\end{itemize}
+\begin{table}[!ht]
+    \centering
+    \caption{Variables issues de l'ajustement de Gaisser--Hillas du profil longitudinal.}
+    \label{tab:annexeA-gh}
+    \small
+    \begin{tabularx}{\textwidth}{@{}l c X@{}}
+        \toprule
+        \textbf{Variable} & \textbf{Paramètre} & \textbf{Sens physique} \\
+        \midrule
+        \texttt{Nmax} & \(N_{\max}\)
+            & Amplitude maximale du profil : corrélée à l'énergie incidente et sensible à la
+              compacité du cœur de gerbe. \\[2pt]
+        \texttt{z0\_fit} & \(z_0\)
+            & Origine effective de la cascade ; affine l'information portée par \texttt{Begin}. \\[2pt]
+        \texttt{Xmax} & \(X_{\max}\)
+            & Position du maximum longitudinal : précoce pour une interaction rapide, tardive pour
+              un développement plus profond. \\[2pt]
+        \texttt{lambda} & \(\lambda\)
+            & Extension de la gerbe : contrôle la largeur et la décroissance après le maximum. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
-\section*{Variables extraites}
-
-Le fit fournit directement les paramètres :
-
-\begin{center}
-\texttt{Nmax}, \texttt{z0\_fit}, \texttt{Xmax}, \texttt{lambda}
-\end{center}
-
-\subsection*{\texttt{Nmax}}
-
-Valeur maximale du profil.
-
-\begin{itemize}
-    \item corrélée à l’énergie incidente ;
-    \item sensible à la compacité du cœur de gerbe.
-\end{itemize}
-
-\subsection*{\texttt{z0\_fit}}
-
-Origine effective de la cascade.
-
-Elle affine l’information de \texttt{Begin}.
-
-\subsection*{\texttt{Xmax}}
-
-Position du maximum longitudinal.
-
-\begin{itemize}
-    \item maximum précoce : interaction rapide ;
-    \item maximum tardif : développement plus profond.
-\end{itemize}
-
-\subsection*{\texttt{lambda}}
-
-Contrôle la largeur ou décroissance de la gerbe après le maximum.
-
-\section*{Intérêt physique}
-
-Ces paramètres condensent la structure complète du profil longitudinal.
-
-Ils sont utiles pour :
-
-\begin{itemize}
-    \item l’identification des espèces hadroniques ;
-    \item la reconstruction d’énergie ;
-    \item la séparation gerbes compactes / étalées ;
-    \item l’étude des fluctuations d’interaction.
-\end{itemize}
-
-\section*{Limites pratiques}
-
-Les gerbes hadroniques réelles présentent des fluctuations fortes.  
-Le fit peut donc être instable lorsque :
-
-\begin{itemize}
-    \item peu de couches sont actives ;
-    \item l’énergie est faible ;
-    \item la gerbe est tronquée par fuite ;
-    \item plusieurs sous-cascades se superposent.
-\end{itemize}
-
-Dans ces cas, les variables plus robustes (\texttt{Begin}, \texttt{Zbary}, \texttt{PctHitsFirst10}) restent souvent plus performantes.
-
-\section*{Usage dans ce mémoire}
-
-Dans les analyses LightGBM, ces variables ont été testées parmi les features candidates.  
-Leur pouvoir prédictif est généralement secondaire par rapport à \texttt{tMin}, \texttt{sumThrTotal}, \(N_1\), \(N_3\) ou \texttt{Density}, mais elles apportent une information complémentaire utile sur la morphologie profonde de la gerbe.
+Ces paramètres condensent la structure complète du profil et servent à l'identification, à la reconstruction d'énergie et à la séparation des gerbes compactes et étalées. L'ajustement reste toutefois instable lorsque peu de couches sont actives, à basse énergie, lorsque la gerbe est tronquée par fuite ou lorsque plusieurs sous-cascades se superposent ; dans ces cas, les variables plus robustes (\texttt{Begin}, \texttt{Zbary}, \texttt{PctHitsFirst10}) restent plus performantes. Dans les analyses LightGBM, leur pouvoir prédictif s'est révélé secondaire par rapport à \texttt{tMin}, \texttt{sumThrTotal}, \(N_1\), \(N_3\) ou \texttt{Density}, tout en apportant une information complémentaire sur la morphologie profonde.
 
 \section{Recherche de segments quasi-linéaires}
 \label{annexe:tracksegments}
 
-Les gerbes hadroniques ne sont pas uniquement constituées d’un dépôt diffus.  
-Elles peuvent également contenir des structures localement rectilignes correspondant à :
+Une gerbe hadronique n'est pas uniquement un dépôt diffus : elle peut contenir des structures localement rectilignes — traces de secondaires chargés, fragments pénétrants, trajectoire résiduelle du primaire, sous-cascades collimatées. La granularité du SDHCAL permet de les identifier géométriquement, ce que quantifie la variable \texttt{nTrackSegments}.
 
-\begin{itemize}
-    \item traces de particules chargées secondaires ;
-    \item fragments pénétrants ;
-    \item trajectoires résiduelles du primaire ;
-    \item sous-cascades collimatées.
-\end{itemize}
+La procédure comporte quatre étapes. Les hits de chaque couche sont d'abord regroupés par 8-connexité (\(|\Delta I|\le1\), \(|\Delta J|\le1\)), chaque amas fournissant un barycentre \((x_c,y_c,z_c)\). Les amas trop volumineux ou situés dans des zones trop denses sont ensuite écartés, afin de ne pas confondre le cœur de gerbe avec une trajectoire isolée : seuls les petits amas compacts, spatialement séparés du cœur, sont conservés. Une \textbf{transformée de Hough} est alors appliquée aux barycentres restants, projetés dans les plans \((z,x)\) et \((z,y)\), chaque maximum significatif de l'accumulateur correspondant à une trajectoire candidate. Les candidats sont enfin validés selon leur extension sur plusieurs couches, leur continuité, l'absence de grands trous, la faiblesse des résidus autour de la droite ajustée et leur non-concentration dans les seules premières couches. Le nombre de structures validées définit \texttt{nTrackSegments}.
 
-Grâce à la très haute granularité du SDHCAL, ces signatures peuvent être identifiées géométriquement.  
-Le \texttt{ShowerAnalyzer} introduit pour cela la variable :
+Une valeur élevée signale plusieurs secondaires chargés énergétiques, une interaction riche en fragments ou une composante pénétrante importante ; une valeur faible correspond à une gerbe dense sans trajectoire nette, à un dépôt fortement diffus ou à une énergie plus basse. Les protons produisent typiquement des topologies plus structurées, les pions davantage de fluctuations diffuses, et les événements neutres montrent moins de traces initiales nettes.
 
-\begin{center}
-\texttt{nTrackSegments}
-\end{center}
+Cette reconstruction reste difficile dans une gerbe dense — confusion avec le cœur hadronique, superposition de trajectoires, inefficacités locales, sensibilité aux paramètres de clustering. Il s'agit donc d'un indicateur morphologique, non d'un traqueur dédié : moins dominant que les variables temporelles ou de comptage, il enrichit néanmoins les modèles supervisés testés.
 
-qui estime le nombre de segments quasi-linéaires présents dans un événement.
-
-\section*{Étape 1 : clustering par couche}
-
-Dans chaque couche, les hits voisins sont d’abord regroupés par connexité 2D (8-connexité) :
-
-\[
-|\Delta I|\le1,\qquad |\Delta J|\le1
-\]
-
-Chaque amas fournit un barycentre :
-
-\[
-(x_c,y_c,z_c)
-\]
-
-Ces barycentres servent ensuite de points représentatifs.
-
-\section*{Étape 2 : rejet des amas non pertinents}
-
-Les amas trop volumineux ou situés dans des zones trop denses sont supprimés afin d’éviter de confondre cœur de gerbe et trajectoire isolée.
-
-On conserve donc préférentiellement :
-
-\begin{itemize}
-    \item petits clusters compacts ;
-    \item structures localisées ;
-    \item objets spatialement séparés du cœur principal.
-\end{itemize}
-
-\section*{Étape 3 : transformée de Hough}
-
-Les barycentres restants sont projetés dans les plans :
-
-\[
-(z,x)\qquad \text{et}\qquad (z,y)
-\]
-
-Une transformée de Hough est appliquée afin de rechercher des alignements compatibles avec une droite.
-
-Chaque maximum significatif de l’accumulateur correspond à une candidate trajectoire.
-
-\section*{Étape 4 : validation topologique}
-
-Les candidats sont ensuite filtrés selon plusieurs critères :
-
-\begin{itemize}
-    \item extension sur plusieurs couches ;
-    \item continuité raisonnable ;
-    \item absence de grands trous ;
-    \item résidus faibles autour de la droite ajustée ;
-    \item non concentration exclusive dans les premières couches.
-\end{itemize}
-
-Les structures validées sont comptabilisées.
-
-\section*{Variable finale}
-
-\[
-\texttt{nTrackSegments}
-=
-\text{nombre total de segments retenus}
-\]
-
-\section*{Interprétation physique}
-
-Une valeur élevée peut signaler :
-
-\begin{itemize}
-    \item plusieurs particules secondaires chargées énergétiques ;
-    \item interactions hadroniques riches en fragments ;
-    \item composante pénétrante importante ;
-    \item topologie moins compacte.
-\end{itemize}
-
-Une valeur faible correspond souvent à :
-
-\begin{itemize}
-    \item gerbe dense sans trajectoires nettes ;
-    \item dépôt fortement diffus ;
-    \item énergie plus faible.
-\end{itemize}
-
-\section*{Intérêt pour l’identification}
-
-Cette observable peut aider à distinguer certaines espèces :
-
-\begin{itemize}
-    \item les protons peuvent produire des topologies plus structurées ;
-    \item les pions peuvent présenter davantage de fluctuations diffuses ;
-    \item des événements neutres peuvent montrer moins de traces initiales nettes.
-\end{itemize}
-
-\section*{Limites}
-
-La reconstruction de segments dans une gerbe dense reste difficile :
-
-\begin{itemize}
-    \item confusion avec le cœur hadronique ;
-    \item superposition de trajectoires ;
-    \item inefficacités locales ;
-    \item sensibilité aux paramètres de clustering.
-\end{itemize}
-
-Il s’agit donc d’un indicateur morphologique, non d’un traqueur dédié.
-
-\section*{Rôle dans ce mémoire}
-
-Bien que moins dominante que les variables temporelles ou de comptage, \texttt{nTrackSegments} apporte une information complémentaire sur la micro-structure interne des événements et enrichit les modèles supervisés testés.
-
-\section{Synthèse des variables utilisées dans les modèles d’apprentissage}
+\section{Hiérarchie des variables et tableau récapitulatif}
 \label{annexe:synthesevars}
 
-Les chapitres précédents ont montré que toutes les variables extraites par \texttt{ShowerAnalyzer} ne contribuent pas avec la même intensité aux tâches étudiées.  
-Certaines dominent nettement la classification PID ou la reconstruction d’énergie, tandis que d’autres jouent un rôle plus secondaire ou complémentaire.
+Toutes ces variables ne contribuent pas avec la même intensité aux tâches étudiées. Pour la
+\textbf{séparation pion/proton}, les plus discriminantes dans les modèles LightGBM sont
+\texttt{tMin} (temps de vol), \texttt{Begin} (profondeur de première interaction),
+\texttt{Density} (compacité locale), \texttt{PctHitsFirst10} (activité précoce), \texttt{Zbary}
+(profondeur moyenne) et \texttt{AvgClustSize} (structure locale) : elles reflètent respectivement la
+cinématique de la particule incidente, la chronologie de l'interaction et la topologie interne de la
+cascade. Pour la \textbf{reconstruction d'énergie}, ce sont \texttt{sumThrTotal}, \(N_1\), \(N_3\),
+\texttt{nHitsTotal} et \texttt{Density} qui dominent, c'est-à-dire les observables directement liées
+à la quantité totale de signal et à sa concentration. Les descripteurs géométriques
+(\texttt{lambda1}, \texttt{lambda2}, \texttt{eccentricity3D}) et les paramètres de l'ajustement de
+Gaisser--Hillas jouent un rôle complémentaire, tandis que \texttt{nTrackSegments} reste le plus
+secondaire.
 
-Cette section résume leur utilité pratique.
+Le Tableau~\ref{tab:recap_features} rassemble l'ensemble des descripteurs, leur signification
+physique et leur usage principal.
 
-\section*{Variables majeures pour l’identification hadronique (PID)}
-
-Dans les modèles LightGBM de séparation pion/proton, les variables les plus discriminantes sont :
-
-\begin{itemize}
-    \item \textbf{\texttt{tMin}} : première information temporelle, très sensible au temps de vol ;
-    \item \textbf{\texttt{Begin}} : profondeur de première interaction ;
-    \item \textbf{\texttt{Density}} : compacité locale ;
-    \item \textbf{\texttt{PctHitsFirst10}} : activité précoce ;
-    \item \textbf{\texttt{Zbary}} : profondeur moyenne ;
-    \item \textbf{\texttt{AvgClustSize}} : structure locale de la gerbe.
-\end{itemize}
-
-Ces observables reflètent directement :
-
-\begin{itemize}
-    \item la cinématique de la particule incidente ;
-    \item la chronologie de l’interaction ;
-    \item la topologie interne de la cascade.
-\end{itemize}
-
-\section*{Variables majeures pour la reconstruction d’énergie}
-
-Pour la régression par arbres boostés, les variables les plus utiles sont :
-
-\begin{itemize}
-    \item \textbf{\texttt{sumThrTotal}} ;
-    \item \textbf{\texttt{N1}}, \textbf{\texttt{N3}} ;
-    \item \textbf{\texttt{nHitsTotal}} ;
-    \item \textbf{\texttt{Density}} ;
-    \item \textbf{\texttt{Zbary}} ;
-    \item \textbf{\texttt{tMin}}.
-\end{itemize}
-
-Ces quantités sont naturellement corrélées à l’énergie visible totale, au confinement de la gerbe et à son mode de développement.
-
-\section*{Variables secondaires mais utiles}
-
-Certaines variables ont un impact plus modeste seules, mais deviennent utiles combinées aux autres :
-
-\begin{itemize}
-    \item \texttt{Radius} ;
-    \item \texttt{lambda1}, \texttt{lambda2} ;
-    \item \texttt{Zrms} ;
-    \item \texttt{NClusters} ;
-    \item \texttt{MaxClustSize} ;
-    \item \texttt{tSpread} ;
-    \item \texttt{Xmax}, \texttt{lambda}.
-\end{itemize}
-
-Elles apportent principalement :
-
-\begin{itemize}
-    \item de la robustesse ;
-    \item des corrélations non linéaires exploitables ;
-    \item des signatures morphologiques fines.
-\end{itemize}
-
-\section*{Variables peu contributives dans cette étude}
-
-Certaines observables testées se sont révélées moins performantes dans le contexte présent :
-
-\begin{itemize}
-    \item \texttt{tMax} ;
-    \item \texttt{ratioThr23} ;
-    \item certains paramètres instables du fit longitudinal ;
-    \item \texttt{eccentricity3D} selon les jeux de données.
-\end{itemize}
-
-Cela ne signifie pas qu’elles soient inutiles en général, mais seulement qu’elles apportent peu d’information supplémentaire ici.
-
-\section*{Lecture physique globale}
-
-Les résultats montrent qu’un petit nombre de familles d’observables concentre l’essentiel de l’information :
-
-\begin{enumerate}
-    \item \textbf{Temps} : particulièrement puissant pour le PID ;
-    \item \textbf{Comptage multi-seuils} : fondamental pour l’énergie ;
-    \item \textbf{Début/profondeur de gerbe} : utile pour PID et énergie ;
-    \item \textbf{Compacité locale} : bon complément discriminant.
-\end{enumerate}
-
-\section*{Conclusion}
-
-Le \texttt{ShowerAnalyzer} permet donc de transformer les hits bruts du SDHCAL en un espace de variables physiquement interprétables et directement exploitable par des algorithmes modernes d’apprentissage supervisé.
-
-Cette étape de \emph{feature engineering} a constitué un élément central de ce travail : elle combine connaissance détecteur, intuition physique et performance algorithmique.
-
-\section{Conclusion de l’annexe}
-\label{annexe:conclusion}
-
-Cette annexe a détaillé l’ensemble des descripteurs construits à partir des hits élémentaires du SDHCAL grâce au module \texttt{ShowerAnalyzer}.  
-À partir d’informations brutes locales --- position, couche, seuil franchi et temps --- il est possible de reconstruire un ensemble riche d’observables résumant la morphologie complète d’une gerbe hadronique.
-
-Les variables introduites couvrent plusieurs dimensions complémentaires :
-
-\begin{itemize}
-    \item \textbf{intensité du dépôt} via les compteurs multi-seuils ;
-    \item \textbf{développement longitudinal} via \texttt{Begin}, \texttt{Zbary}, \texttt{Xmax} ;
-    \item \textbf{structure transverse} via \texttt{Radius}, \texttt{lambda1}, \texttt{lambda2} ;
-    \item \textbf{densité locale et fragmentation} via les variables d’amas ;
-    \item \textbf{chronologie de la gerbe} via \texttt{tMin}, \texttt{tSpread} ;
-    \item \textbf{sous-structures internes} via \texttt{nTrackSegments}.
-\end{itemize}
-
-L’intérêt principal de cette approche est double :
-
-\begin{enumerate}
-    \item \textbf{Physique} : chaque observable possède une interprétation reliée aux mécanismes d’interaction hadronique dans la matière ;
-    \item \textbf{Algorithmique} : ces variables fournissent un espace d’entrée compact, informatif et robuste pour les méthodes d’apprentissage supervisé.
-\end{enumerate}
-
-Les résultats obtenus dans ce mémoire montrent que plusieurs de ces descripteurs --- en particulier les variables temporelles, les compteurs de seuils et les observables de début de gerbe --- jouent un rôle déterminant dans l’identification des particules et la reconstruction d’énergie.
-
-Enfin, cette stratégie illustre qu’un calorimètre hautement granulaire comme le SDHCAL ne se limite pas à mesurer une énergie totale : il fournit une véritable image 4D de l’événement, exploitable soit par des variables construites manuellement, soit directement par des approches avancées telles que CNN ou GNN.
-
-\section{Tableau récapitulatif des descripteurs physiques}
 \label{annexe:tableau_recap}
 
 \begin{table}[!ht]
@@ -1133,3 +395,10 @@ Enfin, cette stratégie illustre qu’un calorimètre hautement granulaire comme
 \end{table}
 
 \clearpage
+
+Chaque observable possède ainsi une interprétation reliée aux mécanismes d'interaction hadronique,
+tout en fournissant un espace d'entrée compact et robuste pour les méthodes supervisées. Cette
+construction illustre qu'un calorimètre hautement granulaire ne se limite pas à mesurer une énergie
+totale : il fournit une image quadridimensionnelle de l'événement, exploitable soit par des variables
+construites manuellement comme ici, soit directement par des approches de type CNN ou GNN
+(section~\ref{sec:pid-gnn}).

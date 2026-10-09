@@ -1,13 +1,31 @@
 \chapter*{Introduction}
 \phantomsection
 \addcontentsline{toc}{chapter}{Introduction}
+\markboth{Introduction}{}
 \label{sec:introduction}
 
 La mesure précise de l’énergie des hadrons demeure l’un des défis historiques de la calorimétrie en physique des hautes énergies. Contrairement aux gerbes électromagnétiques, relativement bien comprises et caractérisées par des fluctuations modérées, les gerbes hadroniques présentent une variabilité importante d’un événement à l’autre. La fraction électromagnétique, l’énergie invisible liée aux processus nucléaires, ainsi que les fuites longitudinales et latérales dégradent directement la linéarité de réponse et la résolution énergétique des calorimètres hadroniques. Ces limitations constituent un enjeu majeur pour les détecteurs de nouvelle génération.
 
+\paragraph{Quelles particules, quelle mesure.}
+
+Le \textit{Modèle Standard} constitue le cadre théorique de référence pour décrire les particules élémentaires et trois des quatre interactions fondamentales \cite{Griffiths2008, HalzenMartin1984}. Les particules qu’il décrit sont représentées Figure~\ref{fig:SM}. Dans le contexte de la calorimétrie hadronique, les objets effectivement observés ne sont toutefois pas les quarks eux-mêmes : le confinement de couleur interdit de les observer isolément \cite{PeskinSchroeder1995}, et les états finals sont constitués de hadrons — baryons \((qqq)\) et mésons \((q\bar{q})\) — dont l’interaction avec la matière absorbante repose sur des processus nucléaires inélastiques complexes.
+
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=0.5\linewidth]{img/ms.png}
+    \caption{Particules élémentaires décrites par le Modèle Standard \cite{pdg2024}.}
+    \label{fig:SM}
+\end{figure}
+
+Ce travail porte sur trois espèces hadroniques représentatives, choisies pour leurs signatures calorimétriques distinctes : les pions chargés \(\pi^-\), les protons \(p\) et les kaons neutres longs \(K^0_L\). Leurs propriétés fondamentales et les conséquences calorimétriques qui en découlent sont rassemblées au Tableau~\ref{tab:hadrons}, au chapitre~\ref{sec:pid_mlp}.
+
+\paragraph{Pourquoi la résolution énergétique est le verrou.}
+
+Dans les expériences de physique des hautes énergies, une fraction importante de l’énergie finale est transportée par des hadrons organisés en jets, et la mesure de ces jets repose de manière déterminante sur les calorimètres hadroniques. Or les gerbes hadroniques présentent des fluctuations importantes liées aux processus nucléaires inélastiques, à l’énergie invisible et aux fuites, ce qui dégrade la résolution énergétique. Ces limitations constituent la motivation centrale du développement de calorimètres à haute granularité.
+
 Dans les approches de type \emph{Particle Flow Algorithm} (PFA) \cite{thomson2009pandora}, la mesure des jets repose sur la combinaison optimale des différents sous-détecteurs. Dans ce cadre, le calorimètre hadronique (HCAL) occupe une place centrale : sa granularité, sa capacité de séparation spatiale et la qualité de sa reconstruction énergétique conditionnent fortement la performance globale du détecteur.
 
-C’est dans cette perspective qu’a été développé le \emph{Semi-Digital Hadron CALorimeter} (SDHCAL). Ce concept associe une segmentation spatiale très fine, reposant sur des cellules centimétriques, à une lecture semi-digitale sur trois seuils codés sur deux bits. Une telle architecture permet de conserver une information calorimétrique riche tout en maîtrisant le volume de données et la consommation électronique. La haute granularité obtenue ouvre également la voie à une analyse détaillée de la morphologie des gerbes, aussi bien pour l’identification de particules (\emph{Particle Identification}, PID) que pour la reconstruction d’énergie.
+C’est dans cette perspective qu’a été développé le \emph{Semi-Digital Hadron CALorimeter} (SDHCAL), au sein de la collaboration CALICE. Ce concept associe une segmentation spatiale très fine, reposant sur des cellules centimétriques, à une lecture semi-digitale sur trois seuils codés sur deux bits. Une telle architecture permet de conserver une information calorimétrique riche tout en maîtrisant le volume de données et la consommation électronique. La haute granularité obtenue ouvre également la voie à une analyse détaillée de la morphologie des gerbes, aussi bien pour l’identification de particules (\emph{Particle Identification}, PID) que pour la reconstruction d’énergie.
 
 Parallèlement, les méthodes d’apprentissage automatique (\emph{Machine Learning}) occupent désormais une place croissante en physique des particules. Après les premières approches multivariées popularisées notamment via TMVA \cite{tmva2007}, des techniques plus récentes telles que les arbres de décision boostés, les réseaux convolutionnels ou les réseaux de neurones graphiques ont démontré leur capacité à exploiter efficacement la complexité des données issues des détecteurs modernes \cite{qu2020,abdughani2019gnn}.
 
@@ -22,35 +40,35 @@ L’identification des particules repose également sur un classifieur BDT, comp
 
 \paragraph{Motivation du PID dans les données de type faisceau.}
 
-Dans les études expérimentales de calorimétrie hadronique, la calibration du détecteur est généralement réalisée à partir de faisceaux dominés par des pions, qui constituent une espèce abondante et relativement bien contrôlée. Cette calibration pion sert ensuite de référence pour reconstruire l’énergie des gerbes hadroniques. Toutefois, en pratique, les faisceaux utilisés lors des tests ne sont pas parfaitement purs : ils présentent des contaminations non négligeables en protons, électrons ou muons, dont la proportion peut varier avec l’énergie et les conditions expérimentales. En l’absence de dispositifs d’identification dédiés en amont du calorimètre, l’espèce incidente n’est donc pas connue événement par événement.
+Dans les études expérimentales de calorimétrie hadronique, la calibration du détecteur est généralement réalisée à partir de faisceaux dominés par des pions, qui constituent une espèce abondante et relativement bien contrôlée. Cette calibration pion sert ensuite de référence pour reconstruire l’énergie des gerbes hadroniques. Toutefois, en pratique, les faisceaux utilisés lors des tests ne sont pas parfaitement purs : ils présentent des contaminations non négligeables en protons, électrons ou muons, dont la proportion peut varier avec l’énergie et les conditions expérimentales. Lors des tests du prototype SDHCAL au SPS, le faisceau de pions positifs de la ligne H6 était ainsi contaminé par des protons au-delà de 20~GeV, la contamination atteignant 45 à 60~\% entre 50 et 100~GeV — en l’absence de détecteur Cherenkov permettant de séparer les deux espèces \cite{calice2012sdhcal}. Sans dispositif d’identification dédié en amont du calorimètre, l’espèce incidente n’est donc pas connue événement par événement.
 
-Or, les différentes particules hadroniques n’interagissent pas de manière identique dans le calorimètre. Les protons, par exemple, présentent une longueur d’interaction différente de celle des pions, ce qui peut modifier le développement longitudinal de la gerbe et son confinement. De même, la fraction électromagnétique, fortement liée à la production de $\pi^0$, peut fluctuer différemment selon l’espèce incidente. L’application d’une calibration unique, dérivée des pions, à un échantillon contenant un mélange de particules introduit ainsi un biais potentiel dans la reconstruction de l’énergie.
+Or, les différentes particules hadroniques n’interagissent pas de manière identique dans le calorimètre. Les protons, par exemple, présentent une longueur d’interaction plus courte que celle des pions dans l’acier — 16,8~cm contre 20,4~cm \cite{calice2012sdhcal} — de sorte qu’ils amorcent leur gerbe plus tôt en moyenne et subissent moins de fuites longitudinales, ce qui modifie le développement de la gerbe et son confinement. De même, la fraction électromagnétique, fortement liée à la production de $\pi^0$, peut fluctuer différemment selon l’espèce incidente. L’application d’une calibration unique, dérivée des pions, à un échantillon contenant un mélange de particules introduit ainsi un biais potentiel dans la reconstruction de l’énergie.
 
-Dans ce contexte, l’identification des particules (\emph{Particle Identification}, PID) apparaît comme un levier essentiel pour améliorer les performances du détecteur. En distinguant les espèces incidentes à partir de la topologie de leur gerbe, il devient possible d’appliquer des calibrations spécifiques à chaque type de particule, ou à défaut de mieux contrôler les effets de mélange. Cette approche permet de rapprocher les conditions expérimentales réelles d’un scénario idéal dans lequel l’espèce incidente serait parfaitement connue, et constitue une motivation centrale du développement de méthodes de PID dans le SDHCAL.
+Dans ce contexte, l’identification des particules apparaît comme un levier essentiel pour améliorer les performances du détecteur. En distinguant les espèces incidentes à partir de la topologie de leur gerbe, il devient possible d’appliquer des calibrations spécifiques à chaque type de particule, ou à défaut de mieux contrôler les effets de mélange. Cette approche permet de rapprocher les conditions expérimentales réelles d’un scénario idéal dans lequel l’espèce incidente serait parfaitement connue, et constitue une motivation centrale du développement de méthodes de PID dans le SDHCAL.
 
 \paragraph{Trois scénarios de référence.}
 
 Afin de quantifier l’impact de cette information, les performances de reconstruction sont étudiées selon trois configurations représentatives :
 
 \begin{enumerate}[label=(\roman*)]
-    \item \textbf{Calibration standard faisceau} : calibration pion appliquée à toutes les espèces (borne inférieure) ;
-    \item \textbf{Calibration assistée par PID} : routage des événements selon la classe prédite ;
-    \item \textbf{Calibration idéale} : routage selon la véritable espèce incidente issue de la simulation (borne supérieure).
+    \item \textbf{Référence pion universelle} : calibration paramétrique déterminée sur les pions et appliquée à toutes les espèces ; cette référence simple n’est pas une borne inférieure générale, car elle n’est pas optimisée comme estimateur inclusif ;
+    \item \textbf{PID + calibration paramétrique} : routage des événements selon la classe prédite, puis application de la calibration analytique correspondante ;
+    \item \textbf{PID + régression BDT} : même routage, suivi d’un modèle de régression spécifique à la classe prédite.
 \end{enumerate}
 
-Cette comparaison permet d’évaluer dans quelle mesure l’identification des particules permet de réduire les biais induits par les mélanges d’espèces et de se rapprocher de la performance optimale.
+Une reconstruction utilisant directement l’espèce vraie de la simulation constitue par ailleurs un cas idéal utile pour interpréter les méthodes, mais elle ne correspond pas à une chaîne expérimentale accessible. La comparaison retenue permet surtout d’évaluer dans quelle mesure le PID réduit les biais dus à l’application d’une calibration unique à un mélange d’espèces.
 
 \paragraph{Objectifs du travail.}
 
 Les objectifs principaux de cette étude sont les suivants :
 
-\begin{itemize}
-    \item définir et extraire des observables robustes et discriminantes pour le PID et la reconstruction d’énergie ;
-    \item comparer les performances des approches paramétriques et supervisées en termes de linéarité, biais et résolution ;
-    \item quantifier l’impact du PID sur la performance énergétique dans des échantillons mixtes ;
-    \item explorer le potentiel des approches profondes basées sur graphes pour les calorimètres hautement granulaires.
-\end{itemize}
+\begin{enumerate}[label=\arabic*.,leftmargin=1.6em]
+    \item \textbf{Extraire des observables discriminantes} et robustes pour le PID et la reconstruction d’énergie, en s’appuyant sur la topologie des gerbes ;
+    \item \textbf{Comparer approches paramétrique et supervisée} en termes de linéarité, de biais et de résolution ;
+    \item \textbf{Quantifier l’apport du PID} sur la performance énergétique dans des échantillons mixtes ;
+    \item \textbf{Explorer les approches fondées sur les graphes} pour les calorimètres hautement granulaires.
+\end{enumerate}
 
 \paragraph{Organisation du mémoire.}
 
-Le manuscrit débute par un rappel du contexte théorique relatif aux particules, aux interactions matière-détecteur et au développement des gerbes hadroniques. Le principe du SDHCAL, sa simulation et sa chaîne de digitalisation sont ensuite présentés. Les chapitres suivants détaillent les méthodes d’analyse mises en œuvre pour l’identification des particules et la reconstruction de l’énergie. Enfin, une étude sur mélanges d’espèces hadroniques permet de comparer les différents scénarios envisagés avant de conclure sur les perspectives ouvertes par ce travail.
+Le manuscrit est organisé comme suit. Le chapitre~\ref{sec:interactions} rappelle les mécanismes d’interaction particule--matière et le développement des gerbes, en insistant sur les grandeurs qui gouvernent la réponse d’un calorimètre hadronique. Le chapitre~\ref{chap:sdhcal} présente le prototype SDHCAL, sa lecture semi-digitale et sa chaîne de simulation. Le chapitre~\ref{sec:pid_mlp} est consacré à l’identification hadronique par apprentissage supervisé, et le chapitre~\ref{sec:energy_reco} à la reconstruction de l’énergie par les deux approches comparées. Le chapitre~\ref{sec:analyse_mixte} réunit les deux volets sur des échantillons mixtes, avant la conclusion. Les détails de mise en œuvre — calcul des descripteurs, configuration des modèles et procédures numériques — sont reportés en annexe.

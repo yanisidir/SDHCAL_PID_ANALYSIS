@@ -2,6 +2,11 @@
 
 This repository contains my M2 internship research software for studying particle identification and energy reconstruction in a Semi-Digital Hadronic Calorimeter (SDHCAL). It combines ROOT/C++ shower-parameter extraction with machine-learning and chi2/TMinuit reconstruction studies for simulated hadronic showers, with an emphasis on clear analysis workflows rather than a production-ready experiment framework.
 
+> **Continuing this work?** Start with the
+> [project handover guide](docs/HANDOVER.md). It identifies the reference
+> results, required external datasets, maintained entry points and priority
+> tasks for the next student.
+
 **Skills demonstrated**
 
 - Particle-physics data analysis with ROOT/C++, LCIO-derived detector outputs, and shower observables.
@@ -9,8 +14,8 @@ This repository contains my M2 internship research software for studying particl
 - Energy reconstruction with both ML regressors and a semi-digital chi2/TMinuit calibration approach.
 - Reproducible research organization: seeded splits, per-run configuration records, performance tables, and method comparisons.
 - Scientific communication through documented pipelines, result summaries, and portfolio-oriented repository structure.
-- Critical review of one's own analysis: the defects found in this code and what was done about them are documented in
-  [docs/corrections.md](docs/corrections.md).
+- Critical review of the analysis, with the main methodological limitations
+  stated explicitly below.
 
 ## Project Overview
 
@@ -45,7 +50,10 @@ SDHCAL simulation (.slcio)
         -> PID and energy reconstruction studies
 ```
 
-The repository assumes ROOT trees containing either per-hit detector information or derived shower parameters. Many scripts still contain local research-path defaults from the internship environment; for reuse, those paths should be changed to local data locations.
+The repository assumes ROOT trees containing either per-hit detector information
+or derived shower parameters. Maintained scripts resolve their inputs through
+`SDHCAL_DATA_DIR`, and write models and outputs through `SDHCAL_MODEL_DIR` and
+`SDHCAL_OUT_DIR`. Legacy path literals are translated by the shared path layer.
 
 ## Main Objectives
 
@@ -103,7 +111,7 @@ The repository assumes ROOT trees containing either per-hit detector information
 ├── calibration/             chi2 coefficients: one file, read by C++ and Python
 ├── tools/                   utilities outside the chain (held-out sample, log repair)
 ├── tests/                   test suite for the shared library
-├── docs/                    documentation, including the record of corrections
+├── docs/                    data-pipeline and validated-results documentation
 ├── results/                 curated figures referenced by the report
 ├── report/                  M2 internship LaTeX report and compiled PDF (self-contained)
 ├── data/                    detector data, not versioned
@@ -111,8 +119,7 @@ The repository assumes ROOT trees containing either per-hit detector information
 ├── Makefile                 make check, and one target per stage
 ├── pyproject.toml           package metadata, pytest and ruff configuration
 ├── requirements.txt         Python dependencies
-├── CITATION.cff             Suggested citation metadata
-└── LICENSE.md               Non-binding license selection note
+└── CITATION.cff             Suggested citation metadata
 ```
 
 The numbering of `analysis/` gives the reading order of the analysis chain.
@@ -123,12 +130,9 @@ every stage shares.
 
 See also:
 
-- [Project overview](docs/project_overview.md)
+- [Project handover](docs/HANDOVER.md)
 - [Data pipeline](docs/data_pipeline.md)
-- [Model summary](docs/model_summary.md)
 - [Results summary](docs/results_summary.md)
-- [Repository map](docs/repository_map.md)
-- [Corrections](docs/corrections.md) - defects found in this code, and what was done
 
 ## Internship Report
 
@@ -209,7 +213,21 @@ figure can be traced back to the configuration that produced it. See
 
 ## Representative Results and Figures
 
-The figures below are examples of outputs currently stored in the repository. They are visual evidence of the analysis workflow, not a claim of publication-level performance, and they predate the corrections in [docs/corrections.md](docs/corrections.md) - see [Limitations](#limitations).
+The figures below are examples of outputs currently stored in the repository. The
+final report uses the validated PID results and the event-level energy biases,
+while treating the historical width curves as qualitative dispersion indicators.
+
+The results retained in the final report are:
+
+- a multiclass LightGBM balanced accuracy of **67.8 %**, with recalls of
+  **48.8 %** for pi-, **68.6 %** for protons and **86.0 %** for K0L;
+- a binary pion/proton accuracy close to **61 %**;
+- for the BDT-PID + BDT-energy chain at 80 GeV, an energy bias below **1 %**
+  in magnitude for all three species;
+- the conclusion that species-dependent routing primarily changes the energy
+  scale bias. No numerical gain in absolute energy resolution is claimed;
+- the GNN study as an exploratory proof of feasibility, without a headline
+  performance value.
 
 <p align="center">
   <img src="results/pid-energy-coupling/summary/confusion_matrix_pid_LGBM.png" width="31%" alt="Example PID confusion matrix">
@@ -232,27 +250,25 @@ Additional useful figure locations:
 
 Read these before quoting any number from this repository.
 
-- **The stored figures predate the corrections.** Everything under `results/`
-  and in `report/` was produced by the code as it stood before the review
-  recorded in [docs/corrections.md](docs/corrections.md). Several of those
-  corrections change a quoted quantity: in particular the resolution curves
-  understate sigma by about 21 %, because the 90 %-truncated RMS was never
-  corrected for the truncation, and the chi2 coefficients were fitted and
-  evaluated on the same events.
+- **The legacy result figures predate the code corrections.** In particular,
+  the width curves use an uncorrected 90 %-truncated RMS and must not be read as
+  an absolute measurement of sigma. The final report therefore uses them only
+  for qualitative comparisons and reports bias separately from dispersion.
 - **The chi2-versus-ML comparison is not yet like-for-like.** The chi2 fit now
   splits train and test, but it has to be re-run; until then the committed
   coefficients are flagged `fitted_on_train_split: false`.
 - **The PID-agnostic baseline has never been measured.** The scripts named
   `noPID_*` routed events by the true particle, so what was compared was real
   PID against perfect PID. `--pid none` now exists and needs to be run.
-- **The held-out sample has not been verified.** Whether `val_set.root` shares
-  events with the training files was never established. `tools/build_holdout.py
-  --check` answers the question; if it fails, the end-to-end numbers are
-  optimistic by an unknown amount.
+- **The final DRD6 results use disjoint training and evaluation samples.** The
+  corresponding ROOT inputs are not versioned in this repository, so their
+  separation cannot be replayed from a fresh checkout. New runs use
+  `tools/build_holdout.py --check` and an event-level manifest to enforce and
+  record the same separation automatically.
 - **Per-particle MLP energy results should be disregarded.** The three scripts
   that were supposed to produce them were byte-identical, read the pion file,
   and did not run at all.
-- **No figure in the repository can be attributed to a configuration**, because
+- **Legacy figures cannot all be attributed to an exact configuration**, because
   the feature list and the smearing width were never logged and the run logs
   were column-shifted. The logs are repaired and new runs record everything, but
   the older figures cannot be reconstructed after the fact.
@@ -276,10 +292,6 @@ Read these before quoting any number from this repository.
 ## Citation
 
 If this repository is useful for orientation or comparison, please cite it using the metadata in [CITATION.cff](CITATION.cff). The repository represents internship research software, not a peer-reviewed publication.
-
-## License
-
-No final license has been selected yet. See [LICENSE.md](LICENSE.md) for a non-binding recommendation. A permissive code license such as MIT or BSD-3-Clause would usually be appropriate for portfolio research code, but dataset rights, collaboration rules, and figure ownership should be checked before choosing one.
 
 ## Contact
 

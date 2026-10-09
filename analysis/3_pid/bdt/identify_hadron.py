@@ -8,15 +8,16 @@ Le modèle final est évalué en termes de précision et d'autres métriques de 
 et l'importance relative des variables (features) est visualisée pour interpréter les résultats.
 """
 
-import uproot
-import pandas as pd
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.metrics import accuracy_score, classification_report
 import matplotlib.pyplot as plt
 import joblib
-from pathlib import Path
+import pandas as pd
+import uproot
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.tree import DecisionTreeClassifier
+
+from sdhcal import paths
 
 # 1) Chargement et étiquetage
 def load_data(base_dirs):
@@ -67,11 +68,10 @@ def plot_importances_and_save(model, features, out_png, out_pkl):
     plt.close()
 
 if __name__ == "__main__":
-    # chemins vers vos fichiers ROOT
     base_dirs = {
-        "pion":   "/home/ilc/midir/Timing/files/analyse/analyse_pi/Params.root",
-        "proton": "/home/ilc/midir/Timing/files/analyse/analyse_proton/Params.root",
-        "kaon":   "/home/ilc/midir/Timing/files/analyse/analyse_kaon/Params.root",
+        "pion": paths.dataset("params", "pi"),
+        "proton": paths.dataset("params", "proton"),
+        "kaon": paths.dataset("params", "kaon"),
     }
     features = ["Thr3","Begin","Radius","Density","nClusters"]
 
@@ -84,10 +84,10 @@ if __name__ == "__main__":
     model, best_params = train_boosted_tree(X_train, y_train)
     print("Meilleurs paramètres :", best_params)
     evaluate(model, X_test, y_test)
-    # création du dossier models s'il n'existe pas
-    Path("models").mkdir(parents=True, exist_ok=True)
+    model_dir = paths.model_dir()
+    model_dir.mkdir(parents=True, exist_ok=True)
     plot_importances_and_save(
         model, features,
-        "models/boosted_tree_importances.png",
-        "models/boosted_hadron_tree.pkl"
+        model_dir / "boosted_tree_importances.png",
+        model_dir / "boosted_hadron_tree.pkl"
     )

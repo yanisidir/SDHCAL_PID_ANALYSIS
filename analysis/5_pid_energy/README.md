@@ -81,9 +81,8 @@ These are exploratory internship studies, not final detector-performance claims.
 
 ## On the files already in this directory
 
-The CSVs and figures here predate the corrections described in
-[`docs/corrections.md`](../../docs/corrections.md), and **their names do not say
-what they are**:
+The CSVs and figures here predate the current methodology, and **their names do
+not say what they are**:
 
 * `no_pid_BDT.csv`, `no_pid_chi2.csv`, `no_pid_BDT_pi_all.csv`,
   `no_pid_chi2_pion_all.csv` and `confusion_matrix_pid_param_LGBM_pi_p.png` were

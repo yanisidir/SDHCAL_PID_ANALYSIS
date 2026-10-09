@@ -27,6 +27,26 @@ the run record.
 | `gnn/` | exploratory PyTorch Geometric studies on hit-level graphs. Six variants kept as written during the internship; no result in the report depends on them. Needs `requirements-gnn.txt`. |
 | `cnn/` | exploratory convolutional approach, same status. |
 
+### Main scripts
+
+- `bdt/LGBM_classifier_PID.py`: maintained multiclass classifier.
+- `bdt/pion_proton_classifier.py`: binary pion/proton study used by the
+  coupled analysis.
+- `bdt/feature_importance_with_permutation.py` and
+  `bdt/analyse_corr_permutation.py`: interpretation diagnostics.
+- `mlp/hadron_classifier_MLP.py`: three-class MLP baseline.
+- `mlp/2_hadron_classifier_MLP.py`: binary MLP baseline.
+- `gnn/GNN.py` and `gnn/GNN_3_classes.py`: exploratory graph workflows; the
+  other GNN files are development variants retained from the internship.
+
+New LightGBM runs write plots, tables, arrays, models and their JSON run record
+under `$SDHCAL_OUT_DIR/pid_lgbm/`. Historical outputs remain beside the scripts
+for traceability. The exploratory GNN studies require:
+
+```bash
+pip install -r ../../requirements-gnn.txt
+```
+
 ## What to be careful about
 
 - **The class imbalance is handled on the training split only.** Oversampling
@@ -40,5 +60,4 @@ the run record.
 - **The timing variables are smeared** before use, to represent a finite
   detector time resolution. The width is `--sigma-time` and is recorded in the
   run log; it used to be hard-coded at 0.1 ns in five places. The smearing is
-  independent per variable and applied exactly once - neither was true before,
-  see [`../../docs/corrections.md`](../../docs/corrections.md) section 2.8.
+  independent per variable and applied exactly once.

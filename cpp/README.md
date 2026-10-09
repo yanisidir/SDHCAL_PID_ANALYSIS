@@ -16,22 +16,17 @@ viennent de `SDHCAL_DATA_DIR` et `SDHCAL_OUT_DIR`, et `repoRoot()` remonte
 jusqu'à un fichier marqueur, de sorte qu'un macro ROOT peut être lancé depuis
 n'importe quel répertoire.
 
-Compilation : `make shower-analyzer` depuis la racine de dépôt.
+Vérification de la compilation : `make cpp` depuis la racine du dépôt. Pour
+construire l'exécutable principal sans lancer l'analyse :
+`make analysis/1_shower_features/computeParams`.
 
-> La documentation de classe qui suit se trouvait dans
-> `energy_reconstruction_Tminuit/kaon/Readme.md`, où elle n'avait aucun rapport
-> avec l'ajustement χ² du kaon. Elle est désormais à côté de la classe qu'elle
-> décrit.
-
----
-
-## 📘 ShowerAnalyzer – Analyse de Gerbes Hadroniques (SDHCAL)
+## ShowerAnalyzer – Analyse de gerbes hadroniques
 
 `ShowerAnalyzer` est une classe C++ modulaire permettant de calculer automatiquement de nombreux **observables caractéristiques d’une gerbe hadronique**, à partir de vecteurs d’un événement simulé (ou réel), issus par exemple du calorimètre SDHCAL.
 
 ---
 
-## ✅ Fonctionnalités
+## Fonctionnalités
 
 La classe permet de calculer les observables suivants :
 
@@ -54,7 +49,7 @@ La classe permet de calculer les observables suivants :
 
 ---
 
-## 🛠️ Utilisation
+## Utilisation
 
 ### 1. Inclure l’en-tête
 
@@ -88,14 +83,14 @@ float ratio = analyzer.getRatioThr23();
 
 ---
 
-## 📎 Dépendances
+## Dépendances
 
 * **ROOT** (nécessaire pour `TGraph`, `TF1` dans le calcul de `Radius`)
 * **C++17 recommandé**
 
 ---
 
-## 📂 Organisation réelle dans ce dépôt
+## Organisation dans le dépôt
 
 ```
 cpp/include/ShowerAnalyzer.h              // En-tête
@@ -103,16 +98,7 @@ cpp/src/ShowerAnalyzer.cpp                // Implémentation
 analysis/1_shower_features/computeParams.cpp   // Boucle sur les événements
 ```
 
----
-
-## 💡 Conseils
-
-* Idéal pour générer des **features** en entrée d'un modèle de classification (ML, MVA, etc.).
-* Tu peux facilement ajouter une méthode pour exporter les résultats en `.csv` ou `.root`.
-
----
-
-## 🧪 Exemple minimal
+## Exemple minimal
 
 ```cpp
 #include "ShowerAnalyzer.h"
@@ -133,9 +119,3 @@ int main() {
     std::cout << "Rmean = " << analyzer.getRmean() << std::endl;
 }
 ```
-
----
-
-## 📤 Auteur
-
-Développé par \[Ton Nom / Projet SDHCAL], 2025

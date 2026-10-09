@@ -203,14 +203,20 @@ La mesure précise de l’énergie des hadrons constitue un enjeu majeur de la p
 
 Le \emph{Semi-Digital Hadron CALorimeter} (SDHCAL) propose une approche originale fondée sur une très haute granularité spatiale associée à une lecture semi-digitale à trois seuils. Une telle architecture permet d’accéder finement à la topologie des gerbes hadroniques et ouvre des perspectives intéressantes aussi bien pour l’identification des particules que pour la reconstruction de leur énergie.
 
-Dans ce travail, une chaîne d’analyse complète a été développée et appliquée à des échantillons simulés de pions, protons et kaons neutres longs. L’identification hadronique repose principalement sur des arbres de décision boostés (\emph{Boosted Decision Trees}, BDT), tandis qu’une étude exploratoire de réseaux de neurones graphiques (GNN) a également été menée. Pour la reconstruction de l’énergie, deux approches ont été comparées : une méthode paramétrique fondée sur un ajustement par minimisation du $\chi^2$ des compteurs multi-seuils, et une régression supervisée par BDT exploitant un ensemble enrichi de descripteurs de gerbe.
+Dans ce travail, une chaîne d’analyse complète a été développée et appliquée à des échantillons simulés de pions, protons et kaons neutres longs. L’identification hadronique repose principalement sur des arbres de décision boostés (\emph{Boosted Decision Trees}, BDT), tandis qu’une étude exploratoire de réseaux de neurones graphiques (GNN) a également été menée. Pour la reconstruction de l’énergie, deux approches ont été comparées : une méthode paramétrique fondée sur une minimisation pondérée des écarts entre énergie reconstruite et énergie vraie, et une régression supervisée par BDT exploitant un ensemble enrichi de descripteurs de gerbe.
 
-Les performances ont ensuite été étudiées dans plusieurs scénarios réalistes combinant identification des particules et reconstruction d’énergie, afin de quantifier l’apport du PID sur la calibration calorimétrique.
+Les performances ont ensuite été étudiées dans plusieurs scénarios combinant identification des particules et reconstruction d’énergie. Le classificateur multiclasse atteint une accuracy équilibrée de $67.8\,\%$, avec une séparation nettement meilleure des $K^0_L$ que des pions et des protons. L’introduction du PID agit surtout sur le biais de reconstruction : à 80~GeV, la chaîne BDT + BDT maintient le biais des trois espèces en dessous de $1\,\%$. Les différences de dispersion entre scénarios restent plus limitées.
 
-Les résultats montrent que l’identification préalable des particules améliore la linéarité de la réponse et réduit les biais de reconstruction. Ils confirment également que les méthodes modernes d’apprentissage automatique constituent une voie prometteuse pour exploiter pleinement le potentiel des calorimètres hadroniques hautement granulaires dans les futurs collisionneurs.
+Cette étude met en évidence l’intérêt d’exploiter conjointement la morphologie des gerbes, l’information semi-digitale et l’identification de l’espèce. Ses performances reposent toutefois sur la simulation ; leur transfert à une mesure expérimentale nécessitera une confrontation aux données de faisceau et une étude dédiée des incertitudes systématiques.
 
 \vspace{0.4cm}
 \textbf{Mots-clés :} SDHCAL, calorimétrie hadronique, identification des particules, reconstruction d’énergie, apprentissage automatique.
+
+
+% ==========================
+%     REMERCIEMENTS
+% ==========================
+\include{chapters/00-remerciements}
 
 % ==========================
 %     CHAPITRES
@@ -218,9 +224,7 @@ Les résultats montrent que l’identification préalable des particules amélio
 \cleardoublepage
 \pagenumbering{arabic}
 \include{chapters/01-introduction}
-\include{chapters/02-Contexte_theorique}
 \include{chapters/03-Interaction_particules_matiere}
-\include{chapters/04-Identification_particules}
 \include{chapters/05-SDHCAL}
 \include{chapters/06-PID}
 \include{chapters/07-Reconstruction_energie}
@@ -230,17 +234,18 @@ Les résultats montrent que l’identification préalable des particules amélio
 % ==========================
 %     ANNEXES
 % ==========================
-\newpage
 \appendix
-\part*{Annexes}
+% Pas de page de séparation dédiée : l'entrée « Annexes » figure dans la table
+% des matières sans consommer de page.
 \phantomsection
 \addcontentsline{toc}{part}{Annexes}
 
 \include{Annexes/Annexe_01_ShowerAnalyzer}
 \include{Annexes/Annexe_02_PID_LGBM}
 \include{Annexes/Annexe_03_GNN_PID}
-% \include{Annexes/Annexe_04_ENERGY_LGBM}
-% \include{Annexes/Annexe_05_Parametric_CHI2}
+\include{Annexes/Annexe_04_ENERGY_LGBM}
+\include{Annexes/Annexe_05_Parametric_CHI2}
+\include{Annexes/Annexe_06_Detecteur}
 
 % ==========================
 %     BIBLIO

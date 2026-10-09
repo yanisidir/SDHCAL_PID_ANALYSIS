@@ -75,7 +75,7 @@ committed; everything else stays in `output/`.
 smearing width, the seeds, the git commit and the package versions, so a figure
 can be traced back to the configuration that produced it. This was not true of
 the original code, and it is why the figures already in `results/` cannot be
-attributed to a run - see [`../docs/corrections.md`](../docs/corrections.md).
+attributed to an exact run; the limitation is stated in the root README.
 
 **Shared code** lives in [`../src/sdhcal/`](../src/sdhcal/) (Python) and
 [`../cpp/`](../cpp/) (C++): paths, time smearing, bias and resolution

@@ -1,47 +1,45 @@
-# M2 Internship Report
+# Rapport PID SDHCAL
 
-This directory contains the LaTeX source and compiled PDF for the M2 internship report associated with this repository.
-
-## Topic
-
-The report documents an SDHCAL particle-identification and energy-reconstruction study. It covers the detector context, semi-digital calorimetry, hadronic shower observables, PID models, energy reconstruction methods, and studies coupling PID decisions to reconstructed energy.
-
-## Internship Context
-
-This work was produced as part of an M2 internship on SDHCAL analysis. The repository contains the research code and selected results, while this report provides the longer scientific narrative, methodology, and interpretation.
+Ce dossier contient le rapport de stage M2 en LaTeX sur l'identification hadronique et la reconstruction d'energie dans le SDHCAL.
 
 ## Structure
 
-- `main.tex`: main LaTeX entry point.
-- `chapters/`: report chapters.
-- `Annexes/`: technical appendices.
-- `Fig/`: scientific figures used in the report.
-- `img/`: logos and institutional images.
-- `references.bib`: bibliography database.
-- `main.pdf`: compiled report kept as a lightweight portfolio artifact.
+- `main.tex` : fichier principal du rapport.
+- `chapters/` : chapitres du manuscrit.
+- `Annexes/` : annexes techniques.
+- `Fig/` : figures scientifiques du rapport.
+- `img/` : logos et images institutionnelles.
+- `references.bib` : bibliographie.
+- `build/` : fichiers de compilation generes automatiquement.
 
 ## Compilation
 
-From this directory:
+Depuis ce dossier, lancer :
 
 ```sh
 make
 ```
 
-The Makefile uses `latexmk` and writes temporary build products to `build/`. The final PDF is copied to `main.pdf`.
+Le PDF final est recopie dans `main.pdf`. Les fichiers temporaires restent dans `build/`.
 
-To remove generated build files:
+## Résultats retenus
+
+Cette version constitue le rapport final. Elle retient les performances PID
+présentées à DRD6 et les biais recalculés à partir des prédictions événement par
+événement. Les courbes historiques de largeur sont interprétées comme des
+indicateurs qualitatifs de dispersion et aucun gain numérique de résolution
+absolue n'en est déduit. L'étude GNN est présentée comme exploratoire.
+
+## Nettoyage
+
+Pour supprimer les fichiers temporaires :
 
 ```sh
 make clean
 ```
 
-To remove generated build files and the compiled PDF:
+Pour supprimer aussi le PDF final :
 
 ```sh
 make clean-all
 ```
-
-## Notes
-
-The LaTeX source was copied without changing the scientific content. Generated temporary files are ignored by Git, and the existing compiled `main.pdf` is kept because it is small enough for the repository.

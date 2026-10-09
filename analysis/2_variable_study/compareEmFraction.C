@@ -13,7 +13,7 @@ void compareEmFraction() {
     // 1) Ouvre les fichiers & récupère les arbres
     TFile* filePion   = TFile::Open(sdhcal::inDataDir("merged_primaryEnergy/200k_pi-_1-130_params_merged.root").c_str());
     TFile* fileProton = TFile::Open(sdhcal::inDataDir("merged_primaryEnergy/200k_proton_1-130_params_merged.root").c_str());
-    // TFile* fileKaon   = TFile::Open("/home/ilc/midir/Timing/files/analyse/analyse_kaon/Params.root");
+    // TFile* fileKaon   = TFile::Open(sdhcal::params("kaon").c_str());
 
     if (!filePion || filePion->IsZombie() ||
         !fileProton || fileProton->IsZombie()

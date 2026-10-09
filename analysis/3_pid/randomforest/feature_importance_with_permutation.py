@@ -25,31 +25,25 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.inspection import permutation_importance
 
+from sdhcal import paths
+
 
 def main():
     # Dossiers et fichiers
-    base_dirs = [
-        "/home/ilc/midir/Timing/files/analyse/analyse_pi/",
-        # "/home/ilc/midir/Timing/files/analyse/analyse_kaon/",
-        "/home/ilc/midir/Timing/files/analyse/analyse_proton/"
+    input_files = [
+        paths.dataset("params", "pi"),
+        paths.dataset("params", "proton"),
     ]
-    root_filename = "Params.root"
     tree_name     = "paramsTree"
-    out_dir       = "processed_data"
+    out_dir       = paths.output_dir() / "pid" / "randomforest"
     os.makedirs(out_dir, exist_ok=True)
 
     model_path = os.path.join(out_dir, "rf_classifier.joblib")
     scaler_path = os.path.join(out_dir, "scaler.joblib")
-    raw_data_path = os.path.join("data", "raw_dataset.csv")
-
     # 2. Chargement et concaténation
     dfs = []
     print("→ Lecture de tous les fichiers ROOT …")
-    for d in base_dirs:
-        path = os.path.join(d, root_filename)
-        if not os.path.isfile(path):
-            print(f"  !!  Fichier manquant: {path}")
-            continue
+    for path in input_files:
         f = uproot.open(path)
         tree = f[tree_name]
         df = tree.arrays(

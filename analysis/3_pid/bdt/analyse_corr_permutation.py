@@ -53,8 +53,8 @@ class Config:
     # tree_name: str = "paramsTree"
 
     file_paths: List[Path] = field(default_factory=lambda: [
-        sdhcal_paths.legacy(str(sdhcal_paths.legacy("/gridgroup/ilc/midir/analyse/data/merged_primaryEnergy/200k_pi-_1-130_params_merged.root"))),
-        sdhcal_paths.legacy(str(sdhcal_paths.legacy("/gridgroup/ilc/midir/analyse/data/merged_primaryEnergy/200k_proton_1-130_params_merged.root"))),
+        sdhcal_paths.data_dir() / "merged_primaryEnergy/200k_pi-_1-130_params_merged.root",
+        sdhcal_paths.data_dir() / "merged_primaryEnergy/200k_proton_1-130_params_merged.root",
     ])
     tree_name: str = "tree"
 

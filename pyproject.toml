@@ -8,7 +8,6 @@ version = "1.0.0"
 description = "Particle identification and energy reconstruction in a semi-digital hadronic calorimeter"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE.md" }
 authors = [{ name = "Yanis Idir" }]
 dependencies = [
     "numpy>=1.24",

@@ -24,26 +24,23 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 from imblearn.over_sampling import SMOTE
 import joblib
 
+from sdhcal import paths
+
 def main():
     # 1. Configuration
-    base_dirs = [
-        "/home/ilc/midir/Timing/files/analyse/analyse_pi/",
-        "/home/ilc/midir/Timing/files/analyse/analyse_kaon/",
-        "/home/ilc/midir/Timing/files/analyse/analyse_proton/"
+    input_files = [
+        paths.dataset("params", "pi"),
+        paths.dataset("params", "kaon"),
+        paths.dataset("params", "proton"),
     ]
-    root_filename = "Params.root"
     tree_name     = "paramsTree"
-    out_dir       = "processed_data"
+    out_dir       = paths.output_dir() / "pid" / "randomforest"
     os.makedirs(out_dir, exist_ok=True)
 
     # 2. Chargement et concaténation
     dfs = []
     print("→ Lecture de tous les fichiers ROOT …")
-    for d in base_dirs:
-        path = os.path.join(d, root_filename)
-        if not os.path.isfile(path):
-            print(f"  !!  Fichier manquant: {path}")
-            continue
+    for path in input_files:
         f = uproot.open(path)
         tree = f[tree_name]
         df = tree.arrays(
@@ -132,7 +129,7 @@ def main():
     )
 
     # 10. Entraînement final sur l'ensemble rééquilibré
-    print("→ Entraînement final du MLP …")
+    print("→ Entraînement final de la forêt aléatoire …")
     clf.fit(X_train_res, y_train_res)
     
     # 10. Évaluation

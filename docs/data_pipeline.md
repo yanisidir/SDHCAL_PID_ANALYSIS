@@ -58,7 +58,7 @@ marker, not a depth.
 To reproduce the full analysis, a user would need:
 
 - an SDHCAL-compatible simulation and digitization environment;
-- ROOT and C++ build support (`make shower-analyzer`);
+- ROOT and C++ build support (`make cpp` verifies the sources);
 - LCIO/Marlin conversion tools if starting from `.slcio`;
 - the Python packages in `requirements.txt` (`make venv`);
 - enough storage for ROOT files and generated model artifacts.
