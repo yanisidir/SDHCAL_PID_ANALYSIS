@@ -38,7 +38,7 @@ avec des poids quadratiques en $N_{\mathrm{hit}}$, par exemple
 \alpha(N_{\mathrm{hit}})=a_0+a_1N_{\mathrm{hit}}+a_2N_{\mathrm{hit}}^2,
 \end{equation}
 
-et des expressions analogues pour $\beta$ et $\gamma$, soit neuf coefficients ajustés sur simulation. Cette forme conserve une interprétation directe des trois seuils, mais elle ne peut exploiter toute l'information spatiale et temporelle du détecteur.
+et des expressions analogues pour $\beta$ et $\gamma$, soit neuf coefficients ajustés sur simulation. Cette paramétrisation reprend la forme introduite pour l'analyse des données de faisceau du prototype SDHCAL \cite{calice2016sdhcal}. Dans cette étude expérimentale, les coefficients étaient déterminés sur une partie des données H2, choisies sans contamination proton significative, puis appliqués aux autres événements H2 et H6. Ici, la même structure fonctionnelle est conservée, mais les ajustements sont réalisés séparément sur les simulations de chaque espèce. Cette forme garde une interprétation directe des trois seuils, sans pouvoir exploiter toute l'information spatiale et temporelle du détecteur.
 
 \section{Ajustement des paramètres par minimisation d'une fonction pondérée}
 \label{sec:energie-chi2}
@@ -52,7 +52,7 @@ S(\vec{\theta})=
 {E_i^{\mathrm{true}}}.
 \end{equation}
 
-Cette pondération limite la domination des événements de haute énergie dans l'ajustement. La méthode est désignée par convention comme méthode «~$\chi^2$~» dans la suite, mais $S$ ne constitue pas un $\chi^2$ statistique au sens d'un test d'adéquation, son dénominateur n'étant pas une variance expérimentale.
+Cette pondération limite la domination des événements de haute énergie dans l'ajustement. Dans l'analyse de référence \cite{calice2016sdhcal}, le choix conventionnel $\sigma_i=\sqrt{E_i}$ conduit algébriquement au même poids en $1/E_i$. La méthode est donc désignée par convention comme méthode «~$\chi^2$~» dans la suite. Dans l'implémentation présente, où le dénominateur n'est pas une variance mesurée événement par événement, $S$ doit néanmoins être interprétée comme une fonction de moindres carrés pondérés, et non comme un test statistique d'adéquation.
 
 Des calibrations distinctes peuvent ainsi être construites pour les pions, les protons et les kaons. Leur utilisation avec l'espèce vraie représente un cas idéal ; dans une chaîne réaliste, le choix de la calibration dépend du PID. Les détails d'implémentation sont décrits en Annexe~\ref{app:chi2}.
 
@@ -61,14 +61,14 @@ Des calibrations distinctes peuvent ainsi être construites pour les pions, les 
 
 Les Figures~\ref{fig:chi2-linearity} et~\ref{fig:chi2-resolution} présentent la méthode paramétrique appliquée sans routage par PID. Elles montrent l'évolution de la réponse moyenne et la diminution de la dispersion relative lorsque l'énergie augmente.
 
-\begin{figure}[!ht]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.76\linewidth]{Fig/no_PID_Lin_n_Dev_chi2.png}
 \caption{Linéarité et biais relatif de la calibration paramétrique.}
 \label{fig:chi2-linearity}
 \end{figure}
 
-\begin{figure}[!ht]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.76\linewidth]{Fig/no_PID_Resolution_relative_chi2.png}
 \caption{Indicateur de dispersion relative obtenu avec la calibration paramétrique.}
@@ -82,14 +82,14 @@ La seconde approche apprend directement $E_{\mathrm{true}}$ à partir des compte
 
 Les résultats sont présentés Figures~\ref{fig:bdt-linearity} et~\ref{fig:bdt-resolution}. Ils montrent que la régression fournit une réponse exploitable sur le domaine énergétique étudié.
 
-\begin{figure}[!ht]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.76\linewidth]{Fig/no_PID_Lin_n_Dev_BDT.png}
 \caption{Linéarité et biais relatif de la régression LightGBM.}
 \label{fig:bdt-linearity}
 \end{figure}
 
-\begin{figure}[!ht]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.76\linewidth]{Fig/no_PID_Resolution_relative_BDT.png}
 \caption{Indicateur de dispersion relative obtenu avec la régression LightGBM.}
@@ -113,7 +113,19 @@ Une résolution calorimétrique est souvent ajustée par
 
 Un ajustement fiable de $a$ et $b$ exige une estimation non biaisée de la largeur dans chaque tranche d'énergie ainsi que ses incertitudes. Ces paramètres ne sont donc pas extraits des courbes présentées ici.
 
+\subsection{Perspective : reconstruction graphique hit par hit}
+
+Une extension naturelle consisterait à appliquer un réseau graphique directement aux hits semi-digitaux. Sur le prototype CMS HGCAL complété par l'AHCAL, un réseau à réduction dynamique (DRN) a été entraîné sur les amplitudes et les coordonnées des cellules, puis validé sur des données de faisceau de pions \cite{aamir2024hgcalgnn}. Le graphe y est reconstruit dans un espace latent, traité par des opérations de type EdgeConv, puis réduit hiérarchiquement avant la régression. Dans cette configuration analogique, le DRN améliore d'environ un facteur deux la résolution par rapport à une sommation pondérée et apprend en particulier à compenser une partie des fluctuations de la composante électromagnétique et des fuites.
+
+Pour le SDHCAL, une transposition prudente serait de conserver l'estimateur semi-digital comme échelle de référence et d'apprendre une correction événementielle,
+\begin{equation}
+E_{\mathrm{reco}}=E_{\mathrm{SD}}\,C_{\theta}(G),
+\end{equation}
+où $G$ contient les positions, les seuils et, après validation instrumentale, les temps des hits. Cette construction préserverait l'interprétation de la calibration à trois seuils tout en donnant accès à la morphologie fine de la gerbe. Les performances publiées pour HGCAL ne constituent cependant pas un objectif numérique pour cette étude : le détecteur est analogique, seuls les pions sont considérés, une partie du gain provient de la correction des fuites, et la largeur est extraite par un ajustement gaussien du c\oe ur de la distribution.
+
 \section{Limites et systématiques}
 \label{sec:energie-limites}
 
-Les résultats reposent entièrement sur simulation. Leur transfert aux données réelles dépend de la modélisation des interactions hadroniques, du bruit, des inefficacités, de la calibration des chambres et des fuites. Une validation expérimentale demanderait donc de confronter les distributions d'entrée et les performances à des données de faisceau, en conservant le même protocole d'entraînement et d'évaluation. L'analyse des mélanges d'espèces est développée au chapitre suivant.
+Les résultats reposent entièrement sur simulation. Leur transfert aux données réelles dépend de la modélisation des interactions hadroniques, du bruit, des inefficacités, de la calibration des chambres et des fuites. Une validation expérimentale demanderait donc de confronter les distributions d'entrée et les performances à des données de faisceau, en conservant le même protocole d'entraînement et d'évaluation.
+
+L'étude CALICE sur données de faisceau fournit une base concrète pour cette évaluation \cite{calice2016sdhcal}. Elle considère comme sources systématiques le choix de la fonction d'ajustement des distributions d'énergie (gaussienne ou Crystal Ball), la variation des coupures de sélection, le biais de sélection estimé sur simulation, la correction de la réponse au cours du spill et l'incertitude sur l'énergie du faisceau. Une reprise de ce travail devrait au minimum adapter ces variations à la chaîne simulée, puis ajouter celles liées à la liste de physique Geant4, aux paramètres de digitalisation et au domaine d'entraînement des modèles. L'analyse des mélanges d'espèces est développée au chapitre suivant.

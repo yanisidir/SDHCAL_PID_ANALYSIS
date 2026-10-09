@@ -243,7 +243,7 @@ La simulation fournit une information temporelle hit par hit, complémentaire de
     \end{tabularx}
 \end{table}
 
-Les différences pion/proton observées dans ce travail proviennent en partie de l'écart de masse \(m_p \gg m_\pi\), qui produit à énergie comparable des temps de vol distincts. Une réserve importante s'attache toutefois à ces variables : la résolution temporelle native de la simulation est extrêmement fine, et un \emph{smearing} gaussien a été appliqué dans plusieurs analyses afin de reproduire des conditions instrumentales réalistes. Ce point est déterminant pour \texttt{tMin}, dont une précision irréaliste renforce artificiellement les performances de classification — comme le montre l'étude GNN de la section~\ref{sec:pid-gnn}.
+Les différences pion/proton observées dans ce travail peuvent provenir en partie de l'écart de masse \(m_p \gg m_\pi\), qui produit à énergie comparable des temps de vol distincts. Une réserve importante s'attache toutefois à ces variables : la résolution temporelle native de la simulation est extrêmement fine, et un \emph{smearing} gaussien a été appliqué dans plusieurs analyses afin d'introduire une résolution effective finie. Une étude CALICE de séparation de gerbes dans l'AHCAL montre que l'information temporelle peut modifier sensiblement les performances d'un modèle graphique, avec un effet dépendant de l'architecture \cite{calice2024showerseparation}. Elle ne permet cependant pas de quantifier l'effet de \texttt{tMin} sur le PID du SDHCAL. Ce point doit être établi ici par une comparaison contrôlée, sur les mêmes événements, avec et sans variables temporelles et pour plusieurs résolutions simulées.
 
 \section{Profil longitudinal et ajustement de Gaisser--Hillas}
 \label{annexe:gaisserhillas}

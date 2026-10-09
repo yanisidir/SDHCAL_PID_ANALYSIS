@@ -19,6 +19,62 @@ The report is a scientific account of the internship. The repository also
 contains historical scripts and figures, which are useful for traceability but
 are not all valid benchmark outputs.
 
+## Experimental Reference
+
+The primary experimental reference for this analysis is the CALICE paper
+*First results of the CALICE SDHCAL technological prototype*, JINST 11 (2016)
+P04001, DOI
+[`10.1088/1748-0221/11/04/P04001`](https://doi.org/10.1088/1748-0221/11/04/P04001),
+arXiv:1602.02276.
+
+It documents the 2012 H2/H6 beam samples, event selections, the origin of the
+three-threshold energy estimator and the experimental systematic uncertainties.
+At 80 GeV it reports semi-digital resolutions of **7.5 +/- 0.3 %** for H6 and
+**7.7 +/- 0.5 %** for H2, compared with **9.5 +/- 0.3 %** and
+**10.6 +/- 0.8 %** in binary mode. These values are an experimental scale check,
+not numbers to merge with the simulation-only results in this repository: the
+samples, selections and resolution estimators differ.
+
+For a future beam-data validation, begin with the paper's uncertainty model:
+fit-function dependence, selection-cut variations, selection bias from
+simulation, spill-time correction and beam-energy uncertainty. Then add Geant4
+physics-list, digitisation and ML-domain uncertainties specific to this work.
+
+## Related GNN and Timing References
+
+Two recent studies provide useful methodological baselines, but their numerical
+results are not directly comparable with this repository:
+
+- *Exploring DHCAL design and performance with Graph Neural Networks*,
+  arXiv:[2501.00128](https://arxiv.org/abs/2501.00128), compares GAT and DeepSets
+  for PID and energy reconstruction in a binary RPWELL DHCAL. It motivates a
+  low-complexity DeepSets baseline and reports a pion/proton confusion pattern
+  qualitatively similar to this study.
+- CALICE, *Shower Separation in Five Dimensions for Highly Granular
+  Calorimeters Using Machine Learning*,
+  arXiv:[2407.00178](https://arxiv.org/abs/2407.00178), compares PointNet, DGCNN
+  and GravNet for charged/neutral shower separation in the analogue AHCAL. It
+  motivates dynamic-graph models and controlled timing ablations.
+- M. Aamir et al., *Using graph neural networks to reconstruct charged pion
+  showers in the CMS High Granularity Calorimeter*, JINST 19 (2024) P11025,
+  arXiv:[2406.11937](https://arxiv.org/abs/2406.11937), validates a dynamic
+  reduction network on pion beam-test data. For this repository, its most useful
+  idea is to learn an event-level correction to the semi-digital estimator from
+  hit-level geometry, rather than replacing the calibrated energy scale at the
+  outset.
+
+The detector technologies and learning targets differ from the SDHCAL PID task.
+In particular, the AHCAL paper's 100 ps timing study is simulation-only and must
+not be used as evidence that 100 ps is an experimentally validated SDHCAL timing
+resolution. A continuation should compare DeepSets, the current static graph and
+a dynamic graph on the same event-level train/validation/test partitions, scan
+the timing smearing, repeat several seeds, and record memory and inference cost.
+For energy regression, first test
+`E_reco = E_semidigital * correction_gnn(graph)` against the inclusive LightGBM
+baseline. Do not import the HGCAL resolution numbers as SDHCAL targets: HGCAL is
+analogue, uses a different geometry and energy range, and part of the reported
+gain comes from learning leakage corrections.
+
 ## Current Scientific Baseline
 
 - The final DRD6 PID results were evaluated on samples distinct from the
@@ -141,7 +197,8 @@ represent perfect PID, not an analysis without PID.
 6. Produce one benchmark table containing bias, resolution and statistical
    uncertainties for all three cases.
 7. Validate the simulation-based conclusions with beam-test data when such data
-   become available.
+   become available, using the CALICE 2016 analysis as the experimental
+   benchmark and systematic-uncertainty starting point.
 
 ## Rules That Protect the Comparison
 
@@ -153,4 +210,3 @@ represent perfect PID, not an analysis without PID.
 - Keep bias and resolution separate.
 - Record the data version, features, seeds, time smearing and software versions
   for every result that may be quoted.
-

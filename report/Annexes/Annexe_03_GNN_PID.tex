@@ -60,6 +60,10 @@ L'implémentation prévoit une évaluation par accuracy, matrice de confusion et
 
 Trois axes d'amélioration se dégagent. Le \textbf{volume statistique} est le levier le plus direct : la performance d'un modèle profond dépend fortement de la taille de l'échantillon, et une montée en statistique autoriserait des architectures plus expressives, aujourd'hui susceptibles de surapprendre. La \textbf{richesse des variables d'entrée} vient ensuite : le modèle n'exploite que position, temps et seuil, alors que les indices de couche \((I,J,K)\), des informations locales de densité, des voisinages multi-rayons ou des descripteurs hybrides issus de \texttt{ShowerAnalyzer} pourraient être ajoutés — une approche combinant variables expertes et apprentissage profond offrirait vraisemblablement le meilleur compromis. La \textbf{topologie du graphe}, enfin, repose ici sur un unique schéma \(k\)-NN causal à \(k=8\) ; des graphes dynamiques recalculés à chaque couche, un rayon fixe en distance physique, une connectivité hiérarchique entre couches ou des arêtes pondérées par distance et compatibilité temporelle constituent autant d'alternatives non explorées. La définition du graphe étant un choix arbitraire du concepteur, elle représente une source de systématique propre à cette classe de méthodes.
 
+Trois références récentes fournissent un cadre concret pour cette comparaison. Dans une étude de DHCAL binaire, DeepSets obtient une reconstruction d'énergie compétitive avec une complexité nettement inférieure à celle d'un GAT, ce qui en fait une référence simple à tester avant d'augmenter la sophistication du graphe \cite{borysova2025dhcalgnn}. Pour l'AHCAL, les modèles DGCNN et GravNet exploitent mieux que PointNet les corrélations locales, notamment lorsque le temps est ajouté aux hits \cite{calice2024showerseparation}. Enfin, la reconstruction de pions dans le prototype CMS HGCAL montre qu'un réseau à réduction dynamique, fondé sur EdgeConv et un regroupement hiérarchique des nœuds, peut apprendre une correction événementielle validée sur données de faisceau \cite{aamir2024hgcalgnn}.
+
+Une reprise devrait donc confronter, sur des partitions événementielles strictement identiques, au minimum une agrégation de type DeepSets, le graphe statique actuel et un graphe dynamique. Pour la reconstruction d'énergie, le premier objectif à tester serait un facteur correctif appliqué à l'estimateur semi-digital, plutôt qu'une prédiction entièrement indépendante de celui-ci. Chaque entraînement devrait être répété avec plusieurs graines ; le coût mémoire, le temps d'inférence et l'effet du nombre de nœuds devraient être enregistrés, et une ablation du temps réalisée à plusieurs résolutions. Les performances externes ne doivent pas être reprises comme références numériques, car ces travaux utilisent d'autres détecteurs, d'autres modes de lecture et d'autres objectifs d'apprentissage.
+
 \section{Tableau récapitulatif}
 
 \begin{table}[H]
@@ -122,7 +126,7 @@ Limites &
 Étude exploratoire nécessitant une comparaison contrôlée avec l'approche tabulaire. \\
 
 Perspective &
-PID avancé, régression d’énergie, Particle Flow, modèles spatio-temporels. \\
+PID avancé, correction graphique de l'estimateur d'énergie, Particle Flow, modèles spatio-temporels. \\
 
 \bottomrule
 \end{tabularx}
