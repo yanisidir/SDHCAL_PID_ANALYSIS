@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sdhcal-pid-analysis"
+version = "1.0.0"
+description = "Particle identification and energy reconstruction in a semi-digital hadronic calorimeter"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE.md" }
+authors = [{ name = "Yanis Idir" }]
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "uproot>=5.0",
+    "scikit-learn>=1.3",
+    "lightgbm>=4.0",
+    "imbalanced-learn>=0.11",
+    "joblib>=1.3",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "ruff>=0.4"]
+# Exploratory graph and convolutional PID studies (analysis/3_pid/{gnn,cnn}).
+gnn = ["torch>=2.0", "torch-geometric>=2.4", "tqdm>=4.65"]
+# SHAP summaries in analysis/3_pid/bdt/plot_trees.py, which degrades gracefully
+# when the package is absent.
+interpret = ["shap>=0.44"]
+
+# Not installable from PyPI: four scripts import ROOT's Python bindings
+# (tools/shower_visualisation.py, analysis/4_energy/ml_bdt/energy_plots.py and
+# the two analysis/5_pid_energy/*/figures.py). They need a ROOT installation,
+# like the C++ stages. Everything else reads ROOT files through uproot.
+
+# src-layout: the package lives under src/, so an uninstalled checkout cannot
+# shadow it with the working directory. Install it once with `pip install -e .`
+# (make venv does this) and every script can simply `from sdhcal import ...`
+# with no sys.path manipulation.
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = ["sdhcal"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+filterwarnings = ["error::DeprecationWarning:sdhcal.*"]
+# So the tests run in a fresh checkout, before `pip install -e .`.
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+# The exploratory GNN/CNN studies and the figure scripts are kept as they were
+# written during the internship; they are not held to the lint rules applied to
+# the shared package and the maintained pipelines.
+exclude = ["analysis/3_pid/gnn", "analysis/3_pid/cnn", "report"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "ARG", "SIM"]
+ignore = [
+    "E501",    # line length is handled by the formatter
+    "B008",    # argparse and dataclass defaults are built in call position
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG"]

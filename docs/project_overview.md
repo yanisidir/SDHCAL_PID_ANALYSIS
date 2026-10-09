@@ -23,12 +23,20 @@ The code was written during an internship workflow, so several scripts retain lo
 
 ## Main Components
 
-- `ShowerAnalyzer/`: ROOT/C++ extraction of shower observables from digitized hits.
-- `compare_parameters/`: comparison plots for selected shower variables.
-- `PID/`: classification studies with BDT, MLP, GNN, and other exploratory baselines.
-- `Energy_reconstruction_ml/`: ML regression studies for energy reconstruction.
-- `energy_reconstruction_Tminuit/`: chi2/TMinuit reconstruction using semi-digital hit counts.
-- `PID_RECONSTRUCTION/`: studies coupling PID decisions to energy reconstruction.
+The analysis is laid out as a chain, one numbered directory per stage:
+
+| Stage | What it does |
+|---|---|
+| `analysis/1_shower_features/` | ROOT/C++ extraction of shower observables from digitized hits |
+| `analysis/2_variable_study/` | comparison plots for selected shower variables between species |
+| `analysis/3_pid/` | classification with BDT and MLP, plus exploratory GNN, CNN and random-forest baselines |
+| `analysis/4_energy/` | energy reconstruction: LightGBM and MLP regressors (`ml_bdt/`, `ml_mlp/`) and the semi-digital calibration (`chi2_tminuit/`) |
+| `analysis/5_pid_energy/` | coupling: no PID, perfect PID and real PID, compared on the same events |
+
+Code shared between stages lives in `src/sdhcal/` (Python) and `cpp/` (C++):
+dataset paths, the detector time smearing, the bias and resolution estimators,
+the splits and their disjointness checks, the run logging, and the chi2
+coefficients.
 
 ## Repository Status
 

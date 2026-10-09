@@ -1,4 +1,14 @@
-# Python cache and environments
+# Rewritten to remove three problems: the C++ and logging blocks were duplicated
+# verbatim; the trailing `!docs/`, `!*.png`, `!*.pdf` negations were no-ops,
+# because nothing above them excluded those paths and a negation cannot re-include
+# a file whose parent directory is excluded; and `*.csv` silently covered the run
+# logs the README presents as evidence. Run outputs now live under output/ (see
+# sdhcal/paths.py), which is excluded wholesale, while the curated logs that are
+# already tracked stay tracked - .gitignore does not affect tracked files.
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *.pyo
@@ -7,13 +17,16 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .ipynb_checkpoints/
+*.egg-info/
 .venv/
 venv/
 env/
 ENV/
 *.env
 
-# macOS and editor files
+# ---------------------------------------------------------------------------
+# Editors and operating systems
+# ---------------------------------------------------------------------------
 .DS_Store
 .AppleDouble
 .LSOverride
@@ -23,30 +36,50 @@ ENV/
 *.swp
 *.swo
 *~
+*.bak
 
-# C/C++ and ROOT build products
+# ---------------------------------------------------------------------------
+# C++ / ROOT build products
+# ---------------------------------------------------------------------------
 *.o
 *.so
 *.a
-*.out
-*.exe
+*.d
 *.dll
 *.dylib
+*.exe
 *.pcm
+*_C.so
+*_C_ACLiC_dict*
 build/
 cmake-build-*/
-ShowerAnalyzer/computeParams
-ShowerAnalyzer/computeParams_parallel
+analysis/1_shower_features/computeParams
+analysis/1_shower_features/computeParams_parallel
 
-# Heavy detector data and generated tabular data
+# ---------------------------------------------------------------------------
+# Detector data and generated tables
+#
+# None of these are versioned: they are too large and depend on the simulation
+# and digitisation environment. See docs/data_pipeline.md for how to produce
+# them, and set SDHCAL_DATA_DIR to point at them.
+# ---------------------------------------------------------------------------
 *.root
 *.slcio
 *.csv
 *.tsv
 *.npz
 *.npy
+data/
+datasets/
+local_data/
 
-# ML model artifacts and checkpoints
+# The chi2 calibration is small, textual and the single source of truth shared
+# by the C++ and Python sides, so it is versioned.
+!calibration/chi2_coefficients.json
+
+# ---------------------------------------------------------------------------
+# Model artifacts
+# ---------------------------------------------------------------------------
 *.pt
 *.pth
 *.ckpt
@@ -54,16 +87,25 @@ ShowerAnalyzer/computeParams_parallel
 *.pkl
 *.h5
 *.onnx
-
-# Logs and transient run output
-*.log
-nohup.out
 models/
 checkpoints/
+
+# ---------------------------------------------------------------------------
+# Run outputs
+#
+# Everything a pipeline writes - plots, per-run JSON, arrays, tables - goes
+# under output/ by default (SDHCAL_OUT_DIR). Promote a figure by copying it into
+# results/ and adding it explicitly.
+# ---------------------------------------------------------------------------
+output/
 runs/
 wandb/
+*.log
+nohup.out
 
+# ---------------------------------------------------------------------------
 # LaTeX build products
+# ---------------------------------------------------------------------------
 *.aux
 *.bbl
 *.bcf
@@ -80,27 +122,3 @@ wandb/
 *.snm
 *.vrb
 report/build/
-
-# Large local data directories
-data/
-datasets/
-local_data/
-
-# Keep documentation and lightweight visual outputs versionable.
-!docs/
-!docs/**
-!*.md
-!*.cff
-!*.png
-!*.pdf
-
-# Compiled binaries / objects
-*.o
-*.so
-*.dylib
-*.exe
-ShowerAnalyzer/computeParams
-ShowerAnalyzer/computeParams_parallel
-
-# Logs
-*.log
