@@ -11,6 +11,14 @@ Pour la \textbf{reconstruction d'énergie}, deux familles d'estimateurs ont ét�
 
 Ces résultats ne démontrent pas qu'un routage par PID surpasse tout estimateur inclusif : la référence disponible est une calibration pion appliquée à toutes les espèces, et non un modèle sans PID optimisé sur le mélange. Ils indiquent néanmoins que la connaissance, même imparfaite, de l'espèce peut corriger une partie des décalages d'échelle dus à une calibration universelle.
 
+Trois de ces conclusions ont été reprises sur deux productions pion/proton indépendantes, qui permettent d'entraîner et d'évaluer sur des échantillons disjoints par construction.
+
+Sur le \textbf{PID} (section~\ref{sec:pid-approfondissement}), le plafond mesuré n'est pas une marge de progression : une étude indépendante sur DHCAL~\cite{borysova2025dhcalgnn}, entraînée sur près de trois cents fois plus d'événements, retrouve la même confusion $\pi/p$ dominante, dont le mécanisme est connu~\cite{akchurin1998proton}. La confusion de $47{,}9\,\%$ rapportée ici doit donc se lire comme une limite physique des topologies de gerbe.
+
+Sur le \textbf{couplage} (section~\ref{sec:coupling-revision}), la réserve formulée au paragraphe précédent se trouve justifiée, et sa levée renverse la lecture. Comparé à un régresseur inclusif réellement optimisé — et non à une calibration pion appliquée à toutes les espèces —, le routage par identification n'apporte plus rien : une identification \emph{parfaite} améliore la résolution de $0{,}0002$. Le gain attribué au PID était celui d'une calibration universelle inadaptée, non celui de la connaissance de l'espèce.
+
+Sur l'\textbf{énergie} enfin (section~\ref{sec:energie-niveau-hits}), la décomposition $\sigma/E = a/\sqrt{E} \oplus b$ montre que les estimateurs fondés sur les variables de gerbe, BDT comme calibration $\chi^2$, partagent le même terme stochastique d'environ $54\,\%$ et ne diffèrent que par le terme constant. Un réseau de graphes travaillant sur les clusters de hits abaisse ce terme stochastique à $45{,}5 \pm 1{,}0\,\%$, et une expérience de contrôle établit que ce gain tient à l'information exploitée et non à la formulation de la cible. C'est, dans cette analyse, le principal argument en faveur des méthodes au niveau des hits.
+
 La portée de ces résultats reste celle d'une étude sur simulation. Une validation sur données de faisceau et une évaluation des incertitudes liées au modèle hadronique, à la réponse du détecteur et à la composition des échantillons seront nécessaires avant toute conclusion expérimentale.
 
 \chapter*{Perspectives}

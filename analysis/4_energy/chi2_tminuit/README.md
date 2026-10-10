@@ -6,8 +6,8 @@ machine learning. It is the physics-motivated counterpart to the regressors in
 
 ```bash
 make energy-chi2                                              # the three fits, then publish
-root -l -b -q 'EnergyReco.C("pi")'                            # one particle
-root -l -b -q 'EnergyReco.C("kaon", 0.2, 42, true)'           # test fraction, seed, containment cut
+root -l -b -q 'fit.C("pi")'                            # one particle
+root -l -b -q 'fit.C("kaon", 0.2, 42, true)'           # test fraction, seed, containment cut
 python ../../../tools/update_calibration.py                   # merge the fit fragments
 ```
 
@@ -61,15 +61,13 @@ Two conditions remain for a fair comparison:
 
 | File | Role |
 |---|---|
-| `EnergyReco.C` | The fit. Takes the particle, the test fraction, the split seed and the containment flag. |
-| `ResoAndLin.C` | Resolution and linearity summary plots. |
-| `pion_proton_EnergyReco.C` | Coupled pion/proton study. |
-| `validate_root_file.C` | Input-file sanity check. |
-| `kaon/`, `pion-/`, `proton/` | Linear-model variants (`EnergyReco_linear.C`, `EnergyReco2.C`), the coefficient-evolution macro `plot_coeff.C`, and the logs and figures of the internship runs. |
+| `fit.C` | The fit. Takes the particle, the test fraction, the split seed and the containment flag. |
+| `plots.C` | Resolution and linearity summary plots. |
+| `validate.C` | Input-file sanity check. |
+| [`../../archive/code/4_energy/chi2_tminuit/`](../../archive/code/4_energy/chi2_tminuit/) | Superseded coupled and per-particle variants, with their historical logs and figures. |
 
-The per-particle copies of the quadratic fit that used to live in those three
-subdirectories were removed: `EnergyReco.C` takes the particle as an argument.
-The linear variants are a genuine alternative model and were kept.
+The active `fit.C` takes the particle as an argument, so the per-particle copies
+are not needed by the maintained workflow.
 
 Summary figures promoted for the report are in
 [`../../../results/energy-reconstruction/chi2-tminuit/summary-plots/`](../../../results/energy-reconstruction/chi2-tminuit/summary-plots/).

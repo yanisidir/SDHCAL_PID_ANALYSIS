@@ -301,6 +301,19 @@ Une valeur élevée signale plusieurs secondaires chargés énergétiques, une i
 
 Cette reconstruction reste difficile dans une gerbe dense — confusion avec le cœur hadronique, superposition de trajectoires, inefficacités locales, sensibilité aux paramètres de clustering. Il s'agit donc d'un indicateur morphologique, non d'un traqueur dédié : moins dominant que les variables temporelles ou de comptage, il enrichit néanmoins les modèles supervisés testés.
 
+\section{Corrections apportées à l'implémentation}
+\label{annexe:showeranalyzer-corrections}
+
+Les définitions ci-dessus sont celles que l'analyse suppose. Une relecture de \texttt{ShowerAnalyzer.cpp} menée après la première campagne de production a montré que trois d'entre elles n'étaient pas celles effectivement calculées. Les écarts sont consignés ici parce qu'ils affectent les valeurs numériques citées dans les chapitres antérieurs à la reprise, et parce qu'aucun n'avait provoqué d'erreur à l'exécution : chacun produisait une variable d'apparence parfaitement acceptable.
+
+\paragraph{\texttt{eccentricity3D} : valeur propre inversée.} ROOT retourne les valeurs propres par ordre \emph{décroissant}. Le code indexait l'élément \texttt{(2)} du vecteur en croyant y lire \(e_3\), le plus grand, et y lisait en fait le plus petit. La variable calculée était donc \(e_{\min}/\sum e_i\) au lieu de la définition du Tableau~\ref{tab:annexeA-transverse}, soit une mesure de \emph{compacité} là où une mesure d'\emph{allongement} était attendue, bornée par \(1/3\) au lieu de 1. Sa médiane sur l'échantillon passe de \(0{,}060\) à \(0{,}833\) après correction. L'implémentation prend désormais explicitement le maximum des trois valeurs propres, sans hypothèse sur leur ordre.
+
+\paragraph{Ajustement de Gaisser--Hillas : paramètres non contraints.} L'ajustement était lancé sans bornes et sans vérification du code de retour, de sorte qu'un échec convergeait vers des valeurs arbitraires enregistrées comme des mesures. Le cas dominant portait sur \(X_{\max}\), qui atteignait \(6167\) mm dans un détecteur long d'environ \(1250\) mm. Trois corrections ont été appliquées : \(X_{\max}\) est contraint à rester dans l'intervalle en profondeur réellement mesuré, le statut de l'ajustement est contrôlé et un échec écrit une valeur sentinelle plutôt qu'un nombre, et la profondeur des couches est lue dans la géométrie au lieu d'être reconstruite à partir d'un pas supposé uniforme. La borne supérieure de la boucle, restée à la couche~29 d'une version antérieure du détecteur, a par ailleurs été portée à la couche~47. L'effet se lit sur la corrélation entre \(N_{\max}\) et l'énergie primaire, qui vaut \(+0{,}79\) après correction, et sur \(X_{\max}\), qui croît de \(243\) à \(404\) mm sur la gamme \(5\)--\(100\) GeV, comme l'attend un développement logarithmique.
+
+\paragraph{Condition morte.} Un test \texttt{thr < 0.1} portait sur un entier valant 1, 2 ou 3 et ne pouvait jamais être vrai. La branche qu'il gardait n'avait donc jamais été exécutée ; elle a été supprimée plutôt que réparée, aucune des variables publiées n'en dépendant.
+
+Deux points relevés lors de la même relecture ne modifient pas les variables mais le coût de la production : l'ajustement allouait un \texttt{TGraph} et un \texttt{TF1} par événement sans les libérer, et la recherche de couche dans la table du profil insérait les clés absentes au lieu de les consulter. Tous les résultats de la reprise (sections~\ref{sec:pid-approfondissement} et~\ref{sec:energie-niveau-hits}) sont issus de productions régénérées après ces corrections ; ceux des chapitres~\ref{sec:pid_mlp} à~\ref{sec:analyse_mixte} proviennent de la production initiale.
+
 \section{Hiérarchie des variables et tableau récapitulatif}
 \label{annexe:synthesevars}
 

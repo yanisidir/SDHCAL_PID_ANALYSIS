@@ -75,7 +75,27 @@ def write_tree(df: pd.DataFrame, path: Path) -> None:
 
 
 def check_existing(particles: list[str]) -> int:
-    """Verify that the existing held-out file shares no event with the inputs."""
+    """Verify that the held-out file shares no event with what the models train on.
+
+    What to compare against depends on how the held-out sample came to be, and the
+    two cases need opposite answers:
+
+    *Carved out of the parameter files* by this script. Its events are then by
+    construction still in those files, so comparing with them would report a 100 %
+    overlap for a perfectly good sample. The meaningful counterpart is
+    ``train_pool_<particle>.root``, the complement the training scripts read with
+    ``--exclude-holdout``.
+
+    *An independent production*, as in the two-class study, where the evaluation
+    lot was simulated separately from the training lot. There is no pool, and the
+    parameter files are exactly what the models trained on, so they are the right
+    counterpart. Note that what the check then establishes is narrow: it catches
+    both roles having been pointed at the same lot, but the real separation is a
+    property of the simulations, which no event key can prove.
+
+    The pool is therefore preferred when present, and the parameter file used
+    otherwise.
+    """
     holdout_path = paths.dataset("holdout")
     holdout = rootio.load_trees(holdout_path, TREE, ["particlePDG", "eventNumber"])
     holdout_keys = splits.event_keys(holdout)
@@ -83,31 +103,46 @@ def check_existing(particles: list[str]) -> int:
 
     failures = 0
     for particle in particles:
-        training = rootio.load_trees(
-            paths.dataset("params", particle), TREE, ["particlePDG", "eventNumber"]
-        )
+        pool_path = holdout_path.parent / f"train_pool_{particle}.root"
+        if pool_path.is_file():
+            train_path, kind = pool_path, "training pool"
+        else:
+            train_path, kind = paths.dataset("params", particle, require=False), "training file"
+            if not train_path.is_file():
+                logger.error(
+                    "%-7s neither %s nor %s exists, so there is nothing to compare the "
+                    "held-out sample against",
+                    particle,
+                    pool_path.name,
+                    train_path.name,
+                )
+                failures += 1
+                continue
+        training = rootio.load_trees(train_path, TREE, ["particlePDG", "eventNumber"])
         try:
             report = splits.assert_disjoint(
                 splits.event_keys(training),
                 holdout_keys,
-                name_a=f"training file for {particle}",
+                name_a=f"{kind} for {particle} ({train_path.name})",
                 name_b="held-out sample",
             )
-            logger.info("%-7s disjoint (%d training events checked)", particle, report["n_a"])
+            logger.info(
+                "%-7s disjoint from the %s (%d training events checked)", particle, kind, report["n_a"]
+            )
         except splits.NotDisjoint as exc:
             logger.error("%-7s %s", particle, exc)
             failures += 1
     if failures:
         logger.error(
-            "The held-out sample overlaps the training files, so any end-to-end number measured "
-            "on it is training performance. Rebuild it with this script."
+            "The held-out sample overlaps what the models trained on, so any end-to-end number "
+            "measured on it is training performance."
         )
     return 1 if failures else 0
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--particles", nargs="+", default=list(paths.PARTICLES))
+    parser.add_argument("--particles", nargs="+", default=list(paths.active_particles()))
     parser.add_argument("--fraction", type=float, default=0.15, help="held-out fraction per particle")
     parser.add_argument("--seed", type=int, default=20240601, help="split seed, recorded in the manifest")
     parser.add_argument(
@@ -149,13 +184,19 @@ def main(argv=None) -> int:
         logger.info("%-7s held out %d of %d events", particle, len(held), len(df))
 
     holdout = pd.concat(holdout_frames, ignore_index=True)
-    write_tree(holdout, paths.dataset("holdout", require=False))
+    holdout_path = paths.dataset("holdout", require=False)
+    write_tree(holdout, holdout_path)
 
+    # The complement and the manifest live beside the held-out file rather than at
+    # the top of the data directory: the two-class study writes its own
+    # val_set.root, and a shared name would have one study overwrite the other's
+    # provenance.
+    beside = holdout_path.parent
     if args.write_train_pool:
         for particle, pool in zip(args.particles, pool_frames, strict=True):
-            write_tree(pool, paths.data_dir() / f"train_pool_{particle}.root")
+            write_tree(pool, beside / f"train_pool_{particle}.root")
 
-    manifest_path = paths.data_dir() / MANIFEST
+    manifest_path = beside / MANIFEST
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     logger.info("manifest written to %s", manifest_path)
 

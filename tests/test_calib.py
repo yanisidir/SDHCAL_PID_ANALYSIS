@@ -86,7 +86,7 @@ def test_in_sample_flag_defaults_to_true(tmp_path):
 
 
 def test_missing_file_explains_how_to_produce_it(tmp_path):
-    with pytest.raises(FileNotFoundError, match="EnergyReco.C"):
+    with pytest.raises(FileNotFoundError, match="fit.C"):
         calib.load_all(tmp_path / "absent.json")
 
 
@@ -105,3 +105,62 @@ def test_repository_calibration_file_is_valid():
         assert coeff.values.shape == (9,)
         assert np.all(np.isfinite(coeff.values))
         assert "source" in coeff.metadata
+
+
+# ---------------------------------------------------------------------------
+# The closed-form weighted least squares
+# ---------------------------------------------------------------------------
+def _sample(n=3000, seed=0):
+    rng = np.random.default_rng(seed)
+    return (
+        rng.integers(10, 400, n).astype(float),
+        rng.integers(1, 120, n).astype(float),
+        rng.integers(1, 80, n).astype(float),
+    )
+
+
+def test_design_matrix_reproduces_ereco():
+    """The model is linear in its coefficients; the fit depends on that."""
+    n1, n2, n3 = _sample()
+    values = np.array([4e-2, -2e-5, 1e-8, 1e-1, -5e-5, 1e-8, 1e-1, 5e-4, -2e-7])
+    assert np.allclose(calib.design_matrix(n1, n2, n3) @ values, calib.ereco(n1, n2, n3, values))
+
+
+def test_fit_wls_recovers_the_coefficients_it_generated():
+    n1, n2, n3 = _sample()
+    truth = np.array([4e-2, -2e-5, 1e-8, 1e-1, -5e-5, 1e-8, 1e-1, 5e-4, -2e-7])
+    e_true = calib.ereco(n1, n2, n3, truth)
+    keep = e_true > 0
+    fitted = calib.fit_wls(n1[keep], n2[keep], n3[keep], e_true[keep])
+    assert np.allclose(fitted, truth, rtol=1e-6, atol=1e-12)
+
+
+def test_fit_wls_is_not_beaten_by_a_nearby_parameter_set():
+    """A closed-form minimum must not be improvable by perturbation."""
+    n1, n2, n3 = _sample(seed=7)
+    truth = np.array([4e-2, -2e-5, 1e-8, 1e-1, -5e-5, 1e-8, 1e-1, 5e-4, -2e-7])
+    rng = np.random.default_rng(1)
+    e_true = np.abs(calib.ereco(n1, n2, n3, truth)) * (1.0 + 0.1 * rng.standard_normal(len(n1)))
+    fitted = calib.fit_wls(n1, n2, n3, e_true)
+    best = calib.wls_objective(n1, n2, n3, e_true, fitted)
+    for _ in range(20):
+        nudged = fitted * (1.0 + 1e-3 * rng.standard_normal(9))
+        assert calib.wls_objective(n1, n2, n3, e_true, nudged) >= best
+
+
+def test_fit_wls_refuses_a_non_positive_energy():
+    n1, n2, n3 = _sample(n=10)
+    with pytest.raises(ValueError, match="must be positive"):
+        calib.fit_wls(n1, n2, n3, np.zeros(10))
+    with pytest.raises(ValueError, match="empty sample"):
+        calib.fit_wls(n1[:0], n2[:0], n3[:0], np.array([]))
+
+
+def test_the_two_sample_sets_have_separate_calibration_files(monkeypatch):
+    """The two-class fit must not overwrite the three-class coefficients."""
+    monkeypatch.delenv("SDHCAL_PARAMS_SET", raising=False)
+    three = calib.coefficients_path()
+    monkeypatch.setenv("SDHCAL_PARAMS_SET", "2class")
+    two = calib.coefficients_path()
+    assert three != two
+    assert three.name == "chi2_coefficients.json"

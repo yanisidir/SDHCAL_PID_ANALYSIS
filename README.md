@@ -74,7 +74,7 @@ or derived shower parameters. Maintained scripts resolve their inputs through
 
 **Particle identification**
 
-- LightGBM BDT classifiers using engineered shower variables: `analysis/3_pid/bdt/LGBM_classifier_PID.py`.
+- LightGBM BDT classifiers using engineered shower variables: `analysis/3_pid/bdt/train.py`.
 - Class imbalance handled by SMOTE on the training split only, or by LightGBM class weights; when hyper-parameters are searched, the resampling runs inside each cross-validation fold.
 - scikit-learn MLP baselines with standardization: `analysis/3_pid/mlp/`.
 - Exploratory PyTorch Geometric GNN models using hit-level or graph-like shower representations.
@@ -82,14 +82,14 @@ or derived shower parameters. Maintained scripts resolve their inputs through
 
 **Energy reconstruction**
 
-- LightGBM and MLP regressors trained on derived shower parameters, in log(E) with a bias-corrected back-transform: `hadron_energy_reco_lgbm.py` and `mlp_energy_reco.py`, both taking `--particles pi|kaon|proton|mixed|all`.
+- LightGBM and MLP regressors trained on derived shower parameters, in log(E) with a bias-corrected back-transform: `train.py` and `ml_mlp/train.py`. The maintained two-class MLP accepts `pi`, `proton`, `mix-pi-proton`, or `all`.
 - Semi-digital weighted least-squares calibration with TMinuit on the threshold multiplicities N1, N2, N3, fitted on a training split and evaluated on a held-out one.
 - Main code: `analysis/4_energy/` and `analysis/4_energy/chi2_tminuit/`.
 
 **PID-energy coupling**
 
 - Three cases, quoted together: no PID at all (one inclusive regressor), perfect PID (routing by the true particle) and real PID (routing by the classifier).
-- Main code: `analysis/5_pid_energy/pid_energy_coupling.py`, driven by `--pid` and `--reco`. See [its README](analysis/5_pid_energy/README.md).
+- Main code: `analysis/5_pid_energy/study.py`, driven by `--pid` and `--reco`. See [its README](analysis/5_pid_energy/README.md).
 
 ## Repository Structure
 
@@ -104,9 +104,10 @@ or derived shower parameters. Maintained scripts resolve their inputs through
 ├── analysis/                THE CHAIN, one directory per stage
 │   ├── 1_shower_features/      digitized hits -> shower variables  (C++/ROOT)
 │   ├── 2_variable_study/       how the variables differ by species (ROOT macros)
-│   ├── 3_pid/                  bdt/ mlp/ randomforest/ gnn/ cnn/
+│   ├── 3_pid/                  bdt/ mlp/ gnn/ cnn/
 │   ├── 4_energy/               ml_bdt/ ml_mlp/ chi2_tminuit/
-│   └── 5_pid_energy/           does identifying first help?
+│   ├── 5_pid_energy/           does identifying first help?
+│   └── archive/                obsolete code and historical outputs
 │
 ├── calibration/             chi2 coefficients: one file, read by C++ and Python
 ├── tools/                   utilities outside the chain (held-out sample, log repair)
@@ -192,18 +193,18 @@ directly:
 
 ```bash
 # 3. identification, with and without the timing variables
-python analysis/3_pid/bdt/LGBM_classifier_PID.py --sigma-time 0.1 --seeds 5
-python analysis/3_pid/bdt/LGBM_classifier_PID.py --no-timing
+python analysis/3_pid/bdt/train.py --sigma-time 0.1 --seeds 5
+python analysis/3_pid/bdt/train.py --no-timing
 
 # 4. energy, per particle and with one inclusive regressor
-python analysis/4_energy/ml_bdt/hadron_energy_reco_lgbm.py --particles all --seeds 5
-python analysis/4_energy/ml_bdt/hadron_energy_reco_lgbm.py --particles mixed
-root -l -b -q 'analysis/4_energy/chi2_tminuit/EnergyReco.C("pi")' && make calibration
+python analysis/4_energy/ml_bdt/train.py --particles all --seeds 5
+python analysis/4_energy/ml_bdt/train.py --particles mixed
+root -l -b -q 'analysis/4_energy/chi2_tminuit/fit.C("pi")' && make calibration
 
 # 5. the coupling study: these three numbers belong in the same table
-python analysis/5_pid_energy/pid_energy_coupling.py --pid none --reco bdt   # no PID
-python analysis/5_pid_energy/pid_energy_coupling.py --pid true --reco bdt   # perfect PID
-python analysis/5_pid_energy/pid_energy_coupling.py --pid bdt  --reco bdt   # real PID
+python analysis/5_pid_energy/study.py --pid none --reco bdt   # no PID
+python analysis/5_pid_energy/study.py --pid true --reco bdt   # perfect PID
+python analysis/5_pid_energy/study.py --pid bdt  --reco bdt   # real PID
 ```
 
 Every run writes its full configuration - feature list, smearing width, seeds,
@@ -238,13 +239,13 @@ The results retained in the final report are:
 Additional useful figure locations:
 
 - `results/pid/bdt/feature-interpretation/` - LightGBM feature-importance, SHAP-style summaries, and tree visualizations.
-- `analysis/3_pid/gnn/plots/` - GNN training and confusion-matrix plots.
+- `analysis/archive/results/3_pid/gnn/plots/` - historical GNN training and confusion-matrix plots.
 - `analysis/4_energy/ml_bdt/plots/` - ML energy linearity, relative deviation, and resolution plots.
-- `analysis/4_energy/ml_mlp/results_*_energy_reco/plots/` - MLP regression curves. The per-particle folders are not trustworthy: the three scripts that wrote them were identical and all read the pion file.
+- `analysis/archive/results/4_energy/ml_mlp/results_*_energy_reco/plots/` - historical MLP regression curves. The per-particle folders are not trustworthy: the three scripts that wrote them were identical and all read the pion file.
 - `results/energy-reconstruction/chi2-tminuit/summary-plots/` - chi2/TMinuit reconstruction profiles and diagnostics.
 - `results/shower-variables/plots/` - shower-variable overlays and comparisons.
 - `results/pid-energy-coupling/summary/` - PID-energy coupling summary confusion matrices.
-- `analysis/5_pid_energy/*/plots/` - coupling comparisons. What is labelled "no PID" there is in fact perfect PID; see [analysis/5_pid_energy/README.md](analysis/5_pid_energy/README.md).
+- `analysis/archive/results/*/plots/` - historical coupling comparisons. What is labelled "no PID" there is in fact perfect PID; see [analysis/5_pid_energy/README.md](analysis/5_pid_energy/README.md).
 
 ## Limitations
 

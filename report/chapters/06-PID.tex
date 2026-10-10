@@ -187,4 +187,56 @@ Les descripteurs globaux utilisés jusqu'ici ne conservent qu'une partie de l'in
 
 Des travaux récents confortent cette orientation tout en fournissant des points de comparaison méthodologiques. Sur un DHCAL binaire à RPWELL, des architectures GAT et DeepSets exploitant les coordonnées des amas et leur multiplicité reproduisent notamment une confusion importante entre pions et protons \cite{borysova2025dhcalgnn}. Pour la séparation de gerbes dans l'AHCAL, CALICE observe que DGCNN et GravNet tirent davantage parti des structures locales spatio-temporelles que PointNet \cite{calice2024showerseparation}. Ces résultats suggèrent de comparer un modèle d'ensemble simple à des graphes statiques et dynamiques. Ils ne constituent toutefois pas une validation numérique directe : le milieu actif, le mode de lecture, les espèces, les cibles d'apprentissage et les plages d'énergie diffèrent de ceux de cette étude.
 
-Cette piste, engagée en fin de stage, a permis de mettre en place la représentation des événements sous forme de graphes et une première chaîne d'apprentissage. Son niveau de maturité ne permettait cependant pas encore une comparaison quantitative contrôlée avec LightGBM. Elle est donc présentée comme une étude de faisabilité, destinée à être poursuivie avec des échantillons, des découpages et des conditions instrumentales identiques à ceux de l'approche tabulaire.
+Cette piste, engagée en fin de stage, a d'abord permis de mettre en place la représentation des événements sous forme de graphes et une première chaîne d'apprentissage, sans comparaison quantitative contrôlée. La section suivante rapporte cette comparaison, menée depuis avec des échantillons, des découpages et des sélections identiques à ceux de l'approche tabulaire.
+
+\section{Approfondissement de la confusion pion/proton}
+\label{sec:pid-approfondissement}
+
+Les sections précédentes établissent un résultat net et un verrou. Le résultat est la séparation des $K^0_L$, dont le rappel de $86\,\%$ s'explique par une dynamique d'étrangeté distincte. Le verrou est la confusion pion/proton, qui concentre à elle seule l'essentiel des erreurs et dont l'interprétation donnée plus haut — un recouvrement réel des signatures plutôt qu'une faiblesse du modèle — reste une hypothèse tant qu'elle n'a pas été mise à l'épreuve.
+
+Deux objections pouvaient lui être opposées. La première est que les descripteurs tabulaires ne conservent qu'une partie de l'information topologique : un modèle lisant directement les hits pourrait voir ce qu'ils résument. La seconde est que le volume d'entraînement limitait la performance. Cette section répond à la première ; la littérature répond à la seconde.
+
+\paragraph{Protocole.} L'étude est menée sur deux productions Geant4 pion/proton indépendantes : une production continue de $2\times10^{5}$ événements par espèce entre 1 et 130~GeV pour l'entraînement, et une production à énergies fixes de $10^{5}$ événements par espèce, couvrant vingt points de 5 à 100~GeV, réservée à l'évaluation. L'échantillon d'évaluation n'est donc pas prélevé dans celui d'entraînement : il provient d'une simulation distincte. Ces lots ne contenant pas de $K^0_L$, l'étude porte exactement sur le cas difficile.
+
+Quatre classificateurs sont comparés sur les mêmes événements : le BDT et un perceptron, qui lisent les descripteurs de gerbe, face à un réseau convolutif et un réseau de graphes, qui lisent les amas de hits. Les amas sont formés par quatre-connexité dans chaque couche, selon la définition même de l'observable \texttt{NClusters} (Annexe~\ref{annexe:showeranalyzer}), ce qui divise par environ quatre le nombre d'objets à traiter — $753$ hits deviennent $191$ amas par événement — sans perdre l'information, puisque chaque amas conserve sa position, sa taille et sa composition en seuils.
+
+La figure de mérite retenue est le rejet du proton à efficacité pion fixée, et non l'exactitude : celle-ci dépend du mélange $\pi/p$ de l'échantillon de test, qui est un artefact de la génération, alors qu'un rejet cité à une efficacité donnée n'en dépend pas.
+
+\begin{table}[!ht]
+\centering
+\caption{Rejet du proton à $50\,\%$ d'efficacité pion, sur les $6\,027$ événements que les quatre modèles ont tous prédits. Les deux réseaux au niveau des hits disposent de vingt fois moins d'événements d'entraînement.}
+\label{tab:pid_comparaison}
+\small
+\begin{tabular}{llrrr}
+\toprule
+Modèle & Entrée & $N_{\mathrm{entr.}}$ & AUC & Rejet $1/\varepsilon_p$ \\
+\midrule
+MLP & descripteurs de gerbe & $176\,000$ & $0{,}679$ & $4{,}07$ \\
+BDT & descripteurs de gerbe & $176\,000$ & $0{,}674$ & $4{,}10$ \\
+CNN & amas de hits          & $8\,400$   & $0{,}655$ & $3{,}62$ \\
+GNN & amas de hits          & $8\,400$   & $0{,}649$ & $3{,}54$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.70\linewidth]{Fig/bench_pid_rejection.png}
+\caption{Rejet du proton en fonction de l'efficacité pion, pour les quatre classificateurs.}
+\label{fig:pid_rejection}
+\end{figure}
+
+La valeur intégrée pourrait cependant masquer une dépendance en énergie : un modèle meilleur seulement à basse énergie, là où la statistique est la plus forte, se confondrait avec un modèle uniformément moyen. La Figure~\ref{fig:pid_efficacite_comp} écarte cette lecture.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.74\linewidth]{Fig/bench_pid_efficiency.png}
+\caption{Efficacité pion au point de fonctionnement à $50\,\%$, par tranche d'énergie vraie. Les barres sont binomiales. La séparation s'améliore lentement avec l'énergie, de $\sim\!0{,}40$ à 5~GeV à $\sim\!0{,}60$ à 100~GeV, mais les quatre modèles restent compatibles dans chaque tranche.}
+\label{fig:pid_efficacite_comp}
+\end{figure}
+
+\paragraph{L'accès aux hits ne lève pas le verrou.} Le BDT et le perceptron sont indiscernables l'un de l'autre : sur les descripteurs de gerbe, un arbre renforcé et un réseau dense extraient la même information, ce qui situe la limite dans les variables et non dans la classe de modèle. Les deux réseaux lisant les hits ne font pas mieux — ils sont même en retrait d'environ trois écarts-types — avec la réserve qu'ils ont vu vingt fois moins d'événements. La première objection est donc levée dans le sens de l'hypothèse : l'information topologique fine, que les descripteurs résument, ne contient pas de pouvoir séparateur supplémentaire accessible dans ces conditions.
+
+\paragraph{Le volume d'entraînement n'est pas davantage en cause.} C'est ici que la littérature tranche la seconde objection. L'étude DHCAL déjà citée~\cite{borysova2025dhcalgnn} entraîne ses réseaux sur $2{,}4$ millions d'événements, soit près de trois cents fois le budget employé ici, avec d'autres architectures et un autre détecteur. Elle rapporte une efficacité pion de 46 à $52\,\%$ et la même confusion dominante : $34\,\%$ des pions classés protons et $26\,\%$ des protons classés pions. Le plafond ne se déplace pas.
+
+\paragraph{Conclusion.} Le mécanisme est connu~\cite{akchurin1998proton} : la conservation du nombre baryonique limite la production de $\pi^0$ dans les gerbes de protons, qui fluctuent donc moins, tandis qu'un $\pi^\pm$ incident en produit facilement. Le recouvrement des topologies est une propriété des gerbes hadroniques, non un défaut de statistique, de représentation ou de modèle. La confusion de $47{,}9\,\%$ rapportée à la section~\ref{sec:pid-resultats} doit en conséquence se lire comme une limite mesurée et corroborée, et non comme une marge de progression. Cette lecture a une conséquence directe sur la chaîne complète, développée au chapitre~\ref{sec:analyse_mixte} : il n'est pas raisonnable d'attendre d'un meilleur classificateur qu'il améliore la reconstruction en énergie.

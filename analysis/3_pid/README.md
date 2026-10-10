@@ -1,14 +1,14 @@
 # Stage 3 - Particle identification
 
-Which hadron produced this shower: pi-, p or K0_L? The integer class labels are
-fixed by the order in `sdhcal.paths.PARTICLES`, i.e. 0 = pi-, 1 = p, 2 = K0_L,
-and every model and every confusion matrix in the repository uses that order.
+Which hadron produced this shower? The maintained two-class study uses
+0 = pi- and 1 = proton. The older three-class outputs remain in the repository
+only for traceability.
 
 ```bash
 make pid                                                 # default: 5 seeds, timing on
-python bdt/LGBM_classifier_PID.py --no-timing            # the timing comparison
-python bdt/LGBM_classifier_PID.py --sigma-time 0.05      # another timing resolution
-python bdt/LGBM_classifier_PID.py --no-smote             # class weights instead of SMOTE
+python bdt/train.py --no-timing            # the timing comparison
+python bdt/train.py --sigma-time 0.05      # another timing resolution
+python bdt/train.py --no-smote             # class weights instead of SMOTE
 ```
 
 **Reads** `$SDHCAL_DATA_DIR/params/130k_<particle>_E1to130_params.root`.
@@ -22,29 +22,54 @@ the run record.
 | Directory | Status |
 |---|---|
 | `bdt/` | **The maintained classifier.** LightGBM, with SMOTE applied to the training split only, early stopping on validation, and multi-seed uncertainties. |
-| `mlp/` | scikit-learn MLP baselines on the same engineered variables. |
-| `randomforest/` | tree-based baseline, for comparison. |
-| `gnn/` | exploratory PyTorch Geometric studies on hit-level graphs. Six variants kept as written during the internship; no result in the report depends on them. Needs `requirements-gnn.txt`. |
-| `cnn/` | exploratory convolutional approach, same status. |
+| `mlp/` | Maintained binary scikit-learn MLP baseline on the same engineered variables. |
+| `gnn/` | Binary pion/proton PyTorch Geometric workflow on hit-level graphs. `train.py` is maintained; the other variants are archived internship prototypes. Needs `requirements-gnn.txt`. |
+| `cnn/` | Binary pion/proton hit-level baseline using permutation-invariant point-wise convolutions and masked pooling. |
 
 ### Main scripts
 
-- `bdt/LGBM_classifier_PID.py`: maintained multiclass classifier.
-- `bdt/pion_proton_classifier.py`: binary pion/proton study used by the
-  coupled analysis.
-- `bdt/feature_importance_with_permutation.py` and
-  `bdt/analyse_corr_permutation.py`: interpretation diagnostics.
-- `mlp/hadron_classifier_MLP.py`: three-class MLP baseline.
-- `mlp/2_hadron_classifier_MLP.py`: binary MLP baseline.
-- `gnn/GNN.py` and `gnn/GNN_3_classes.py`: exploratory graph workflows; the
-  other GNN files are development variants retained from the internship.
+- `bdt/train.py`: maintained multiclass classifier.
+- `bdt/interpret.py`: correlation and permutation-importance diagnostics.
+- `mlp/train.py`: maintained binary pion/proton MLP.
+- `mlp/evaluate.py`: evaluation of a saved model on the discrete sample.
+- `mlp/importance.py`: permutation importance on that external validation.
+- `gnn/train.py`: maintained binary pion/proton graph workflow.
+- `cnn/train.py`: maintained binary pion/proton convolutional hit-set workflow.
+
+The older binary BDT, AdaBoost, random-forest and experimental GNN variants are
+under [`../archive/code/3_pid/`](../archive/code/3_pid/). Their historical run
+outputs are under [`../archive/results/3_pid/`](../archive/results/3_pid/).
 
 New LightGBM runs write plots, tables, arrays, models and their JSON run record
 under `$SDHCAL_OUT_DIR/pid_lgbm/`. Historical outputs remain beside the scripts
-for traceability. The exploratory GNN studies require:
+for traceability. The hit-level GNN and CNN studies require:
 
 ```bash
 pip install -r ../../requirements-gnn.txt
+```
+
+The hit-level CSVs must contain `eventNumber`, `x_coords`, `y_coords`,
+`z_coords`, `time` and `thr`. Run the binary workflows from anywhere with:
+
+```bash
+python analysis/3_pid/cnn/train.py --pion-csv /path/pi.csv --proton-csv /path/proton.csv
+python analysis/3_pid/gnn/train.py --pion-csv /path/pi.csv --proton-csv /path/proton.csv
+```
+
+Both scripts make event-disjoint stratified splits, fit preprocessing on train
+only, apply timing smearing exactly once to all events, save the best-validation
+checkpoint, and report AUC, accuracy, balanced accuracy, class efficiencies and
+purities under `$SDHCAL_OUT_DIR`.
+
+The shower-variable MLP reads the parameter shards derived from `new_data`
+under `$SDHCAL_SHARDS_DIR` (default: `<repo>/new_data_params`). It trains and
+calibrates only on the continuous `200k` production and evaluates only on the
+independent `100k` discrete production:
+
+```bash
+python analysis/3_pid/mlp/train.py
+python analysis/3_pid/mlp/train.py \
+  --max-shards-per-particle 1 --max-events-per-particle 1000 --max-epochs 2
 ```
 
 ## What to be careful about

@@ -13,6 +13,9 @@ dependencies = [
     "numpy>=1.24",
     "pandas>=2.0",
     "uproot>=5.0",
+    # uproot already pulls it in, but analysis/4_energy/gnn reads awkward arrays
+    # directly, so the dependency is declared rather than left implicit.
+    "awkward>=2.0",
     "scikit-learn>=1.3",
     "lightgbm>=4.0",
     "imbalanced-learn>=0.11",
@@ -25,14 +28,12 @@ dependencies = [
 dev = ["pytest>=7.4", "ruff>=0.4"]
 # Exploratory graph and convolutional PID studies (analysis/3_pid/{gnn,cnn}).
 gnn = ["torch>=2.0", "torch-geometric>=2.4", "tqdm>=4.65"]
-# SHAP summaries in analysis/3_pid/bdt/plot_trees.py, which degrades gracefully
-# when the package is absent.
+# SHAP summaries in the archived BDT tree visualiser.
 interpret = ["shap>=0.44"]
 
-# Not installable from PyPI: four scripts import ROOT's Python bindings
-# (tools/shower_visualisation.py, analysis/4_energy/ml_bdt/energy_plots.py and
-# the two analysis/5_pid_energy/*/figures.py). They need a ROOT installation,
-# like the C++ stages. Everything else reads ROOT files through uproot.
+# Not installable from PyPI: ROOT is required by the C++ stages and by
+# tools/shower_visualisation.py. Maintained ROOT-file ingestion otherwise uses
+# uproot; archived plotting scripts may still require PyROOT.
 
 # src-layout: the package lives under src/, so an uninstalled checkout cannot
 # shadow it with the working directory. Install it once with `pip install -e .`

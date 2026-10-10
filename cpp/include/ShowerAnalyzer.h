@@ -52,6 +52,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <cstddef>   // size_t
+#include <limits>    // quiet_NaN
 
 // Déclaration anticipée du type Hit
 struct Hit {
@@ -154,11 +155,13 @@ private:
     float tMean_ = 0.0f;
     float tSpread_ = 0.0f;
 
-    // Paramètres du fit Gaisser–Hillas
-    float Nmax_   = 0.0f;
-    float z0_fit_ = 0.0f;
-    float Xmax_   = 0.0f;
-    float lambda_ = 0.0f;
+    // Paramètres du fit Gaisser–Hillas. NaN tant que le fit n'a pas convergé :
+    // zéro était ambigu (une valeur ajustée possible) et 97 % des événements
+    // ressortaient avec la graine de lambda, indiscernable d'un vrai résultat.
+    float Nmax_   = std::numeric_limits<float>::quiet_NaN();
+    float z0_fit_ = std::numeric_limits<float>::quiet_NaN();
+    float Xmax_   = std::numeric_limits<float>::quiet_NaN();
+    float lambda_ = std::numeric_limits<float>::quiet_NaN();
 
     float eccentricity3D_ = 0.0f;
 

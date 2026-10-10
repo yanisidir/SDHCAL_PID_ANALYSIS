@@ -31,11 +31,7 @@ PLACEHOLDERS = ("*", "{", "<", "$")
 
 
 def markdown_files() -> list[Path]:
-    return sorted(
-        path
-        for path in REPO.rglob("*.md")
-        if not SKIPPED_DIRS & set(path.relative_to(REPO).parts)
-    )
+    return sorted(path for path in REPO.rglob("*.md") if not SKIPPED_DIRS & set(path.relative_to(REPO).parts))
 
 
 def test_there_are_documentation_files_to_check():
@@ -142,7 +138,10 @@ def test_makefile_references_existing_files():
         referenced.add(token)
 
     # Build products are created by the targets, not committed.
-    generated = {"analysis/1_shower_features/computeParams", "analysis/1_shower_features/computeParams_parallel"}
+    generated = {
+        "analysis/1_shower_features/extract",
+        "analysis/1_shower_features/extract_parallel",
+    }
     missing = sorted(token for token in referenced - generated if not (REPO / token).exists())
     assert not missing, f"Makefile refers to missing path(s): {missing}"
     assert len(referenced) > 5, "the Makefile path scan found suspiciously little"
@@ -194,10 +193,7 @@ def test_requirements_and_pyproject_agree():
     import tomllib
 
     pyproject = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))
-    declared = {
-        re.split(r"[<>=!\[]", dep)[0].strip().lower()
-        for dep in pyproject["project"]["dependencies"]
-    }
+    declared = {re.split(r"[<>=!\[]", dep)[0].strip().lower() for dep in pyproject["project"]["dependencies"]}
     extras = {
         name.lower()
         for group in pyproject["project"].get("optional-dependencies", {}).values()
@@ -209,8 +205,7 @@ def test_requirements_and_pyproject_agree():
     runtime = listed - extras
 
     assert runtime == declared, (
-        f"requirements.txt only: {sorted(runtime - declared)}; "
-        f"pyproject only: {sorted(declared - runtime)}"
+        f"requirements.txt only: {sorted(runtime - declared)}; pyproject only: {sorted(declared - runtime)}"
     )
 
 
@@ -219,15 +214,16 @@ def test_every_third_party_import_is_declared():
     import tomllib
 
     pyproject = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))
-    declared = {
-        re.split(r"[<>=!\[]", dep)[0].strip().lower()
-        for dep in pyproject["project"]["dependencies"]
-    }
+    declared = {re.split(r"[<>=!\[]", dep)[0].strip().lower() for dep in pyproject["project"]["dependencies"]}
     for group in pyproject["project"].get("optional-dependencies", {}).values():
         declared |= {re.split(r"[<>=!\[]", dep)[0].strip().lower() for dep in group}
 
     # Import name -> distribution name, plus what is not pip-installable.
-    aliases = {"sklearn": "scikit-learn", "imblearn": "imbalanced-learn", "torch_geometric": "torch-geometric"}
+    aliases = {
+        "sklearn": "scikit-learn",
+        "imblearn": "imbalanced-learn",
+        "torch_geometric": "torch-geometric",
+    }
     not_on_pypi = {"root"}  # ROOT's own Python bindings
     import sys
 
@@ -247,6 +243,10 @@ def test_every_third_party_import_is_declared():
                 continue
             for module in modules:
                 if module in standard_library or module == "sdhcal" or module.startswith("_"):
+                    continue
+                # A sibling .py file is a local module, not a distribution: the
+                # scripts under analysis/ import helpers that sit next to them.
+                if (source.parent / f"{module}.py").is_file():
                     continue
                 name = aliases.get(module, module).lower()
                 if name in declared or name in not_on_pypi:

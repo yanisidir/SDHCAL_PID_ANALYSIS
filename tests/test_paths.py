@@ -130,8 +130,8 @@ def test_no_legacy_prefix_survives_in_the_maintained_pipelines():
         "sdhcal/calib.py",
         "sdhcal/rootio.py",
         "sdhcal/target.py",
-        "PID_RECONSTRUCTION/pid_energy_coupling.py",
-        "Energy_reconstruction_ml/MLP/mlp_energy_reco.py",
+        "analysis/5_pid_energy/study.py",
+        "analysis/4_energy/ml_mlp/train.py",
     ]
     offenders = []
     for relative in maintained:

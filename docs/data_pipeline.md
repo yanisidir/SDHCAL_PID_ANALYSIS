@@ -39,6 +39,52 @@ The central derived-data product is a ROOT tree of shower variables. Typical var
 
 These variables are extracted mainly through `analysis/1_shower_features/`.
 
+## Corrections to the shower variables
+
+A review of `cpp/src/ShowerAnalyzer.cpp` found four defects that changed what the
+variables mean. Parameter files produced before these fixes carry the old values.
+
+**`eccentricity3D` was inverted.** `TMatrixDSymEigen::GetEigenValues()` returns
+eigenvalues in *descending* order, so `eig(2)` is the smallest, not the largest.
+The variable computed the smallest eigenvalue over the trace - a sphericity,
+bounded by 1/3 - while its definition (annex 1) is the largest over the trace,
+tending to 1 for an elongated shower. Measured on 200 000 events: median 0.060,
+max 0.295 before; median 0.843 after. Any physical reading of the old values is
+backwards.
+
+**The Gaisser-Hillas fit was not fitting.** Four causes, now fixed:
+
+| Cause | Effect before |
+|---|---|
+| no parameter bounds, and `(x-z0)^k` is NaN for `x < z0` | `lambda` stayed at its seed 10.0 in **97.4 %** of events |
+| the fit status was never checked, and failures wrote the seed | `z0_fit` was 0 in 21.8 %, the other three in 4.1 % |
+| `MAX_LAYER = 29`, against 48 layers in the detector | `Xmax` capped at 290 mm in 99.4 % |
+| `hitsByLayer[base+j]` inserted empty layers *while iterating the map* | zero-signal points injected into the profile |
+
+The depth also came from `layer * 10 mm`, a hard-coded pitch against the SDHCAL's
+~26 mm; the measured `vz` is used instead, so `z0_fit`, `Xmax` and `lambda` are
+now in millimetres. On failure the four parameters are **NaN** rather than a seed
+value, because a failed fit is not a measurement - `rootio.clean` then drops the
+event instead of feeding a fabricated number to a model.
+
+**`primaryEnergy` is copied** from the input when it carries one, which the
+sharded lots do. That removes the separate merge step for them.
+
+**Three variables are exactly redundant**, verified on 200 000 events:
+
+```text
+ratioThr23  = (100 - Thr1) / Thr1        (Thr1+Thr2+Thr3 = 100 exactly)
+tSpread     = tMax - tMin                (tMin std 0.3 ns against tMax std 315 ns)
+AvgClustSize = nHitsTotal / NClusters
+nHitsTotal  = N1+N2+N3 ;  sumThrTotal = N1+2*N2+3*N3
+```
+
+Only the first two are dropped from the PID feature list. A decision tree splits
+on one column at a time and is invariant to a monotone transform of it, so a
+feature that is such a transform of another can never yield a split the other
+could not. The rest are *combinations* of several columns, which a tree cannot
+build from splits, so they earn their place. All of them stay in the files.
+
 ## Per-event bookkeeping branches
 
 Besides the shower observables, `ShowerAnalyzer` writes two branches that exist
@@ -86,6 +132,154 @@ $SDHCAL_DATA_DIR/
 A missing file raises an error naming the variable to set, instead of failing
 inside uproot or returning an empty frame.
 
+## The Two-Class Study (pion/proton)
+
+A later delivery, `new_data_params/`, holds **two independent Geant4 productions**
+with two roles:
+
+| Role | Lot | Events | Energies | Why |
+|---|---|---|---|---|
+| `train` | `200k_pi-`, `200k_proton` | 199 971 / 199 975 | continuous 1-130 GeV | trains the models, calibrates the chi2 |
+| `val` | `100k_pi-_discret`, `100k_proton_discret` | 100 000 each | 20 fixed points, 5-100 GeV in 5 GeV steps, 5 000 events per point | the evaluation sample, and the natural binning of the resolution and linearity curves |
+
+Because they are separate productions, **the evaluation sample is not carved out
+of the training one**. Nothing has to be held out: `tools/build_holdout.py` plays
+no part in this study, and the training stages must not be given
+`--exclude-holdout`. The train/val separation rests on how the samples were
+simulated, which no event key can prove.
+
+The lots carry **no kaon**, so this study separates two species.
+
+They already hold the shower variables, so the C++ extraction does not run, and
+they carry the true energy, so nothing has to be merged. Three things do have to
+be repaired, and `src/sdhcal/shards.py` does all three once:
+
+| Problem in the lots | What is done |
+|---|---|
+| `particlePDG` and `particle1PDG` are `0` in every event | the label is taken from the lot a file belongs to |
+| `eventNumber` restarts at 0 in every shard, so the 200k lots hold 5 000 distinct values for 200 000 events | `shardIndex * 100000 + localEventNumber`, with the shard id read off the *file name* so the key survives a re-listing |
+| the two lots' raw shard ids overlap (0..39 against 2..41) | a per-lot offset, `LOT_ID_BASE`, so a training event and a validation event can never answer to the same key |
+| `touchesLastLayer` was never written | recomputed as `any(K == 47)`; the lots kept their hit branches |
+
+Their tree is `tree` and their energy branch `energy`; both are translated to
+`paramsTree` and `primaryEnergy`.
+
+The last two rows matter more than they look. `splits.event_keys` keys on
+`(particlePDG, eventNumber)`. Used as delivered - a constant PDG on top of an
+event number that restarts - every key would collapse onto one of 5 000 values;
+and without the per-lot offset, 95 000 training events would share a key with a
+validation event.
+
+### Running it
+
+```bash
+python tools/build_2class_params.py          # both roles
+export SDHCAL_PARAMS_SET=2class              # redirects every stage
+make pid energy
+```
+
+This writes, under `<data>/params_2class/`:
+
+```text
+pi_params.root        training sample, pion
+proton_params.root    training sample, proton
+val_set.root          evaluation sample, both species in one tree
+manifest.json         roles, lots, energy points, events per point, derivations
+```
+
+`SDHCAL_PARAMS_SET=2class` is what points `params`, `params_merged` and `holdout`
+at that directory; no stage script holds a second set of paths.
+`python tools/build_2class_params.py --check` re-verifies the files, and
+`--roles val` rebuilds only the evaluation sample.
+
+`$SDHCAL_SHARDS_DIR` points at the lots themselves; it defaults to
+`<repo>/new_data_params`.
+
+### Feature interpretation
+
+`analysis/3_pid/bdt/interpret.py` produces the correlation
+matrix and the permutation importances. It replaces
+`legacy_importance.py`, which could not run on either sample:
+it filtered on a `primaryID` branch present in no parameter file, listed two
+features (`Zbary_thr2`, `Zbary_thr3`) present in neither, named the kaon lot
+unconditionally, and loaded one hard-coded legacy artifact.
+
+The feature list, the species and the time smearing are taken **from the model
+artifact**, so the figures describe the model that was trained rather than a list
+kept in parallel; and the importances are measured on the evaluation lot, so no
+event informing them was ever seen in training.
+
+```bash
+make interpret-2class
+```
+
+**Reading the importance plot.** The script warns about near-duplicate feature
+pairs, and there are two:
+
+| Pair | r | Why |
+|---|---|---|
+| `tMax`, `tSpread` | +1.0000 | `tSpread = tMax - tMin`, and `tMin` is essentially constant (std 0.04 ns) |
+| `Thr1`, `ratioThr23` | -0.9972 | `Thr1 + Thr2 + Thr3 = 100`, so the three fractions carry two degrees of freedom |
+
+Permutation importance shuffles one column at a time, so when two columns carry
+the same information, shuffling either leaves the other intact and both score
+near zero however useful that information is. A low bar on one of these is a
+reason to distrust the measurement, not evidence that the variable does not
+matter.
+
+### The chi2 calibration, fitted out of sample
+
+`analysis/4_energy/chi2_tminuit/fit.C` reads the digitized hits and the
+generator-level files of the three-class sample, and it fitted its coefficients
+and drew its curves on the same events - which is why every coefficient in
+`calibration/chi2_coefficients.json` is flagged `fitted_in_sample`.
+
+The two roles make the honest version possible, and no C++ has to run:
+
+```bash
+python tools/fit_chi2_2class.py        # fit on train, evaluate on val
+```
+
+Two things make this simple. The model depends only on `N1`, `N2`, `N3`, which the
+consolidated files already carry, so the hits are not needed. And it is **linear
+in its nine coefficients** - expanding `alpha(N) N1 + beta(N) N2 + gamma(N) N3`
+gives one column per coefficient - so the weighted least squares
+`sum (Ereco - Etrue)^2 / Etrue` has a closed-form solution. `calib.fit_wls`
+returns the exact global minimum, with no starting values and no convergence to
+check; the TMinuit fit approximated that same minimum from a hand-chosen seed.
+
+The coefficients go to `calibration/chi2_coefficients_2class.json`:
+`calib.coefficients_path()` follows `$SDHCAL_PARAMS_SET` just as `paths.dataset`
+does, so the two studies cannot end up sharing a calibration, and a stage reading
+coefficients cannot end up on a different sample from the stage reading
+parameters.
+
+#### The containment cut goes to every arm or to none
+
+The chi2 chain rejects showers reaching the last active layer, so its
+coefficients are only valid under that cut. Evaluating them on the full sample
+would take the method outside the domain it was fitted on, and comparing it with a
+regressor trained on everything would not be like-for-like. Hence:
+
+```bash
+make energy-2class       # regressors trained with --require-contained
+make chi2-2class         # calibration fitted under the same cut
+make coupling-2class     # five scenarios, all with --require-contained
+```
+
+The cut keeps about half the events (100 744 of 200 000 in the evaluation lot).
+Whichever choice was made is recorded in the calibration metadata and in each
+run's parameter log.
+
+### Excluding held-out events (the three-class study only)
+
+The training stages take `--exclude-holdout`, which drops the events of the
+held-out file before splitting. It exists for a sample *carved* out of the
+parameter files, where the training scripts would otherwise be fitted on the very
+events the coupling study evaluates on. The two-class study needs no such thing,
+since its evaluation sample is a separate production. The flag is recorded in each
+run's parameter log, so a run that used it is distinguishable afterwards.
+
 ## Building the Held-Out Sample
 
 The evaluation sample is not a leftover of a training split: it is carved out
@@ -95,6 +289,11 @@ first, with a recorded seed, and the two halves are asserted disjoint.
 python tools/build_holdout.py --fraction 0.15 --seed 20240601 --write-train-pool
 python tools/build_holdout.py --check      # verify an existing val_set.root
 ```
+
+`--check` compares the held-out sample against `train_pool_<particle>.root`, not
+against the parameter file: the held-out events are carved *out of* that file, so
+they are all still in it, and comparing with it would report a 100 % overlap for a
+correctly built sample. The pool is the complement the training stages read.
 
 This writes `val_set_manifest.json` next to the data, recording the fraction,
 the seed, the per-particle counts and a digest of the held-out event numbers.

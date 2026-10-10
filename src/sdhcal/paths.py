@@ -13,6 +13,9 @@ Environment variable  Meaning                                 Default
 ``SDHCAL_OUT_DIR``    run outputs (plots, logs, arrays)       ``<repo>/output``
 ====================  ======================================  ==============================
 
+The hit-level pion/proton shards use ``SDHCAL_HIT_SHARDS_DIR`` and default to
+``<repo>/new_data``.
+
 Usage::
 
     from sdhcal import paths
@@ -36,7 +39,15 @@ __all__ = [
     "output_dir",
     "dataset",
     "legacy",
+    "params_set",
+    "active_particles",
+    "shards_dir",
+    "hit_shards_dir",
     "PARTICLES",
+    "PARTICLES_2CLASS",
+    "SHARD_SAMPLES",
+    "SHARD_TREE",
+    "SHARD_ENERGY_BRANCH",
     "PARTICLE_PDG",
     "PDG_TO_PARTICLE",
 ]
@@ -49,6 +60,26 @@ PARTICLES = ("pi", "proton", "kaon")
 PARTICLE_PDG: dict[str, int] = {"pi": -211, "proton": 2212, "kaon": 311}
 
 PDG_TO_PARTICLE: dict[int, str] = {v: k for k, v in PARTICLE_PDG.items()}
+
+#: Particles of the two-class study, rebuilt from the sharded lots delivered as
+#: ``new_data_params``. Those lots carry no kaon, and padding the kaon class from
+#: the older three-class sample would train the classifier to separate
+#: *productions* rather than species, so the study is pion/proton only.
+PARTICLES_2CLASS: tuple[str, ...] = ("pi", "proton")
+
+#: The sharded parameter lots: sample name -> particle -> directory under
+#: :func:`shards_dir`. ``200k`` is the continuous 1-130 GeV spectrum, ``discret``
+#: the 5-100 GeV grid in 5 GeV steps.
+SHARD_SAMPLES: dict[str, dict[str, str]] = {
+    "200k": {"pi": "200k_pi-", "proton": "200k_proton"},
+    "discret": {"pi": "100k_pi-_discret", "proton": "100k_proton_discret"},
+}
+
+#: Tree holding the parameters inside a shard, and the branch holding the true
+#: energy there. Both differ from the three-class files, which use ``paramsTree``
+#: and ``primaryEnergy``; ``sdhcal.shards`` translates them once.
+SHARD_TREE = "tree"
+SHARD_ENERGY_BRANCH = "energy"
 
 #: Filename templates, relative to :func:`data_dir`, keyed by dataset kind.
 #: ``{particle}`` is substituted with one of :data:`PARTICLES`.
@@ -64,6 +95,21 @@ _LAYOUT: dict[str, str] = {
     # Held-out evaluation sample, built by tools/build_holdout.py.
     "holdout": "val_set.root",
 }
+
+#: Layout of the two-class study, overriding :data:`_LAYOUT` when
+#: ``SDHCAL_PARAMS_SET=2class``. ``tools/build_2class_params.py`` consolidates the
+#: shards into one file per particle; the true energy travels inside it, so
+#: ``params`` and ``params_merged`` are the same file and no merge step remains.
+#: The held-out sample has its own name so that building it cannot clobber the
+#: three-class ``val_set.root``.
+_LAYOUT_2CLASS: dict[str, str] = {
+    "params": "params_2class/{particle}_params.root",
+    "params_merged": "params_2class/{particle}_params.root",
+    "holdout": "params_2class/val_set.root",
+}
+
+#: Values accepted by ``$SDHCAL_PARAMS_SET``.
+PARAMS_SETS = ("130k", "2class")
 
 
 class DatasetNotFound(FileNotFoundError):
@@ -107,6 +153,46 @@ def output_dir() -> Path:
     return _dir_from_env("SDHCAL_OUT_DIR", "output")
 
 
+def shards_dir() -> Path:
+    """Directory holding the sharded parameter lots (``$SDHCAL_SHARDS_DIR``).
+
+    Defaults to ``<repo>/new_data_params``, where the lots were delivered.
+    """
+    return _dir_from_env("SDHCAL_SHARDS_DIR", "new_data_params")
+
+
+def hit_shards_dir() -> Path:
+    """Directory holding the sharded hit-level pion/proton productions.
+
+    Defaults to ``<repo>/new_data`` and can be overridden with
+    ``SDHCAL_HIT_SHARDS_DIR``.
+    """
+
+    return _dir_from_env("SDHCAL_HIT_SHARDS_DIR", "new_data")
+
+
+def params_set() -> str:
+    """Which generation of parameter files :func:`dataset` resolves to.
+
+    ``"130k"`` (the default) is the original three-class sample. ``"2class"`` is
+    the pion/proton study consolidated from the sharded lots. Selecting it with
+    ``SDHCAL_PARAMS_SET=2class`` points every stage at the new files without
+    touching a single stage script.
+    """
+    value = os.environ.get("SDHCAL_PARAMS_SET") or "130k"
+    if value not in PARAMS_SETS:
+        raise ValueError(
+            f"SDHCAL_PARAMS_SET={value!r} is not one of {PARAMS_SETS}; "
+            "unset it for the original three-class sample."
+        )
+    return value
+
+
+def active_particles() -> tuple[str, ...]:
+    """Particles of the active sample set: two for ``2class``, three otherwise."""
+    return PARTICLES_2CLASS if params_set() == "2class" else PARTICLES
+
+
 def dataset(kind: str, particle: str | None = None, *, require: bool = True) -> Path:
     """Resolve the path of a declared dataset.
 
@@ -116,20 +202,28 @@ def dataset(kind: str, particle: str | None = None, *, require: bool = True) -> 
         One of the keys of :data:`_LAYOUT` (``params``, ``params_merged``,
         ``digitized``, ``raw``, ``holdout``).
     particle:
-        Required for the per-particle datasets; must be one of :data:`PARTICLES`.
+        Required for the per-particle datasets; must be one of
+        :func:`active_particles`.
     require:
         When true (the default), raise :class:`DatasetNotFound` if the file is
         absent. Pass ``False`` to get the intended path of a file to be written.
-    """
-    if kind not in _LAYOUT:
-        raise KeyError(f"unknown dataset kind {kind!r}; known kinds: {sorted(_LAYOUT)}")
 
-    template = _LAYOUT[kind]
+    ``$SDHCAL_PARAMS_SET=2class`` redirects ``params``, ``params_merged`` and
+    ``holdout`` to the two-class layout; see :func:`params_set`.
+    """
+    layout = dict(_LAYOUT)
+    if params_set() == "2class":
+        layout.update(_LAYOUT_2CLASS)
+    if kind not in layout:
+        raise KeyError(f"unknown dataset kind {kind!r}; known kinds: {sorted(layout)}")
+
+    allowed = active_particles()
+    template = layout[kind]
     if "{particle}" in template:
         if particle is None:
-            raise ValueError(f"dataset kind {kind!r} requires a particle among {PARTICLES}")
-        if particle not in PARTICLES:
-            raise ValueError(f"unknown particle {particle!r}; expected one of {PARTICLES}")
+            raise ValueError(f"dataset kind {kind!r} requires a particle among {allowed}")
+        if particle not in allowed:
+            raise ValueError(f"unknown particle {particle!r}; expected one of {allowed}")
         rel = template.format(particle=particle)
     else:
         if particle is not None:

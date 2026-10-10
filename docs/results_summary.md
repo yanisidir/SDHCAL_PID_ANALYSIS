@@ -49,17 +49,17 @@ gain in absolute energy resolution.
 Useful PID locations:
 
 - `results/pid/bdt/feature-interpretation/`
-- `analysis/3_pid/bdt/results_with_time/`
-- `analysis/3_pid/mlp/results/`
-- `analysis/3_pid/gnn/plots/`
+- `analysis/archive/results/3_pid/bdt/results_with_time/`
+- `analysis/archive/results/3_pid/mlp/results/`
+- `analysis/archive/results/3_pid/gnn/plots/`
 - `results/pid-energy-coupling/summary/`
 
 Useful energy-reconstruction locations:
 
 - `analysis/4_energy/ml_bdt/plots/`
-- `analysis/4_energy/ml_bdt/results_all_energy_reco/plots/`
+- `analysis/archive/results/4_energy/ml_bdt/results_all_energy_reco/plots/`
 - `results/energy-reconstruction/chi2-tminuit/summary-plots/`
-- `analysis/5_pid_energy/kaon_pi-_proton/csv/`
+- `analysis/archive/results/kaon_pi-_proton/csv/`
 
 Useful shower-variable locations:
 

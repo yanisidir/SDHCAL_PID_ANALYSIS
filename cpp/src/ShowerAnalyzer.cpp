@@ -52,6 +52,8 @@
 #include "TMatrixDSymEigen.h"
 #include "TString.h"
 #include "TVectorD.h"
+#include "TFitResult.h"
+#include "TFitResultPtr.h"
 #include <TH2I.h>
 #include <TMath.h>
 
@@ -70,6 +72,11 @@
 
 
 
+
+namespace {
+/// Index of the last active layer of the SDHCAL, as in extract.cpp.
+const int kLastLayer = 47;
+}  // namespace
 
 ShowerAnalyzer::ShowerAnalyzer(const std::vector<int>& vThr,
                                const std::vector<int>& vK,
@@ -243,7 +250,7 @@ void ShowerAnalyzer::computeZbaryAndZrms() {
 // so it cannot be confused with a real depth, but it is still handed to the
 // models as a plain number: a tree sees it as an extreme value, which is the
 // intended behaviour, while a neural network would need it encoded separately.
-// This is documented on the output branch in computeParams.cpp as well.
+// This is documented on the output branch in extract.cpp as well.
 void ShowerAnalyzer::computeBeginLayer() {
     // 1) Compter les hits par couche
     std::map<int, int> hitsPerLayer;
@@ -535,14 +542,15 @@ void ShowerAnalyzer::computeLongitudinalProfile() {
 
     // Prune solitary branches
     const int MIN_CHAIN_LENGTH = 5;
-    const double ENERGY_THRESHOLD = 0.1;
     auto pruneOnce = [&]() {
         bool removed = false;
         for (auto it = graph.begin(); it != graph.end(); ) {
             Hit* node = it->first;
             auto& neigh = it->second;
             if (neigh.size() == 1) {
-                if (chainLength(node, graph) < MIN_CHAIN_LENGTH || node->thr < ENERGY_THRESHOLD) {
+                // The old second test, `node->thr < 0.1`, could never fire: thr is
+                // an integer in {1,2,3}. Dropped rather than left as dead code.
+                if (chainLength(node, graph) < MIN_CHAIN_LENGTH) {
                     Hit* parent = neigh[0];
                     auto &pne = graph[parent];
                     pne.erase(std::remove(pne.begin(), pne.end(), node), pne.end());
@@ -557,13 +565,19 @@ void ShowerAnalyzer::computeLongitudinalProfile() {
     };
     while (pruneOnce());
 
-    // Group remaining hits by layer K
-    std::map<int, std::vector<Hit*>> hitsByLayer;
+    // Group remaining hits by layer K, and keep the real depth of each layer
+    // rather than a hard-coded pitch: vz_ is measured, layer * 10 mm was not
+    // (the SDHCAL samples every ~26 mm, so the old constant put z0, Xmax and
+    // lambda in no physical unit at all).
+    std::map<int, std::vector<Hit*> > hitsByLayer;
     for (auto &kv : graph) {
         hitsByLayer[kv.first->K].push_back(kv.first);
     }
 
-    // Find true start layer: >=3 hits for 4 consecutive layers
+    // Find true start layer: >=3 hits for 4 consecutive layers.
+    // Lookup without insertion: operator[] would grow the map with empty layers
+    // while we iterate it, and those layers would then enter the profile below
+    // as artificial zeros - the same trap computeBeginLayer() guards against.
     const int MIN_HITS_PER_LAYER = 3;
     const int CONSECUTIVE_LAYERS = 4;
     int startLayer = -1;
@@ -571,60 +585,87 @@ void ShowerAnalyzer::computeLongitudinalProfile() {
         int base = it->first;
         bool ok = true;
         for (int j = 0; j < CONSECUTIVE_LAYERS; ++j) {
-            if (hitsByLayer[base+j].size() < MIN_HITS_PER_LAYER) { ok = false; break; }
+            const auto found = hitsByLayer.find(base + j);
+            if (found == hitsByLayer.end() ||
+                static_cast<int>(found->second.size()) < MIN_HITS_PER_LAYER) {
+                ok = false;
+                break;
+            }
         }
         if (ok) { startLayer = base; break; }
     }
     if (startLayer < 0 && !hitsByLayer.empty()) startLayer = hitsByLayer.begin()->first;
 
-    // Build longitudinal profile (layer → sum(thr))
-    const double layerThickness = 10.0; // mm, adapter à ton détecteur
-    const int MAX_LAYER = 29;
+    // Build longitudinal profile (layer -> sum(thr)) over the whole detector.
+    // MAX_LAYER used to be 29, which threw away 18 of the 48 layers and capped
+    // Xmax at 290 mm for 99.4 % of events.
     std::vector<double> zvec, Evec;
     for (auto &kv : hitsByLayer) {
-        int layer = kv.first;
-        if (layer < startLayer || layer > MAX_LAYER) continue;
-        double sumThr = 0;
-        for (Hit* ph : kv.second) sumThr += ph->thr;
-        zvec.push_back(layer * layerThickness);
+        const int layer = kv.first;
+        if (layer < startLayer || layer > kLastLayer) continue;
+        if (kv.second.empty()) continue;
+        double sumThr = 0.0, sumZ = 0.0;
+        for (Hit* ph : kv.second) { sumThr += ph->thr; sumZ += ph->z; }
+        zvec.push_back(sumZ / static_cast<double>(kv.second.size()));
         Evec.push_back(sumThr);
     }
-    if (zvec.size() < 5) {
-        std::cerr << "Not enough points (" << zvec.size() << ")\n";
-        return;
-    }
+    if (zvec.size() < 5) return;   // leaves the NaN sentinels in place
 
     // Smooth (moving average, window=5)
     std::vector<double> E_smooth(Evec.size());
-    int w = 2;
+    const int w = 2;
     for (size_t i = 0; i < Evec.size(); ++i) {
-        int L = std::max<int>(0, i - w);
-        int U = std::min<int>(Evec.size()-1, i + w);
-        double s = 0;
-        for (int j = L; j <= U; ++j) s += Evec[j];
-        E_smooth[i] = s / (U - L + 1);
+        const int L = std::max<int>(0, static_cast<int>(i) - w);
+        const int U = std::min<int>(static_cast<int>(Evec.size()) - 1, static_cast<int>(i) + w);
+        double acc = 0.0;
+        for (int k = L; k <= U; ++k) acc += Evec[k];
+        E_smooth[i] = acc / (U - L + 1);
     }
 
-    // --- 4) construction du TGraph et fit Gaisser–Hillas ---
-    TGraph *gr = new TGraph(zvec.size(), &zvec[0], &E_smooth[0]);
-    gr->SetName(Form("longProf_evt%lu", static_cast<unsigned long>(nHitsTotal_)));
-    gr->SetTitle(Form("Profil longitudinal;profondeur [mm];sum(thr)"));
+    // --- Gaisser-Hillas fit ---------------------------------------------------
+    // Stack objects: the previous version leaked one TGraph and one TF1 per
+    // event, and re-registered a TF1 named "gh" in ROOT's global list each time.
+    const double zFront = zvec.front();
+    const double zBack  = zvec.back();
+    if (!(zBack > zFront)) return;
 
-    TF1 *gh = new TF1("gh",
-        "[0]*pow((x-[1])/( [2]-[1] ),(( [2]-[1] )/[3]))*exp((([2]-x)/[3]))",
-        zvec.front(), zvec.back());
-    gh->SetParameters(*std::max_element(E_smooth.begin(), E_smooth.end()),
-                      zvec.front(), zvec[zvec.size()/2], 10);
-    gh->SetParNames("Nmax","z0","Xmax","lambda");
-    gr->Fit("gh","Q");
+    TGraph gr(static_cast<int>(zvec.size()), &zvec[0], &E_smooth[0]);
+    TF1 gh("gh_local",
+           "[0]*pow((x-[1])/([2]-[1]),(([2]-[1])/[3]))*exp((([2]-x)/[3]))",
+           zFront, zBack);
+    gh.SetParNames("Nmax", "z0", "Xmax", "lambda");
 
-    // 5) Stockage des résultats
-    Nmax_   = gh->GetParameter(0);
-    z0_fit_ = gh->GetParameter(1);
-    Xmax_   = gh->GetParameter(2);
-    lambda_ = gh->GetParameter(3);
+    const double peak = *std::max_element(E_smooth.begin(), E_smooth.end());
+    const double span = zBack - zFront;
+    const size_t iPeak = static_cast<size_t>(
+        std::max_element(E_smooth.begin(), E_smooth.end()) - E_smooth.begin());
+    gh.SetParameters(peak, zFront - 0.05 * span, zvec[iPeak], 0.25 * span);
 
+    // Bounds matter here. (x-z0)^((Xmax-z0)/lambda) is NaN as soon as x < z0, so
+    // an unbounded z0 walking above the first point kills the minimisation; and
+    // lambda was previously free to stay exactly at its seed, which it did in
+    // 97 % of events.
+    // Xmax is held inside the measured profile. Letting it run past the last
+    // layer lets the minimiser place the peak where there is no data and use
+    // Nmax as an extrapolated amplitude: the residuals improve, but Nmax stops
+    // being the height of anything. With the loose bound its correlation with
+    // the true energy fell to +0.08, against +0.94 for the total signal.
+    // A shower whose maximum is genuinely past the calorimeter is not one whose
+    // maximum this fit can measure, and the containment flag already marks it.
+    gh.SetParLimits(0, 0.0, 1.0e3 * std::max(1.0, peak));
+    gh.SetParLimits(1, zFront - 2.0 * span, zFront - 1.0e-3 * span);
+    gh.SetParLimits(2, zFront, zBack);
+    gh.SetParLimits(3, 0.05 * span, 2.0 * span);
 
+    // "Q" quiet, "N" do not draw, "S" return the status.
+    const TFitResultPtr result = gr.Fit(&gh, "QNS");
+    const bool converged = result.Get() != nullptr && result->IsValid();
+    if (!converged) return;   // leaves the NaN sentinels: a failed fit is not a measurement
+
+    Nmax_   = static_cast<float>(gh.GetParameter(0));
+    z0_fit_ = static_cast<float>(gh.GetParameter(1));
+    Xmax_   = static_cast<float>(gh.GetParameter(2));
+    lambda_ = static_cast<float>(gh.GetParameter(3));
 }
 
 void ShowerAnalyzer::computeEccentricity3D() {
@@ -666,13 +707,17 @@ void ShowerAnalyzer::computeEccentricity3D() {
     // Normalisation par N (cohérent avec le reste de ta classe)
     cov *= (1.0 / static_cast<double>(nHitsTotal_));
 
-    // 3) Valeurs propres (ordre croissant)
+    // 3) Valeurs propres. ROOT les renvoie en ordre DECROISSANT, donc eig(0) est
+    //    la plus grande. Le code prenait eig(2), c'est-a-dire la plus petite, ce
+    //    qui calculait l'inverse de la definition : la variable etait bornee par
+    //    1/3 (mediane 0.06) au lieu de tendre vers 1 pour une gerbe allongee.
     TMatrixDSymEigen eigenSolver(cov);
     const TVectorD& eig = eigenSolver.GetEigenValues();
 
+    const double largest = std::max(eig(0), std::max(eig(1), eig(2)));
     const double sum = eig(0) + eig(1) + eig(2);
-    eccentricity3D_ = (sum > 0.0) 
-        ? static_cast<float>(eig(2) / sum)   // plus grande VP / somme
+    eccentricity3D_ = (sum > 0.0)
+        ? static_cast<float>(largest / sum)   // plus grande VP / trace
         : 0.f;
 }
 

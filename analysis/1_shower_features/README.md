@@ -5,8 +5,8 @@ later stage reads the output of this one.
 
 ```bash
 make features                                       # every particle
-./computeParams <input.root> tree <output.root>      # one file
-IN=... OUT=... ./run_parallel.sh                     # many files, in parallel
+./extract <input.root> tree <output.root>      # one file
+IN=... OUT=... ./parallel.sh                     # many files, in parallel
 ```
 
 **Reads** `$SDHCAL_DATA_DIR/digitized/130k_<particle>_E1to130_digitized.root`,
@@ -18,11 +18,11 @@ tree `tree`, branches `thr`, `K`, `x`, `y`, `z`, `I`, `J`, `time`,
 
 ## Files
 
-- `computeParams.cpp`: event-loop driver. Takes input/tree/output on the command
+- `extract.cpp`: event-loop driver. Takes input/tree/output on the command
   line, or processes every particle under `$SDHCAL_DATA_DIR`.
-- `computeParams_parallel.cpp`: variant that appends the parameter branches to an
+- `extract_parallel.cpp`: variant that appends the parameter branches to an
   existing tree, for use with GNU parallel.
-- `run_parallel.sh`: driver for the parallel variant; directories come from
+- `parallel.sh`: driver for the parallel variant; directories come from
   `IN`, `OUT` and `SDHCAL_DATA_DIR`.
 
 The observable computation itself lives in [`../../cpp/`](../../cpp/) -
@@ -58,5 +58,5 @@ The analyzer computes variables used downstream for PID and energy reconstructio
 A ROOT file holding a `paramsTree` with one entry per event: the shower
 observables, `particlePDG`, `eventNumber` and `touchesLastLayer`.
 
-Compiled objects and binaries are build products, not source: `computeParams`
-and `computeParams_parallel` are git-ignored, and `make clean` removes them.
+Compiled objects and binaries are build products, not source: `extract`
+and `extract_parallel` are git-ignored, and `make clean` removes them.

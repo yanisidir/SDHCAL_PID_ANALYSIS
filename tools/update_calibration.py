@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Merge the per-particle chi2 fit fragments into the shared calibration file.
 
-``EnergyReco.C`` writes ``calibration/fit_<particle>.json`` after each fit. This
+``fit.C`` writes ``calibration/fit_<particle>.json`` after each fit. This
 merges those fragments into ``calibration/chi2_coefficients.json``, the single
 file that :mod:`sdhcal.calib` reads, so the coefficients are never retyped into
 a Python script again.
@@ -73,7 +73,7 @@ def read_fragment(path: Path, particle: str) -> calib.Coefficients:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--particles", nargs="+", default=list(paths.PARTICLES))
+    parser.add_argument("--particles", nargs="+", default=list(paths.active_particles()))
     parser.add_argument("--dry-run", action="store_true", help="show what would change")
     args = parser.parse_args(argv)
 
@@ -81,7 +81,7 @@ def main(argv=None) -> int:
     if not fragments:
         logger.error(
             "no fragment found. Produce one first:\n"
-            "    root -l -b -q 'energy_reconstruction_Tminuit/EnergyReco.C(\"pi\")'"
+            "    root -l -b -q 'energy_reconstruction_Tminuit/fit.C(\"pi\")'"
         )
         return 1
 

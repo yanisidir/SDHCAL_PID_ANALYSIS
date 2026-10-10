@@ -92,3 +92,35 @@ Les courbes de dispersion diminuent avec l'énergie et restent proches entre les
 Cette comparaison ne permet pas d'isoler séparément le gain d'un PID parfait, le coût des erreurs de classification et le gain propre à chaque régresseur, car toutes les combinaisons correspondantes n'ont pas été étudiées. Elle ne compare pas non plus les chaînes à un estimateur inclusif optimisé sans PID. Il serait donc excessif de conclure que le PID surpasse systématiquement toute méthode indépendante de l'espèce.
 
 La stabilité des résultats vis-à-vis de la composition du mélange et des incertitudes systématiques de simulation reste à étudier. Les résultats établissent néanmoins une tendance cohérente : l'information d'espèce peut réduire certains biais de calibration, tandis que les dispersions restent dominées par les fluctuations intrinsèques des gerbes.
+
+\section{Lever la réserve : le gain vient-il du PID ou du régresseur ?}
+\label{sec:coupling-revision}
+
+La première de ces limites est la plus gênante, car elle porte sur la conclusion elle-même : si la seule référence sans identification est une calibration pion appliquée aux protons, tout estimateur qui tient compte de l'espèce paraîtra meilleur, qu'il ait ou non appris quoi que ce soit de la morphologie des gerbes. Les deux productions pion/proton de la section~\ref{sec:pid-approfondissement} permettent de séparer les deux effets, en croisant la \emph{source de l'étiquette} — aucune, prédite, vraie — avec le \emph{régresseur} qui la consomme.
+
+\begin{table}[!ht]
+\centering
+\caption{Biais moyen et résolution globale selon la source de l'étiquette d'espèce et le régresseur. Même sélection et même échantillon d'évaluation sur toutes les lignes ; les coefficients de calibration sont ajustés hors échantillon.}
+\label{tab:coupling_revision}
+\small
+\begin{tabular}{llrr}
+\toprule
+Étiquette & Régresseur & Biais moyen [\%] & $\sigma/E$ \\
+\midrule
+aucune (référence pion) & $\chi^2$ & $-1{,}36$ & $0{,}1342$ \\
+prédite (BDT)           & $\chi^2$ & $+0{,}60$ & $0{,}1287$ \\
+vraie                   & $\chi^2$ & $-0{,}27$ & $0{,}1295$ \\
+\midrule
+prédite (BDT)           & BDT      & $+2{,}02$ & $0{,}1201$ \\
+vraie                   & BDT      & $+1{,}88$ & $0{,}1199$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Les trois premières lignes reproduisent le résultat du chapitre : à régresseur paramétrique fixé, passer d'une calibration pion universelle à une calibration routée par espèce fait gagner $0{,}005$ en résolution, et l'étiquette prédite suffit — elle fait même marginalement mieux que l'étiquette vraie, ce qui indique que l'écart entre les deux dernières lignes n'est plus significatif à cette statistique.
+
+Les deux dernières lignes renversent la lecture. Dès que le régresseur est un BDT entraîné sur le mélange, l'étiquette ne porte plus rien : remplacer la prédiction du classificateur par la \emph{vérité} ne déplace la résolution que de $0{,}0002$, soit un quart de la dispersion de graine du BDT lui-même ($0{,}1200 \pm 0{,}0008$ sur cinq graines, section~\ref{sec:energie-niveau-hits}). Le changement de régresseur, lui, vaut $0{,}009$ — quarante fois plus.
+
+L'interprétation est que les descripteurs de gerbe utilisés par le régresseur contiennent déjà l'information d'espèce dont il a besoin : ce sont en grande partie ceux-là mêmes sur lesquels le classificateur s'appuie (section~\ref{sec:pid-donnees}). Router explicitement revient alors à lui fournir une projection appauvrie de ce qu'il lit déjà. Le gain attribué au PID au paragraphe précédent était celui du remplacement d'une calibration universelle inadaptée, non celui de la connaissance de l'espèce.
+
+Deux réserves subsistent. Le biais résiduel de $+2\,\%$ de la chaîne BDT n'est pas imputable aux erreurs d'identification, puisque l'étiquette vraie le laisse à $+1{,}88\,\%$ : il appartient au régresseur. Et ce constat est établi pour un mélange pion/proton équilibré ; une composition fortement asymétrique, ou l'ajout d'une espèce que le régresseur n'a pas vue à l'entraînement, pourrait rendre l'étiquette utile à nouveau.

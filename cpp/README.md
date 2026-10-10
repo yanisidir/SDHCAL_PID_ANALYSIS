@@ -18,7 +18,7 @@ n'importe quel répertoire.
 
 Vérification de la compilation : `make cpp` depuis la racine du dépôt. Pour
 construire l'exécutable principal sans lancer l'analyse :
-`make analysis/1_shower_features/computeParams`.
+`make analysis/1_shower_features/extract`.
 
 ## ShowerAnalyzer – Analyse de gerbes hadroniques
 
@@ -95,7 +95,7 @@ float ratio = analyzer.getRatioThr23();
 ```
 cpp/include/ShowerAnalyzer.h              // En-tête
 cpp/src/ShowerAnalyzer.cpp                // Implémentation
-analysis/1_shower_features/computeParams.cpp   // Boucle sur les événements
+analysis/1_shower_features/extract.cpp   // Boucle sur les événements
 ```
 
 ## Exemple minimal

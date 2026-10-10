@@ -5,10 +5,10 @@ Does identifying the hadron first improve the reconstruction of its energy?
 Everything is driven by one script:
 
 ```bash
-python pid_energy_coupling.py --pid bdt  --reco bdt    # realistic chain
-python pid_energy_coupling.py --pid true --reco bdt    # perfect-PID upper bound
-python pid_energy_coupling.py --pid none --reco bdt    # no PID at all: the baseline
-python pid_energy_coupling.py --pid bdt  --reco chi2   # semi-digital calibration
+python study.py --pid bdt  --reco bdt    # realistic chain
+python study.py --pid true --reco bdt    # perfect-PID upper bound
+python study.py --pid none --reco bdt    # no PID at all: the baseline
+python study.py --pid bdt  --reco chi2   # semi-digital calibration
 ```
 
 The three `--pid` modes are the point of the study and must be quoted together:
@@ -25,7 +25,7 @@ possibly buy; the gap between `none` and `bdt` is how much it actually buys.
 `--pid none` needs an inclusive regressor, trained with:
 
 ```bash
-python ../4_energy/ml_bdt/hadron_energy_reco_lgbm.py --particles mixed
+python ../4_energy/ml_bdt/train.py --particles mixed
 ```
 
 ## Pointing at the models
@@ -42,7 +42,7 @@ Which run feeds the coupling study is a decision, so it is not guessed. Either
 pass the paths:
 
 ```bash
-python pid_energy_coupling.py --pid bdt --reco bdt \
+python study.py --pid bdt --reco bdt \
   --classifier "$SDHCAL_OUT_DIR/pid_lgbm/models/lgbm_pid_7_seed42.joblib" \
   --regressor pi=".../lgbm_regressor_pi_3_seed42.joblib" \
   --regressor proton=".../lgbm_regressor_proton_3_seed42.joblib" \
@@ -79,7 +79,7 @@ Earlier summary confusion matrices are kept in
 
 These are exploratory internship studies, not final detector-performance claims.
 
-## On the files already in this directory
+## Historical files
 
 The CSVs and figures here predate the current methodology, and **their names do
 not say what they are**:
@@ -91,19 +91,17 @@ not say what they are**:
 * No genuine PID-agnostic baseline exists in this directory, because no
   inclusive regressor had been trained.
 
-They are kept because `figures.py` reads them and because they are part of the
-record of the internship, but any comparison drawn from them should be labelled
-"real PID versus perfect PID".
+They are kept under [`../archive/results/`](../archive/results/) as part of the
+internship record, but any comparison drawn from them should be labelled "real
+PID versus perfect PID".
 
-`figures.py` still works: `pid_energy_coupling.py` writes its per-event CSV with
-the same column names (`E_true_GeV`, `E_pred_GeV`, `label_true`,
-`label_true_int`).
+The archived plotting scripts expect the same historical CSV layout.
 
 ## The fifteen scripts that used to be here
 
 `BDT_BDT.py`, `BDT_chi2.py`, `MLP_BDT.py`, `MLP_MLP.py`, `MLP_chi2.py`,
 `noPID_BDT.py`, `noPID_MLP.py`, `noPID_chi2.py` and `hadron_pid_reco_linear.py`,
 across both `pi-_proton/` and `kaon_pi-_proton/`, were copies differing by a few
-literals. They are in the git history; `pid_energy_coupling.py` covers all of
+literals. They are in the git history; `study.py` covers all of
 their combinations and fixes three defects they shared: the mislabelled
 baseline, the unverified held-out sample, and `tMin` being smeared twice.

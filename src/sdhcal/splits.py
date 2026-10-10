@@ -34,6 +34,7 @@ __all__ = [
     "event_keys",
     "overlap_report",
     "assert_disjoint",
+    "exclude_keys",
     "NotDisjoint",
 ]
 
@@ -175,3 +176,23 @@ def assert_disjoint(
             "Evaluating on these events would report training performance."
         )
     return report
+
+
+def exclude_keys(
+    df: pd.DataFrame,
+    keys: Iterable[str],
+    *,
+    key_cols: Sequence[str] = ("particlePDG", "eventNumber"),
+) -> tuple[pd.DataFrame, int]:
+    """Drop the rows of ``df`` whose event key is in ``keys``.
+
+    This is what makes a held-out sample mean anything: ``build_holdout.py`` carves
+    the sample out of the parameter files, but the training scripts read those same
+    files, so without this the models would be fitted on the very events the
+    coupling study evaluates on. Returns the filtered frame and how many rows went.
+    """
+    wanted = set(keys)
+    if not wanted:
+        return df, 0
+    mask = ~event_keys(df, key_cols).isin(wanted)
+    return df.loc[mask].reset_index(drop=True), int((~mask).sum())

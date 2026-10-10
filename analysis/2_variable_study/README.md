@@ -5,7 +5,7 @@ species at all. This is what justifies the feature list used in stage 3.
 
 ```bash
 make variables                       # every macro
-root -l -b -q compareDensity.C       # one of them
+root -l -b -q density.C       # one of them
 ```
 
 **Reads** the merged parameter files under `$SDHCAL_DATA_DIR`, resolved through
@@ -15,11 +15,11 @@ root -l -b -q compareDensity.C       # one of them
 
 | Macro | Variable |
 |---|---|
-| `compareBegin.C` | shower start layer |
-| `compareDensity.C` | local hit density |
-| `compareRadius.C` | transverse radius |
-| `compareThr3.C` | fraction of third-threshold hits |
-| `compareEmFraction.C` | electromagnetic-like fraction |
+| `begin.C` | shower start layer |
+| `density.C` | local hit density |
+| `radius.C` | transverse radius |
+| `thr3.C` | fraction of third-threshold hits |
+| `em_fraction.C` | electromagnetic-like fraction |
 
 The committed PDFs (`Begin.pdf`, `Density.pdf`, `Radius.pdf`, `Thr3.pdf`,
 `emFraction.pdf`) are the outputs of these macros on the internship samples.

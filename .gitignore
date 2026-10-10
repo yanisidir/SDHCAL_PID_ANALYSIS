@@ -53,8 +53,10 @@ ENV/
 *_C_ACLiC_dict*
 build/
 cmake-build-*/
-analysis/1_shower_features/computeParams
-analysis/1_shower_features/computeParams_parallel
+analysis/1_shower_features/extract
+analysis/1_shower_features/extract_parallel
+analysis/archive/build/
+analysis/archive/cache/
 
 # ---------------------------------------------------------------------------
 # Detector data and generated tables
@@ -71,6 +73,11 @@ analysis/1_shower_features/computeParams_parallel
 *.npy
 data/
 datasets/
+# The sharded parameter lots of the two-class study: inputs, not artifacts, and
+# several GB of them. Their *.root files are already covered above; naming the
+# directories keeps a stray log or manifest out too.
+new_data/
+new_data_params/
 local_data/
 
 # The chi2 calibration is small, textual and the single source of truth shared
@@ -122,3 +129,14 @@ nohup.out
 *.snm
 *.vrb
 report/build/
+
+# Historical files moved out of the active analysis tree remain versioned so a
+# commit records renames rather than silent deletions. Rebuildable binaries and
+# bytecode stay ignored through the explicit archive/build and archive/cache
+# rules above.
+!analysis/archive/
+!analysis/archive/README.md
+!analysis/archive/code/
+!analysis/archive/code/**
+!analysis/archive/results/
+!analysis/archive/results/**

@@ -49,6 +49,23 @@ make coupling     # 5  (the three --pid modes, which belong in one table)
 `make help` lists every target. Each target just calls the stage's own script,
 so you can always run that script directly with your own arguments.
 
+## File names
+
+Source files use short role-based names consistently across methods:
+
+- `train.py` trains a model;
+- `evaluate.py`, `predict.py`, `interpret.py` and `importance.py` perform the
+  corresponding post-training task;
+- `fit.C`, `linear.C`, `plots.C` and `validate.C` are ROOT macros;
+- `extract.cpp` and `extract_parallel.cpp` build the shower variables.
+
+Historical plots, tables and logs keep their original run-specific names so
+their provenance is not lost.
+
+Superseded code and historical run outputs have been collected under
+[`archive/`](archive/). The archive is not called by the Makefile and is kept
+only for provenance; maintained stages must not import from it.
+
 ## Conventions shared by every stage
 
 **Inputs** come from `$SDHCAL_DATA_DIR`, never from a path written into a

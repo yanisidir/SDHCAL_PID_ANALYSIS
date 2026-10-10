@@ -111,17 +111,66 @@ Une résolution calorimétrique est souvent ajustée par
 \label{eq:fit-ab}
 \end{equation}
 
-Un ajustement fiable de $a$ et $b$ exige une estimation non biaisée de la largeur dans chaque tranche d'énergie ainsi que ses incertitudes. Ces paramètres ne sont donc pas extraits des courbes présentées ici.
+Un ajustement fiable de $a$ et $b$ exige une estimation non biaisée de la largeur dans chaque tranche d'énergie ainsi que ses incertitudes. Ces conditions n'étaient pas réunies pour les courbes présentées plus haut, dont la largeur est extraite d'un c\oe{}ur tronqué non corrigé ; les paramètres n'en sont donc pas tirés.
 
-\subsection{Perspective : reconstruction graphique hit par hit}
+Elles le sont en revanche sur la production à énergies fixes décrite à la section~\ref{sec:energie-niveau-hits}, qui fournit vingt points d'énergie avec une statistique suffisante par point. Les résultats correspondants sont rassemblés au Tableau~\ref{tab:energie_comparaison}. Séparer les deux termes n'est pas une commodité d'écriture : $a$ est fixé par les fluctuations d'échantillonnage du détecteur, tandis que $b$ regroupe ce qui ne s'améliore pas avec la statistique — dispersion de calibration, fuites, non-compensation. Une résolution citée à une seule énergie confond les deux et masque \emph{lequel} un estimateur a réellement amélioré.
+
+\subsection{Reconstruction au niveau des hits}
+\label{sec:energie-niveau-hits}
 
 Une extension naturelle consisterait à appliquer un réseau graphique directement aux hits semi-digitaux. Sur le prototype CMS HGCAL complété par l'AHCAL, un réseau à réduction dynamique (DRN) a été entraîné sur les amplitudes et les coordonnées des cellules, puis validé sur des données de faisceau de pions \cite{aamir2024hgcalgnn}. Le graphe y est reconstruit dans un espace latent, traité par des opérations de type EdgeConv, puis réduit hiérarchiquement avant la régression. Dans cette configuration analogique, le DRN améliore d'environ un facteur deux la résolution par rapport à une sommation pondérée et apprend en particulier à compenser une partie des fluctuations de la composante électromagnétique et des fuites.
 
-Pour le SDHCAL, une transposition prudente serait de conserver l'estimateur semi-digital comme échelle de référence et d'apprendre une correction événementielle,
+Pour le SDHCAL, la transposition prudente consiste à conserver l'estimateur semi-digital comme échelle de référence et à apprendre une correction événementielle,
 \begin{equation}
 E_{\mathrm{reco}}=E_{\mathrm{SD}}\,C_{\theta}(G),
+\label{eq:correction-graphique}
 \end{equation}
-où $G$ contient les positions, les seuils et, après validation instrumentale, les temps des hits. Cette construction préserverait l'interprétation de la calibration à trois seuils tout en donnant accès à la morphologie fine de la gerbe. Les performances publiées pour HGCAL ne constituent cependant pas un objectif numérique pour cette étude : le détecteur est analogique, seuls les pions sont considérés, une partie du gain provient de la correction des fuites, et la largeur est extraite par un ajustement gaussien du c\oe ur de la distribution.
+où $G$ contient les positions, les seuils et les temps des hits. Cette construction préserve l'interprétation de la calibration à trois seuils tout en donnant accès à la morphologie fine de la gerbe. Les performances publiées pour HGCAL ne constituent cependant pas un objectif numérique : le détecteur est analogique, seuls les pions sont considérés, une partie du gain provient de la correction des fuites, et la largeur y est extraite par un ajustement gaussien du c\oe{}ur de la distribution.
+
+\paragraph{Mise en \oe{}uvre.} Cette construction a été réalisée sur les deux productions pion/proton décrites à la section~\ref{sec:pid-approfondissement} : ajustement de la calibration $\chi^2$ et entraînement du réseau sur la production continue, évaluation sur la production à énergies fixes. Le réseau prend en entrée les amas de hits — environ $191$ par événement — et apprend $\log\!\left(E_{\mathrm{vrai}}/E_{\chi^2}\right)$, c'est-à-dire le logarithme du facteur $C_\theta$ de l'équation~\ref{eq:correction-graphique}.
+
+Les coefficients de la calibration servant de référence sont eux-mêmes ajustés hors échantillon, ce qui n'était pas le cas de ceux de la section~\ref{sec:energie-res-chi2} : sur les mêmes événements d'évaluation, ce seul changement ramène le biais du pion de $-1{,}81\,\%$ à $-0{,}07\,\%$ et celui du proton de $-2{,}24\,\%$ à $-0{,}46\,\%$.
+
+\begin{table}[!ht]
+\centering
+\caption{Termes stochastique et constant de l'équation~\ref{eq:fit-ab}, résolution globale et écart maximal de la réponse à l'unité. Évaluation sur les $100\,744$ événements confinés de la production à énergies fixes, avec la même sélection pour tous les estimateurs.}
+\label{tab:energie_comparaison}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Estimateur & $N_{\mathrm{entr.}}$ & $a$ [\%] & $b$ [\%] & $\sigma/E$ & $\max|\mathcal{R}-1|$ \\
+\midrule
+Réseau sur amas, cible $C_\theta$ & $79\,451$  & $45{,}5 \pm 1{,}0$ & $6{,}4 \pm 0{,}2$ & $0{,}1115$ & $0{,}028$ \\
+BDT, cible $C_\theta$             & $176\,000$ & $53{,}7 \pm 1{,}0$ & $5{,}6 \pm 0{,}3$ & $0{,}1197$ & $0{,}052$ \\
+BDT, cible énergie                & $176\,000$ & $53{,}6 \pm 1{,}1$ & $5{,}6 \pm 0{,}3$ & $0{,}1199$ & $0{,}054$ \\
+Calibration $\chi^2$              & ---        & $54{,}4 \pm 1{,}2$ & $7{,}0 \pm 0{,}3$ & $0{,}1295$ & $0{,}031$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.74\linewidth]{Fig/bench_energy_resolution.png}
+\caption{Résolution en énergie des estimateurs comparés. Les traits discontinus représentent l'ajustement de l'équation~\ref{eq:fit-ab}.}
+\label{fig:energie_resolution_comp}
+\end{figure}
+
+\paragraph{Le terme stochastique est un plancher, sauf au niveau des hits.} La calibration $\chi^2$ et les deux variantes du BDT sont compatibles autour de $54\,\%$, dans leurs incertitudes : aucun estimateur fondé sur les descripteurs de gerbe ne déplace ce terme, ce qui est cohérent avec son interprétation comme propriété de l'échantillonnage du détecteur. Le réseau lisant les amas l'abaisse à $45{,}5 \pm 1{,}0\,\%$, soit huit points, très au-delà des incertitudes.
+
+\paragraph{Les deux familles n'améliorent pas le même terme.} L'avantage du BDT sur la calibration $\chi^2$ réside entièrement dans le terme \emph{constant} ($5{,}6\,\%$ contre $7{,}0\,\%$, environ quatre écarts-types), c'est-à-dire dans le traitement de la calibration et des fuites. Celui du réseau réside dans le terme \emph{stochastique}, c'est-à-dire dans la compensation, événement par événement, du partage entre composantes électromagnétique et hadronique — précisément le mécanisme invoqué pour le DRN de HGCAL. Ce sont deux effets distincts, qu'une résolution globale confond.
+
+\paragraph{Le gain tient à l'information, non à la formulation.} La forme~\ref{eq:correction-graphique} est \emph{nécessaire} au réseau : entraîné directement sur $\log E$, il plafonne à $\sigma/E = 0{,}203$ avec un terme stochastique de $78\,\%$, et surtout une réponse dérivant de $1{,}21$ à 5~GeV à $0{,}81$ à 100~GeV. Ce tassement vers la moyenne de l'échantillon améliore artificiellement la résolution apparente aux extrémités de la gamme tout en détruisant la linéarité, ce que seul le suivi de la réponse (Figure~\ref{fig:energie_linearite_comp}) permet de détecter.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.74\linewidth]{Fig/bench_energy_linearity.png}
+\caption{Réponse moyenne $\langle E_{\mathrm{rec}}\rangle / E_{\mathrm{vrai}}$ des estimateurs entraînés sur la cible $C_\theta$, comparée à la calibration $\chi^2$. Les trois estimateurs appris restent plats à $+1$ à $+2\,\%$ sur l'essentiel de la gamme, l'écart le plus fort étant le $+5\,\%$ des BDT au premier point ; la calibration $\chi^2$ présente une pente résiduelle, de $-3\,\%$ à 10~GeV à $-2\,\%$ à 100~GeV.}
+\label{fig:energie_linearite_comp}
+\end{figure}
+
+Elle n'est pas pour autant \emph{suffisante}. Appliquée au BDT sur descripteurs de gerbe, la même cible ne change rien : $a = 53{,}7 \pm 1{,}0\,\%$ contre $53{,}6 \pm 1{,}1\,\%$. La formulation a donc permis au réseau d'exploiter une information que les descripteurs ne portent pas ; elle ne l'a pas créée. C'est, dans ce travail, l'argument le plus direct en faveur des méthodes au niveau des hits — et il contraste avec le constat de la section~\ref{sec:pid-approfondissement}, où le même accès aux hits n'apporte rien à l'identification.
+
+\paragraph{Réserves.} Le réseau a été entraîné sous contrainte de temps de calcul et dispose de deux fois moins d'événements que le BDT ; la comparaison lui est donc défavorable sur ce point, ce qui renforce plutôt la conclusion. La dispersion de graine n'a été établie que pour le BDT, où la résolution vaut $0{,}1200 \pm 0{,}0008$ sur cinq graines : l'écart au réseau y est très supérieur. Enfin, la comparaison de $a = 45{,}5\,\%$ aux valeurs publiées sur DHCAL~\cite{borysova2025dhcalgnn} doit tenir compte de détecteurs, de gammes d'énergie et de définitions du c\oe{}ur différents.
 
 \section{Limites et systématiques}
 \label{sec:energie-limites}

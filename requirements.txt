@@ -4,10 +4,9 @@
 #   pip install -r requirements.txt
 #
 # ROOT itself is not installable from PyPI. The C++ stages need a ROOT
-# installation, and so do four Python scripts that import its bindings
-# (tools/shower_visualisation.py, analysis/4_energy/ml_bdt/energy_plots.py and
-# the two analysis/5_pid_energy/*/figures.py). Every other Python script reads
-# the ROOT trees through uproot and needs no ROOT.
+# installation. Among the maintained Python tools, shower_visualisation.py also
+# imports PyROOT. The archived plotting scripts retain the same external
+# requirement but are not part of the active environment contract.
 #
 # Lower bounds are those the code actually relies on; they are not upper-pinned
 # so the analysis keeps working on a newer stack. The versions a given run used
@@ -17,8 +16,10 @@
 numpy>=1.24
 pandas>=2.0
 
-# ROOT I/O without ROOT (uproot pulls in awkward itself)
+# ROOT I/O without ROOT. uproot pulls awkward in itself, but analysis/4_energy/gnn
+# reads awkward arrays directly, so the dependency is declared rather than implicit.
 uproot>=5.0
+awkward>=2.0
 
 # Models
 scikit-learn>=1.3     # 1.6 removed mean_squared_error(squared=False); the code no longer uses it
@@ -30,8 +31,8 @@ joblib>=1.3
 matplotlib>=3.7
 seaborn>=0.12
 
-# Optional: SHAP summaries in analysis/3_pid/bdt/plot_trees.py, which runs
-# without it. Install with `pip install -e ".[interpret]"`.
+# Optional: SHAP summaries in the archived BDT tree visualiser.
+# Install with `pip install -e ".[interpret]"` when reproducing that study.
 # shap>=0.44
 
 # Development

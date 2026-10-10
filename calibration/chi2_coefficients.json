@@ -3,12 +3,12 @@
   "formula": "Ereco = (a0+a1*N+a2*N^2)*N1 + (b0+b1*N+b2*N^2)*N2 + (c0+c1*N+c2*N^2)*N3, N = N1+N2+N3",
   "comment": [
     "Single source of truth for the semi-digital chi2 calibration coefficients.",
-    "Written by energy_reconstruction_Tminuit/EnergyReco.C and read by sdhcal.calib,",
+    "Written by energy_reconstruction_Tminuit/fit.C and read by sdhcal.calib,",
     "so the C++ and the Python reconstructions can no longer drift apart.",
     "The values below are the ones recovered from the internship code. They are",
     "flagged fitted_on_train_split=false because the original fit used every event",
     "and then drew its linearity and resolution curves on those same events; rerun",
-    "EnergyReco.C to replace them with coefficients fitted on the training split only."
+    "fit.C to replace them with coefficients fitted on the training split only."
   ],
   "particles": {
     "pi": {
@@ -21,7 +21,7 @@
       "c0": 1.81865e-13,
       "c1": 0.000735489,
       "c2": -3.00925e-07,
-      "source": "legacy: startParams of EnergyReco.C at commit dbaf683",
+      "source": "legacy: startParams of fit.C at commit dbaf683",
       "fitted_on_train_split": false,
       "selection": "events with no hit in layer 47, primaryEnergy > 0",
       "energy_range_gev": [1, 130]
@@ -36,7 +36,7 @@
       "c0": 1.22381e-14,
       "c1": 0.000797643,
       "c2": -3.5693e-07,
-      "source": "legacy: startParams of EnergyReco.C at commit dbaf683",
+      "source": "legacy: startParams of fit.C at commit dbaf683",
       "fitted_on_train_split": false,
       "selection": "events with no hit in layer 47, primaryEnergy > 0",
       "energy_range_gev": [1, 130],
@@ -52,7 +52,7 @@
       "c0": 2.61942e-13,
       "c1": 0.00047743,
       "c2": -1.68624e-07,
-      "source": "legacy: startParams of EnergyReco.C at commit dbaf683",
+      "source": "legacy: startParams of fit.C at commit dbaf683",
       "fitted_on_train_split": false,
       "selection": "events with no hit in layer 47, primaryEnergy > 0",
       "energy_range_gev": [1, 130],
