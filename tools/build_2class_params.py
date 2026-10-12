@@ -259,6 +259,41 @@ def check(particles: list[str]) -> int:
     return 0
 
 
+def check_manifest() -> int:
+    """Reject consolidated files built from a different shard directory."""
+    existing = _read_manifest()
+    if existing is None:
+        logger.error("missing or unreadable manifest: %s", manifest_path())
+        return 1
+
+    recorded = existing.get("shards_dir")
+    expected = paths.shards_dir().resolve()
+    if not recorded or Path(str(recorded)).expanduser().resolve() != expected:
+        logger.error(
+            "consolidated files came from %s, expected %s; rebuild with make params-2class",
+            recorded or "an unknown shard directory",
+            expected,
+        )
+        return 1
+
+    expected_roles = {"train": "200k", "val": "discret"}
+    if existing.get("roles") != expected_roles:
+        logger.error("manifest roles are %s, expected %s", existing.get("roles"), expected_roles)
+        return 1
+
+    missing = [
+        output_path(role, particle)
+        for role, particle in [("train", "pi"), ("train", "proton"), ("val", None)]
+        if not output_path(role, particle).is_file()
+    ]
+    if missing:
+        logger.error("manifest exists but consolidated file(s) are missing: %s", ", ".join(map(str, missing)))
+        return 1
+
+    logger.info("manifest matches corrected shards: %s", expected)
+    return 0
+
+
 def _read_manifest() -> dict | None:
     path = manifest_path()
     if not path.is_file():
@@ -285,7 +320,13 @@ def main(argv=None) -> int:
         default=list(paths.PARTICLES_2CLASS),
         help="particles to build (default: the two-class set)",
     )
-    parser.add_argument("--check", action="store_true", help="only verify the existing files")
+    checks = parser.add_mutually_exclusive_group()
+    checks.add_argument("--check", action="store_true", help="verify the existing files and their manifest")
+    checks.add_argument(
+        "--check-manifest",
+        action="store_true",
+        help="quickly verify that the consolidated files came from SDHCAL_SHARDS_DIR",
+    )
     args = parser.parse_args(argv)
 
     unknown = [p for p in args.particles if p not in paths.PARTICLES_2CLASS]
@@ -296,7 +337,9 @@ def main(argv=None) -> int:
         )
 
     if args.check:
-        return check(args.particles)
+        return check_manifest() or check(args.particles)
+    if args.check_manifest:
+        return check_manifest()
     return build(args.roles, args.particles)
 
 

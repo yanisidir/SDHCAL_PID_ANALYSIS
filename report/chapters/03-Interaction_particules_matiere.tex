@@ -29,7 +29,7 @@ Bethe--Bloch \cite{bichsel1988, pdg2024} :
 \end{equation}
 
 où $K = 4\pi N_A r_e^2 m_e c^2$, $z$ est la charge de la particule incidente, $Z/A$ le rapport
-charge/masse du milieu, $I$ le potentiel moyen d'excitation, $T_{\max}$ l'énergie maximale
+le rapport du numéro atomique au nombre de masse du milieu, $I$ le potentiel moyen d'excitation, $T_{\max}$ l'énergie maximale
 transférable à un électron libre et $\delta$ le terme de correction de densité \cite{pdg2024}.
 
 Cette expression présente un \textit{minimum d'ionisation} pour $\beta\gamma \simeq 3$--$4$
@@ -37,7 +37,8 @@ Cette expression présente un \textit{minimum d'ionisation} pour $\beta\gamma \s
 le SDHCAL (1--130~GeV), l'ionisation domine pour les hadrons et les muons, ce qui justifie l'usage
 du MIP comme unité de calibration et motive la lecture multi-seuils pour caractériser la densité
 locale de dépôt. Le \textit{bremsstrahlung} ne domine que pour les $e^\pm$ au-delà de l'énergie
-critique $E_c \sim 500/Z$~MeV et reste donc marginal ici.
+critique, que le PDG paramétrise par $E_c \simeq 610\,\mathrm{MeV}/(Z+1{,}24)$ pour les
+solides \cite{pdg2024} — soit environ $22$~MeV dans le fer — et reste donc marginal ici.
 
 Les photons, quant à eux, interagissent via l'\textit{effet photoélectrique} à basse énergie (keV),
 la \textit{diffusion Compton} aux énergies intermédiaires (quelques MeV), puis la \textit{création
@@ -64,7 +65,7 @@ d'interactions fortes et de cascades nucléaires, avec une part d'énergie non d
 difficulté à atteindre une résolution comparable à celle des calorimètres
 électromagnétiques \cite{fabjan2003, wigmans2000}.
 
-Enfin, les \textbf{hadrons neutres} tels que le $K^0_L$ n'ionisent pas et ne déposent de l'énergie
+Enfin, les \textbf{hadrons neutres} tels que le $K^0$ n'ionisent pas et ne déposent de l'énergie
 que via ces interactions nucléaires, ce qui rend leur point de départ de gerbe nettement plus
 variable. Cette propriété sera exploitée au chapitre~\ref{sec:pid_mlp}.
 

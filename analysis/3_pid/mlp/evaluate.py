@@ -6,10 +6,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import joblib
 from sklearn.metrics import balanced_accuracy_score, classification_report, roc_auc_score
 
-from train import Config, load_sample
+from sdhcal import artifacts, pid_mlp
 
 
 def main() -> int:
@@ -19,7 +18,7 @@ def main() -> int:
     parser.add_argument("--max-events-per-particle", type=int)
     args = parser.parse_args()
 
-    artifact = joblib.load(args.model)
+    artifact = artifacts.load_bundle(args.model, kind="pid")
     if artifact.get("particles") != ["pi", "proton"]:
         raise ValueError("This evaluator accepts only a pion/proton PID artifact")
     smearing = artifact.get("smearing", {})
@@ -27,14 +26,14 @@ def main() -> int:
     if sigma == "none":
         sigma = None
     seed = int(smearing.get("smear_seed", 42))
-    cfg = Config(
+    cfg = pid_mlp.Config(
         feature_cols=artifact["features"],
         random_state=seed,
         smear_sigma_ns=sigma,
         max_shards_per_particle=args.max_shards_per_particle,
         max_events_per_particle=args.max_events_per_particle,
     )
-    frame = load_sample("discret", cfg, seed + 10_000)
+    frame = pid_mlp.load_sample("discret", cfg, seed + 10_000)
     x = artifact["scaler"].transform(frame[list(cfg.feature_cols)])
     y = frame["label"].to_numpy()
     probability = artifact["model"].predict_proba(x)

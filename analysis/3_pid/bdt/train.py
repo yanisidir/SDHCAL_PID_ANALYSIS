@@ -41,14 +41,10 @@ from __future__ import annotations
 
 import argparse
 import logging
-import random
-import sys
-from dataclasses import dataclass, field, replace
+from collections.abc import Sequence
+from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
 
-import joblib
-import lightgbm as lgb
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -56,148 +52,24 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from sklearn.metrics import (
-    accuracy_score,
-    balanced_accuracy_score,
-    classification_report,
-    confusion_matrix,
-    log_loss,
-    roc_auc_score,
-)
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
-
-
+from sdhcal import artifacts, paths, provenance, rootio, runlog, splits
+from sdhcal import config as sdconfig
 from sdhcal import metrics as sdmetrics  # noqa: F401  (kept for energy-binned studies)
-from sdhcal import paths, rootio, runlog, splits
-from sdhcal.smearing import TimeSmearing, smear_time_columns
+from sdhcal.pid_bdt import (
+    CLASS_NAMES,  # noqa: F401  historical import surface
+    Config,
+    build_classifier,  # noqa: F401  historical import surface
+    evaluate,
+    search_hyperparameters,  # noqa: F401  historical import surface
+    set_global_seeds,
+    train,
+)
+from sdhcal.smearing import smear_time_columns
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s | %(levelname)8s | %(message)s", datefmt="%H:%M:%S"
 )
 logger = logging.getLogger("pid_lgbm")
-
-#: Display names of the classes, in label order.
-CLASS_NAMES = {"pi": r"$\pi^-$", "proton": "p", "kaon": r"$K^0_L$"}
-
-
-@dataclass
-class Config:
-    """Everything that defines a run. Logged verbatim, feature list included."""
-
-    tree_name: str = "paramsTree"
-    pdg_col: str = "particlePDG"
-
-    #: Particles to separate; the order fixes the integer labels (0, 1, 2, ...).
-    particles: Sequence[str] = field(default_factory=lambda: list(paths.active_particles()))
-
-    #: Two of the original 26 are gone, because a decision tree splits on single
-    #: columns and is invariant to a monotone transform of one: a feature that is
-    #: such a transform of another cannot produce a single split the other could
-    #: not. Verified on 200 000 events:
-    #:
-    #:   ratioThr23 = (100 - Thr1) / Thr1   (Thr1+Thr2+Thr3 = 100 exactly)
-    #:   tSpread    = tMax - tMin,          tMin std 0.3 ns against tMax std 315 ns
-    #:
-    #: Both also flattened the permutation importances, which shuffle one column
-    #: at a time and therefore score a pair of twins at zero.
-    #: ``nHitsTotal``, ``sumThrTotal`` and ``AvgClustSize`` are redundant too, but
-    #: as *combinations* of several columns, which a tree cannot build from
-    #: splits; they are kept.
-    feature_cols: Sequence[str] = field(
-        default_factory=lambda: [
-            "Thr1", "Thr2", "Thr3", "Begin", "Radius", "Density", "NClusters",
-            "Zbary", "Zrms", "PctHitsFirst10", "PlanesWithClusmore2", "AvgClustSize",
-            "MaxClustSize", "lambda1", "lambda2", "tMin", "tMax", "tMean",
-            "Nmax", "z0_fit", "Xmax", "lambda", "nTrackSegments", "eccentricity3D",
-        ]
-    )
-
-    # Split: both fractions are of the whole sample.
-    test_size: float = 0.20
-    val_size: float = 0.10
-    random_state: int = 42
-
-    #: Drop the events of the held-out file before splitting. Without it the
-    #: classifier is fitted on the very events the coupling study evaluates on,
-    #: and the end-to-end numbers are training performance.
-    exclude_holdout: bool = False
-
-    # Class imbalance: SMOTE on the training split, or LightGBM class weights.
-    use_smote: bool = True
-    class_weight: Optional[str] = None
-
-    # Time smearing; None means ideal timing.
-    smear_sigma_ns: Optional[float] = 0.1
-    smear_columns: Sequence[str] = ("tMin", "tMax", "tMean")
-
-    # LightGBM.
-    learning_rate: float = 0.01
-    n_estimators: int = 1000
-    num_leaves: int = 63
-    max_depth: int = -1
-    reg_alpha: float = 0.1
-    reg_lambda: float = 0.1
-    min_child_samples: int = 30
-    subsample: float = 0.8
-    colsample_bytree: float = 0.8
-    early_stopping_rounds: int = 50
-
-    grid_search: bool = False
-    param_grid: Dict[str, List] = field(
-        default_factory=lambda: {
-            "clf__num_leaves": [31, 63, 127],
-            "clf__max_depth": [-1, 10, 20],
-            "clf__learning_rate": [0.01, 0.05, 0.1],
-            "clf__n_estimators": [500, 1000],
-        }
-    )
-
-    @property
-    def target_pdg(self) -> List[int]:
-        return [paths.PARTICLE_PDG[p] for p in self.particles]
-
-    @property
-    def labels(self) -> List[str]:
-        return [CLASS_NAMES.get(p, p) for p in self.particles]
-
-    def smearing(self) -> TimeSmearing:
-        return TimeSmearing(
-            sigma_ns=self.smear_sigma_ns, columns=tuple(self.smear_columns), seed=self.random_state
-        )
-
-    def uses_timing(self) -> bool:
-        return any(c.startswith("t") and c in self.feature_cols for c in self.smear_columns)
-
-    def loggable(self) -> Dict[str, object]:
-        out: Dict[str, object] = {
-            "particles": ";".join(self.particles),
-            "tree_name": self.tree_name,
-            "test_size": self.test_size,
-            "val_size": self.val_size,
-            "random_state": self.random_state,
-            "use_smote": int(self.use_smote),
-            "exclude_holdout": int(self.exclude_holdout),
-            "class_weight": str(self.class_weight),
-            "learning_rate": self.learning_rate,
-            "n_estimators": self.n_estimators,
-            "num_leaves": self.num_leaves,
-            "max_depth": self.max_depth,
-            "reg_alpha": self.reg_alpha,
-            "reg_lambda": self.reg_lambda,
-            "min_child_samples": self.min_child_samples,
-            "subsample": self.subsample,
-            "colsample_bytree": self.colsample_bytree,
-            "early_stopping_rounds": self.early_stopping_rounds,
-            "grid_search": int(self.grid_search),
-            "timing_in_features": int(self.uses_timing()),
-        }
-        out.update(self.smearing().as_dict())
-        return out
-
-
-def set_global_seeds(seed: int) -> None:
-    random.seed(seed)
-    np.random.seed(seed)
 
 
 # ---------------------------------------------------------------------------
@@ -216,9 +88,7 @@ def load_dataset(cfg: Config) -> pd.DataFrame:
     df = rootio.clean(pd.concat(frames, ignore_index=True), columns=needed)
 
     if cfg.exclude_holdout:
-        holdout = rootio.load_trees(
-            paths.dataset("holdout"), cfg.tree_name, [cfg.pdg_col, "eventNumber"]
-        )
+        holdout = rootio.load_trees(paths.dataset("holdout"), cfg.tree_name, [cfg.pdg_col, "eventNumber"])
         df, dropped = splits.exclude_keys(df, splits.event_keys(holdout))
         logger.info("Excluded %d held-out events; %d remain for training", dropped, len(df))
         if not dropped:
@@ -237,152 +107,15 @@ def load_dataset(cfg: Config) -> pd.DataFrame:
     counts = np.bincount(df["label"], minlength=len(cfg.particles))
     logger.info(
         "Class balance: %s",
-        ", ".join(f"{p}={c}" for p, c in zip(cfg.particles, counts)),
+        ", ".join(f"{p}={c}" for p, c in zip(cfg.particles, counts, strict=True)),
     )
     return smear_time_columns(df, cfg.smearing())
 
 
 # ---------------------------------------------------------------------------
-# Model
-# ---------------------------------------------------------------------------
-def build_classifier(cfg: Config, seed: int) -> lgb.LGBMClassifier:
-    n_classes = len(cfg.particles)
-    # num_class must be absent for a binary objective, not passed as None.
-    multiclass = {"objective": "multiclass", "num_class": n_classes} if n_classes > 2 else {"objective": "binary"}
-    return lgb.LGBMClassifier(
-        **multiclass,
-        learning_rate=cfg.learning_rate,
-        n_estimators=cfg.n_estimators,
-        num_leaves=cfg.num_leaves,
-        max_depth=cfg.max_depth,
-        reg_alpha=cfg.reg_alpha,
-        reg_lambda=cfg.reg_lambda,
-        min_child_samples=cfg.min_child_samples,
-        subsample=cfg.subsample,
-        colsample_bytree=cfg.colsample_bytree,
-        class_weight=cfg.class_weight,
-        random_state=seed,
-        n_jobs=-1,
-        verbose=-1,
-    )
-
-
-def search_hyperparameters(x_train: pd.DataFrame, y_train: np.ndarray, cfg: Config, seed: int) -> Dict:
-    """Grid-search with the resampling *inside* each cross-validation fold.
-
-    Oversampling before the search is a leak: SMOTE interpolates between
-    neighbours, so a synthetic point built from a training-fold event can land in
-    the validation fold and be predicted almost perfectly.
-    """
-    from imblearn.over_sampling import SMOTE
-    from imblearn.pipeline import Pipeline
-
-    steps = []
-    if cfg.use_smote:
-        steps.append(("smote", SMOTE(random_state=seed)))
-    steps.append(("clf", build_classifier(cfg, seed)))
-
-    grid = GridSearchCV(
-        Pipeline(steps),
-        cfg.param_grid,
-        cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=seed),
-        scoring="f1_macro",
-        n_jobs=-1,
-        verbose=1,
-    )
-    grid.fit(x_train, y_train)
-    best = {k.removeprefix("clf__"): v for k, v in grid.best_params_.items()}
-    logger.info("Best parameters: %s (CV f1_macro=%.4f)", best, grid.best_score_)
-    return best
-
-
-def train(
-    x_train: pd.DataFrame,
-    y_train: np.ndarray,
-    x_val: pd.DataFrame,
-    y_val: np.ndarray,
-    cfg: Config,
-    seed: int,
-):
-    """Resample the training split only, then fit with early stopping on validation."""
-    best = search_hyperparameters(x_train, y_train, cfg, seed) if cfg.grid_search else {}
-
-    if cfg.use_smote:
-        from imblearn.over_sampling import SMOTE
-
-        x_fit, y_fit = SMOTE(random_state=seed).fit_resample(x_train, y_train)
-        x_fit = pd.DataFrame(x_fit, columns=x_train.columns)
-        logger.info("Training split after SMOTE: %s", np.bincount(y_fit).tolist())
-    else:
-        x_fit, y_fit = x_train, y_train
-
-    model = build_classifier(cfg, seed)
-    if best:
-        model.set_params(**best)
-    model.fit(
-        x_fit,
-        y_fit,
-        eval_set=[(x_fit, y_fit), (x_val, y_val)],
-        eval_names=["train", "valid"],
-        eval_metric="multi_logloss" if len(cfg.particles) > 2 else "binary_logloss",
-        callbacks=[
-            lgb.early_stopping(cfg.early_stopping_rounds, verbose=False),
-            lgb.log_evaluation(period=200),
-        ],
-    )
-    return model, best
-
-
-def evaluate(model, x_test: pd.DataFrame, y_test: np.ndarray, cfg: Config):
-    """Accuracy, balanced accuracy, AUC, log-loss and the confusion matrix.
-
-    Balanced accuracy is reported alongside accuracy because the test split keeps
-    the natural class proportions: a plain accuracy can be carried by the
-    majority class.
-    """
-    n_classes = len(cfg.particles)
-    proba = model.predict_proba(x_test)
-    y_pred = np.argmax(proba, axis=1)
-
-    results = {
-        "accuracy": float(accuracy_score(y_test, y_pred)),
-        "balanced_accuracy": float(balanced_accuracy_score(y_test, y_pred)),
-        "log_loss": float(log_loss(y_test, proba, labels=np.arange(n_classes))),
-        "n_test": int(y_test.size),
-        "best_iteration": int(getattr(model, "best_iteration_", 0) or 0),
-    }
-    if n_classes > 2:
-        results["auc_ovr_macro"] = float(roc_auc_score(y_test, proba, multi_class="ovr", average="macro"))
-    else:
-        results["auc"] = float(roc_auc_score(y_test, proba[:, 1]))
-
-    cm = confusion_matrix(y_test, y_pred, labels=np.arange(n_classes))
-    for index, particle in enumerate(cfg.particles):
-        true_count = cm[index].sum()
-        results[f"efficiency_{particle}"] = float(cm[index, index] / true_count) if true_count else float("nan")
-        predicted_count = cm[:, index].sum()
-        results[f"purity_{particle}"] = (
-            float(cm[index, index] / predicted_count) if predicted_count else float("nan")
-        )
-
-    logger.info(
-        "Test: accuracy=%.4f  balanced=%.4f  logloss=%.4f%s",
-        results["accuracy"],
-        results["balanced_accuracy"],
-        results["log_loss"],
-        f"  AUC={results['auc_ovr_macro']:.4f}" if n_classes > 2 else f"  AUC={results['auc']:.4f}",
-    )
-    logger.info(
-        "Classification report:\n%s",
-        classification_report(y_test, y_pred, target_names=list(cfg.particles), digits=4, zero_division=0),
-    )
-    return results, cm, proba, y_pred
-
-
-# ---------------------------------------------------------------------------
 # Plots
 # ---------------------------------------------------------------------------
-def plot_training_curve(evals: Dict, out: Path) -> None:
+def plot_training_curve(evals: dict, out: Path) -> None:
     metric = next(iter(next(iter(evals.values())).keys()))
     train_curve = evals.get("train", {}).get(metric, [])
     valid_curve = evals.get("valid", {}).get(metric, [])
@@ -479,7 +212,12 @@ def plot_feature_importance(model, features: Sequence[str], out: Path) -> pd.Dat
 # ---------------------------------------------------------------------------
 # Runs
 # ---------------------------------------------------------------------------
-def run_single_seed(cfg: Config, seed: int, log: runlog.RunLogger) -> Dict[str, float]:
+def run_single_seed(
+    cfg: Config,
+    seed: int,
+    log: runlog.RunLogger,
+    resolved_config: dict | None = None,
+) -> dict[str, float]:
     set_global_seeds(seed)
     seeded = replace(cfg, random_state=seed)
 
@@ -492,9 +230,7 @@ def run_single_seed(cfg: Config, seed: int, log: runlog.RunLogger) -> Dict[str, 
     )
     logger.info("Split sizes: %s", split.sizes())
 
-    model, best = train(
-        x.iloc[split.train], y[split.train], x.iloc[split.val], y[split.val], seeded, seed
-    )
+    model, best = train(x.iloc[split.train], y[split.train], x.iloc[split.val], y[split.val], seeded, seed)
     results, cm, proba, y_pred = evaluate(model, x.iloc[split.test], y[split.test], seeded)
     results["seed"] = seed
     if best:
@@ -502,7 +238,13 @@ def run_single_seed(cfg: Config, seed: int, log: runlog.RunLogger) -> Dict[str, 
 
     tag = f"{log.run_id}_seed{seed}"
     model_path = log.path("models", f"lgbm_pid_{tag}.joblib")
-    joblib.dump(
+    artifact_config = (
+        sdconfig.update_resolved_values(resolved_config, random_state=seed)
+        if resolved_config is not None
+        else seeded.loggable()
+    )
+    artifacts.save_bundle(
+        model_path,
         {
             "model": model,
             "features": list(seeded.feature_cols),
@@ -510,7 +252,16 @@ def run_single_seed(cfg: Config, seed: int, log: runlog.RunLogger) -> Dict[str, 
             "label_to_pdg": dict(enumerate(seeded.target_pdg)),
             "smearing": seeded.smearing().as_dict(),
         },
-        model_path,
+        kind="pid",
+        model_family="lightgbm",
+        preprocessing={"smearing": seeded.smearing().as_dict()},
+        training_counts={
+            "train_before_resampling": int(len(split.train)),
+            "validation": int(len(split.val)),
+            "test": int(len(split.test)),
+        },
+        configuration=artifact_config,
+        provenance=provenance.environment_fingerprint(),
     )
 
     plot_training_curve(model.evals_result_, log.path("plots", f"training_curve_{tag}.png"))
@@ -537,17 +288,24 @@ def run_single_seed(cfg: Config, seed: int, log: runlog.RunLogger) -> Dict[str, 
     return results
 
 
-def run(cfg: Config, n_seeds: int) -> Dict[str, float]:
+def run(cfg: Config, n_seeds: int, resolved_config: dict | None = None) -> dict[str, float]:
     out_dir = paths.output_dir() / "pid_lgbm"
     log = runlog.RunLogger(out_dir, name="pid")
     log.start(cfg.loggable(), features=list(cfg.feature_cols))
-    logger.info("=== PID run %d | %d seed(s) | timing in features: %s ===",
-                log.run_id, n_seeds, cfg.uses_timing())
+    if resolved_config is not None:
+        resolved_path = sdconfig.write_resolved_config(
+            log.path("runs", f"pid_{log.run_id}_resolved_config.json"),
+            resolved_config,
+        )
+        log.log_artifacts(resolved_config=resolved_path)
+    logger.info(
+        "=== PID run %d | %d seed(s) | timing in features: %s ===", log.run_id, n_seeds, cfg.uses_timing()
+    )
 
-    per_seed = [run_single_seed(cfg, cfg.random_state + i, log) for i in range(n_seeds)]
+    per_seed = [run_single_seed(cfg, cfg.random_state + i, log, resolved_config) for i in range(n_seeds)]
     pd.DataFrame(per_seed).to_csv(log.path("tables", f"per_seed_{log.run_id}.csv"), index=False)
 
-    summary: Dict[str, float] = {"n_seeds": n_seeds}
+    summary: dict[str, float] = {"n_seeds": n_seeds}
     numeric = [k for k, v in per_seed[0].items() if isinstance(v, (int, float))]
     for key in numeric:
         values = np.array([r[key] for r in per_seed], dtype=float)
@@ -571,57 +329,109 @@ def build_parser() -> argparse.ArgumentParser:
         description=__doc__.splitlines()[0], formatter_class=argparse.RawDescriptionHelpFormatter
     )
     p.add_argument(
-        "--particles", nargs="+", default=list(paths.active_particles()),
+        "--particles",
+        nargs="+",
+        default=list(paths.active_particles()),
         help="particles to separate; the order fixes the integer labels",
     )
     p.add_argument("--features", nargs="+", default=None, help="override the feature list")
     p.add_argument(
-        "--exclude-holdout", action="store_true",
+        "--exclude-holdout",
+        action="store_true",
         help="drop the held-out events before splitting, so the coupling study evaluates "
-             "on events this model never saw",
+        "on events this model never saw",
     )
     p.add_argument(
-        "--sigma-time", type=float, default=0.1, metavar="NS",
+        "--sigma-time",
+        type=float,
+        default=0.1,
+        metavar="NS",
         help="width of the Gaussian time smearing in ns (default 0.1)",
     )
     p.add_argument(
-        "--no-timing", action="store_true",
+        "--no-timing",
+        action="store_true",
         help="drop every time variable from the features, for the timing-vs-no-timing comparison",
     )
     p.add_argument("--no-smote", action="store_true", help="use LightGBM class weights instead of SMOTE")
     p.add_argument("--seeds", type=int, default=1, metavar="N", help="number of independent splits")
-    p.add_argument("--grid-search", action="store_true", help="search hyper-parameters (resampling inside folds)")
+    p.add_argument(
+        "--grid-search", action="store_true", help="search hyper-parameters (resampling inside folds)"
+    )
+    p.add_argument("--config", type=Path, default=None, help="optional versioned JSON configuration")
     return p
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = build_parser().parse_args(argv)
-    if args.seeds < 1:
+def resolve_configuration(
+    argv: Sequence[str] | None = None,
+) -> tuple[Config, int, dict]:
+    parser = build_parser()
+    args, explicit = sdconfig.parse_cli(parser, argv)
+    defaults = asdict(Config())
+    defaults["seeds"] = 1
+
+    document = None
+    file_values = {}
+    if args.config is not None:
+        document = sdconfig.load_config(args.config)
+        file_values = sdconfig.workflow_values(document, "pid_bdt", params_set=paths.params_set())
+
+    cli_values = {}
+    mapping = {
+        "particles": "particles",
+        "features": "feature_cols",
+        "exclude_holdout": "exclude_holdout",
+        "sigma_time": "smear_sigma_ns",
+        "grid_search": "grid_search",
+        "seeds": "seeds",
+    }
+    for cli_name, config_name in mapping.items():
+        if cli_name in explicit:
+            cli_values[config_name] = explicit[cli_name]
+    if explicit.get("no_smote"):
+        cli_values.update(use_smote=False, class_weight="balanced")
+
+    effective = sdconfig.merge_config(
+        defaults,
+        file_values,
+        cli_values,
+        nullable_types={"class_weight": str, "smear_sigma_ns": (int, float)},
+    )
+    config_keys = set(asdict(Config()))
+    cfg = Config(**{key: effective[key] for key in config_keys})
+    if explicit.get("no_timing"):
+        kept = [column for column in cfg.feature_cols if column not in set(cfg.smear_columns)]
+        cfg = replace(cfg, feature_cols=kept, smear_sigma_ns=None)
+        logger.info("Timing dropped: %d features remain", len(kept))
+    n_seeds = effective["seeds"]
+    resolved_values = {**asdict(cfg), "seeds": n_seeds}
+    resolved = sdconfig.build_resolved_config(
+        "pid_bdt",
+        resolved_values,
+        config_path=args.config,
+        cli_overrides=[key for key in explicit if key != "config"],
+        profile=document.get("profile") if document else None,
+        dataset=document.get("dataset") if document else None,
+    )
+    return cfg, n_seeds, resolved
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    try:
+        cfg, n_seeds, resolved = resolve_configuration(argv)
+    except sdconfig.ConfigError as error:
+        raise SystemExit(f"configuration error: {error}") from error
+    if n_seeds < 1:
         raise SystemExit("--seeds must be at least 1")
 
-    unknown = [p for p in args.particles if p not in paths.active_particles()]
+    unknown = [particle for particle in cfg.particles if particle not in paths.active_particles()]
     if unknown:
         raise SystemExit(
             f"unknown particle(s): {', '.join(unknown)}; expected among {paths.active_particles()}"
         )
 
-    cfg = Config(
-        particles=args.particles,
-        smear_sigma_ns=args.sigma_time,
-        exclude_holdout=args.exclude_holdout,
-        use_smote=not args.no_smote,
-        class_weight="balanced" if args.no_smote else None,
-        grid_search=args.grid_search,
-    )
-    if args.features:
-        cfg = replace(cfg, feature_cols=list(args.features))
-    if args.no_timing:
-        kept = [c for c in cfg.feature_cols if c not in set(cfg.smear_columns)]
-        cfg = replace(cfg, feature_cols=kept, smear_sigma_ns=None)
-        logger.info("Timing dropped: %d features remain", len(kept))
-
     try:
-        summary = run(cfg, args.seeds)
+        summary = run(cfg, n_seeds, resolved)
     except (paths.DatasetNotFound, FileNotFoundError) as exc:
         logger.error("%s", exc)
         return 1

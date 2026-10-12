@@ -11,7 +11,7 @@ Deux estimateurs sont comparés : une calibration paramétrique fondée sur les 
 \section{Données disponibles et protocole d'évaluation}
 \label{subsec:Data_protocol}
 
-L'étude utilise des simulations de pions, de protons et de $K^0_L$ entre 1 et 130~GeV. Pour l'étude binaire pion/proton, environ $2\times10^5$ événements par espèce sont disponibles. Les modèles sont évalués sur des événements distincts de ceux employés pour l'entraînement. Les performances énergétiques sont décrites par le biais relatif
+L'étude utilise des simulations de pions, de protons et de $K^0$ entre 1 et 130~GeV. Pour l'étude binaire pion/proton, environ $2\times10^5$ événements par espèce sont disponibles. Les modèles sont évalués sur des événements distincts de ceux employés pour l'entraînement. Les performances énergétiques sont décrites par le biais relatif
 
 \begin{equation}
 \delta(E)=\frac{\langle E_{\mathrm{reco}}\rangle-E_{\mathrm{true}}}{E_{\mathrm{true}}}
@@ -63,14 +63,14 @@ Les Figures~\ref{fig:chi2-linearity} et~\ref{fig:chi2-resolution} présentent la
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.76\linewidth]{Fig/no_PID_Lin_n_Dev_chi2.png}
+\includegraphics[width=0.76\linewidth]{Fig/bench_species_linearity_chi2.png}
 \caption{Linéarité et biais relatif de la calibration paramétrique.}
 \label{fig:chi2-linearity}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.76\linewidth]{Fig/no_PID_Resolution_relative_chi2.png}
+\includegraphics[width=0.76\linewidth]{Fig/bench_species_resolution_chi2.png}
 \caption{Indicateur de dispersion relative obtenu avec la calibration paramétrique.}
 \label{fig:chi2-resolution}
 \end{figure}
@@ -84,14 +84,14 @@ Les résultats sont présentés Figures~\ref{fig:bdt-linearity} et~\ref{fig:bdt-
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.76\linewidth]{Fig/no_PID_Lin_n_Dev_BDT.png}
+\includegraphics[width=0.76\linewidth]{Fig/bench_species_linearity_bdt.png}
 \caption{Linéarité et biais relatif de la régression LightGBM.}
 \label{fig:bdt-linearity}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.76\linewidth]{Fig/no_PID_Resolution_relative_BDT.png}
+\includegraphics[width=0.76\linewidth]{Fig/bench_species_resolution_bdt.png}
 \caption{Indicateur de dispersion relative obtenu avec la régression LightGBM.}
 \label{fig:bdt-resolution}
 \end{figure}
@@ -111,9 +111,38 @@ Une résolution calorimétrique est souvent ajustée par
 \label{eq:fit-ab}
 \end{equation}
 
+Le terme de bruit $c/E$ de l'équation~\ref{eq:resolution} est omis, et cette omission n'est pas une simplification d'écriture. La chaîne de digitalisation employée ici (chapitre~\ref{chap:sdhcal}) enchaîne sélection temporelle, efficacité de détection, charge induite fluctuante, diffusion transverse et application des seuils, sans injecter de bruit électronique : aucun hit fortuit n'est produit, de sorte que $c$ vaut exactement zéro par construction dans ces échantillons. L'ajuster reviendrait à ajouter un paramètre libre que les données ne contraignent pas. Sur détecteur réel, un bruit résiduel se traduirait par un nombre à peu près constant de hits fortuits, donc par une contribution relative en $1/E$ ; l'estimer demanderait des données de faisceau et des prises de données au repos, et ne peut pas se faire sur simulation seule.
+
 Un ajustement fiable de $a$ et $b$ exige une estimation non biaisée de la largeur dans chaque tranche d'énergie ainsi que ses incertitudes. Ces conditions n'étaient pas réunies pour les courbes présentées plus haut, dont la largeur est extraite d'un c\oe{}ur tronqué non corrigé ; les paramètres n'en sont donc pas tirés.
 
 Elles le sont en revanche sur la production à énergies fixes décrite à la section~\ref{sec:energie-niveau-hits}, qui fournit vingt points d'énergie avec une statistique suffisante par point. Les résultats correspondants sont rassemblés au Tableau~\ref{tab:energie_comparaison}. Séparer les deux termes n'est pas une commodité d'écriture : $a$ est fixé par les fluctuations d'échantillonnage du détecteur, tandis que $b$ regroupe ce qui ne s'améliore pas avec la statistique — dispersion de calibration, fuites, non-compensation. Une résolution citée à une seule énergie confond les deux et masque \emph{lequel} un estimateur a réellement amélioré.
+
+\subsection{La coupure de confinement et ce qu'elle impose}
+\label{subsec:confinement}
+
+Tous les estimateurs comparés ci-dessous sont évalués sous une même sélection : seules sont retenues les gerbes ne déposant aucun hit dans la dernière couche instrumentée. La raison est que la calibration $\chi^2$ est ajustée sous cette coupure, et l'évaluer sans elle reviendrait à l'appliquer hors du domaine où ses coefficients ont été déterminés. La coupure va donc à tous les bras de la comparaison ou à aucun.
+
+Ce choix a un coût qu'il faut énoncer, car il conditionne la lecture de $a$ et $b$. Avec une profondeur d'environ $6\,\lambda_I$ (chapitre~\ref{chap:sdhcal}), le confinement longitudinal se dégrade vite avec l'énergie :
+
+\begin{table}[!ht]
+\centering
+\caption{Fraction d'événements survivant à la coupure de confinement, sur la production à énergies fixes ($10^{4}$ événements générés par point).}
+\label{tab:confinement}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+$E$ [GeV] & 5 & 20 & 50 & 80 & 100 \\
+\midrule
+Survie & $95{,}8\,\%$ & $75{,}3\,\%$ & $48{,}1\,\%$ & $29{,}2\,\%$ & $23{,}1\,\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+L'acceptance chute d'un facteur quatre sur la gamme. À 100~GeV, ne conserver que les gerbes entièrement contenues revient à sélectionner le quart qui s'amorce le plus tôt et se développe le plus compactement, c'est-à-dire précisément la population dont les fluctuations sont les plus faibles. Les résolutions citées aux hautes énergies sont donc meilleures que celles d'un lot non sélectionné, et deux conséquences en découlent.
+
+D'une part, l'échantillon effectif n'est pas le même d'un point d'énergie à l'autre : l'ajustement de l'équation~\ref{eq:fit-ab} porte sur des points dont la sélection varie de $96\,\%$ à $23\,\%$. Les termes $a$ et $b$ qui en sortent caractérisent le couple détecteur--sélection, et non le détecteur seul ; ils ne sont pas directement comparables à des termes publiés sans cette coupure. D'autre part, l'acceptance dépend légèrement de l'espèce — à 100~GeV, $24{,}7\,\%$ pour les pions contre $21{,}5\,\%$ pour les protons — de sorte que le mélange $\pi/p$ effectif dérive avec l'énergie, ce dont il faut tenir compte au chapitre~\ref{sec:analyse_mixte}.
+
+La coupure reste néanmoins le choix le moins mauvais ici : la comparaison entre estimateurs, qui est l'objet de ce chapitre, se fait à sélection identique, et c'est elle qui porte les conclusions. Lever la coupure demanderait de réajuster la calibration sur le lot complet et de traiter explicitement les fuites, ce qui constitue une étude en soi.
 
 \subsection{Reconstruction au niveau des hits}
 \label{sec:energie-niveau-hits}
@@ -128,6 +157,8 @@ E_{\mathrm{reco}}=E_{\mathrm{SD}}\,C_{\theta}(G),
 où $G$ contient les positions, les seuils et les temps des hits. Cette construction préserve l'interprétation de la calibration à trois seuils tout en donnant accès à la morphologie fine de la gerbe. Les performances publiées pour HGCAL ne constituent cependant pas un objectif numérique : le détecteur est analogique, seuls les pions sont considérés, une partie du gain provient de la correction des fuites, et la largeur y est extraite par un ajustement gaussien du c\oe{}ur de la distribution.
 
 \paragraph{Mise en \oe{}uvre.} Cette construction a été réalisée sur les deux productions pion/proton décrites à la section~\ref{sec:pid-approfondissement} : ajustement de la calibration $\chi^2$ et entraînement du réseau sur la production continue, évaluation sur la production à énergies fixes. Le réseau prend en entrée les amas de hits — environ $191$ par événement — et apprend $\log\!\left(E_{\mathrm{vrai}}/E_{\chi^2}\right)$, c'est-à-dire le logarithme du facteur $C_\theta$ de l'équation~\ref{eq:correction-graphique}.
+
+L'architecture retenue n'est pas un réseau de graphes mais un encodeur d'ensemble invariant par permutation, de type DeepSets : chaque amas est encodé isolément, puis mis à jour par un résumé global de l'événement, sans qu'aucune arête ne soit construite. Ce choix suit l'étude DHCAL~\cite{borysova2025dhcalgnn}, qui trouve ce modèle à la fois plus précis et nettement moins coûteux que l'attention sur un graphe de plus proches voisins. Il a une conséquence qu'il faut énoncer : le gain mesuré plus bas ne peut pas être attribué à la connectivité explicite entre amas, puisqu'il n'y en a aucune. Il vient de l'accès aux amas eux-mêmes, et de la capacité du modèle à pondérer leur contribution individuelle — ce qu'une somme de compteurs par seuil ne permet pas.
 
 Les coefficients de la calibration servant de référence sont eux-mêmes ajustés hors échantillon, ce qui n'était pas le cas de ceux de la section~\ref{sec:energie-res-chi2} : sur les mêmes événements d'évaluation, ce seul changement ramène le biais du pion de $-1{,}81\,\%$ à $-0{,}07\,\%$ et celui du proton de $-2{,}24\,\%$ à $-0{,}46\,\%$.
 
@@ -155,6 +186,10 @@ Calibration $\chi^2$              & ---        & $54{,}4 \pm 1{,}2$ & $7{,}0 \pm
 \label{fig:energie_resolution_comp}
 \end{figure}
 
+\paragraph{Ce que la colonne $\sigma/E$ ne dit pas.} La résolution globale du tableau est obtenue en regroupant tous les événements de la production à énergies fixes, qui compte vingt points également peuplés à la génération. Ce n'est donc pas « la résolution du SDHCAL » mais celle d'un spectre plat, et la distinction n'est pas rhétorique : en repondérant les mêmes points par un spectre en $1/E$, puis en $1/E^2$, la valeur du réseau sur amas passe de $0{,}103$ à $0{,}144$ puis $0{,}190$, et celle de la calibration $\chi^2$ de $0{,}119$ à $0{,}171$ puis $0{,}231$. L'écart atteint presque un facteur deux.
+
+C'est la même objection que celle opposée à l'exactitude au chapitre~\ref{sec:pid_mlp} — une figure de mérite ne doit pas dépendre de la composition de l'échantillon de test — et elle vaut ici aussi. Deux choses la désamorcent toutefois. Le \emph{classement} des estimateurs est inchangé sous les trois pondérations, de sorte que les comparaisons de ce chapitre sont robustes. Et les termes $a$ et $b$, eux, sont ajustés point par point et ne dépendent pas du spectre : ce sont eux qu'il faut citer pour caractériser un estimateur, la colonne $\sigma/E$ ne servant qu'à situer l'ordre de grandeur sur ce lot précis.
+
 \paragraph{Le terme stochastique est un plancher, sauf au niveau des hits.} La calibration $\chi^2$ et les deux variantes du BDT sont compatibles autour de $54\,\%$, dans leurs incertitudes : aucun estimateur fondé sur les descripteurs de gerbe ne déplace ce terme, ce qui est cohérent avec son interprétation comme propriété de l'échantillonnage du détecteur. Le réseau lisant les amas l'abaisse à $45{,}5 \pm 1{,}0\,\%$, soit huit points, très au-delà des incertitudes.
 
 \paragraph{Les deux familles n'améliorent pas le même terme.} L'avantage du BDT sur la calibration $\chi^2$ réside entièrement dans le terme \emph{constant} ($5{,}6\,\%$ contre $7{,}0\,\%$, environ quatre écarts-types), c'est-à-dire dans le traitement de la calibration et des fuites. Celui du réseau réside dans le terme \emph{stochastique}, c'est-à-dire dans la compensation, événement par événement, du partage entre composantes électromagnétique et hadronique — précisément le mécanisme invoqué pour le DRN de HGCAL. Ce sont deux effets distincts, qu'une résolution globale confond.
@@ -170,7 +205,9 @@ Calibration $\chi^2$              & ---        & $54{,}4 \pm 1{,}2$ & $7{,}0 \pm
 
 Elle n'est pas pour autant \emph{suffisante}. Appliquée au BDT sur descripteurs de gerbe, la même cible ne change rien : $a = 53{,}7 \pm 1{,}0\,\%$ contre $53{,}6 \pm 1{,}1\,\%$. La formulation a donc permis au réseau d'exploiter une information que les descripteurs ne portent pas ; elle ne l'a pas créée. C'est, dans ce travail, l'argument le plus direct en faveur des méthodes au niveau des hits — et il contraste avec le constat de la section~\ref{sec:pid-approfondissement}, où le même accès aux hits n'apporte rien à l'identification.
 
-\paragraph{Réserves.} Le réseau a été entraîné sous contrainte de temps de calcul et dispose de deux fois moins d'événements que le BDT ; la comparaison lui est donc défavorable sur ce point, ce qui renforce plutôt la conclusion. La dispersion de graine n'a été établie que pour le BDT, où la résolution vaut $0{,}1200 \pm 0{,}0008$ sur cinq graines : l'écart au réseau y est très supérieur. Enfin, la comparaison de $a = 45{,}5\,\%$ aux valeurs publiées sur DHCAL~\cite{borysova2025dhcalgnn} doit tenir compte de détecteurs, de gammes d'énergie et de définitions du c\oe{}ur différents.
+\paragraph{Réserves.} Le réseau a été entraîné sous contrainte de temps de calcul et dispose de deux fois moins d'événements que le BDT ; la comparaison lui est donc défavorable sur ce point, ce qui renforce plutôt la conclusion. La dispersion de graine n'a été établie que pour le BDT, où la résolution vaut $0{,}1200 \pm 0{,}0008$ sur cinq graines : l'écart au réseau y est très supérieur. La comparaison de $a = 45{,}5\,\%$ aux valeurs publiées sur DHCAL~\cite{borysova2025dhcalgnn} doit tenir compte de détecteurs, de gammes d'énergie et de définitions du c\oe{}ur différents, et toutes les valeurs de ce chapitre sont celles d'un échantillon confiné (section~\ref{subsec:confinement}).
+
+Enfin, l'estimateur de dispersion lui-même repose sur une hypothèse. La largeur est extraite du c\oe{}ur central à $90\,\%$ puis corrigée du facteur de troncature gaussien ; cette correction est exacte pour un c\oe{}ur gaussien, ce que les résidus hadroniques ne sont pas tout à fait. Sur des distributions à queues lourdes, l'incertitude associée est sous-estimée d'environ un quart. Les écarts discutés plus haut — $0{,}009$ entre familles d'estimateurs, $0{,}0002$ entre sources d'étiquette au chapitre~\ref{sec:analyse_mixte} — se situent l'un très au-dessus et l'autre très en dessous de cette marge, de sorte qu'aucune conclusion n'en dépend. Il reste à vérifier, sur ce détecteur, si une connectivité explicite entre amas ajoute quoi que ce soit à l'encodeur d'ensemble employé ici : la question n'a pas été tranchée faute de temps de calcul.
 
 \section{Limites et systématiques}
 \label{sec:energie-limites}

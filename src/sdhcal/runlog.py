@@ -30,14 +30,13 @@ import csv
 import json
 import logging
 import os
-import platform
-import subprocess
-import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from .manifest import EVENT_COUNT_FIELDS
+from .provenance import environment_fingerprint, to_jsonable
 
 logger = logging.getLogger(__name__)
 
@@ -107,45 +106,6 @@ def next_run_id(*csv_paths: Path) -> int:
             except (TypeError, ValueError):
                 continue
     return highest + 1
-
-
-def environment_fingerprint() -> dict[str, str]:
-    """Record what produced a run: git commit, Python and key package versions."""
-    info: dict[str, str] = {
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "python": sys.version.split()[0],
-        "platform": platform.platform(),
-    }
-    try:
-        info["git_commit"] = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=Path(__file__).resolve().parent,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=True,
-        ).stdout.strip()
-        info["git_dirty"] = str(
-            bool(
-                subprocess.run(
-                    ["git", "status", "--porcelain"],
-                    cwd=Path(__file__).resolve().parent,
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                    check=True,
-                ).stdout.strip()
-            )
-        )
-    except Exception:  # git absent, or not a checkout
-        info["git_commit"] = "unknown"
-
-    for module in ("numpy", "pandas", "sklearn", "lightgbm", "uproot", "imblearn", "torch"):
-        try:
-            info[f"version_{module}"] = __import__(module).__version__
-        except Exception:
-            continue
-    return info
 
 
 @dataclass
@@ -218,6 +178,18 @@ class RunLogger:
         self._config.setdefault("artifacts", {}).update({k: str(v) for k, v in artifacts.items()})
         self._write_json()
 
+    def log_event_counts(self, **counts: int | None) -> None:
+        """Record exact split counts, using null when a quantity is unavailable."""
+        self._require_started()
+        unknown = sorted(set(counts) - set(EVENT_COUNT_FIELDS))
+        if unknown:
+            raise ValueError(f"unknown event count field(s): {', '.join(unknown)}")
+        for name, value in counts.items():
+            if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+                raise ValueError(f"event count {name} must be a non-negative integer or null")
+        self._config.setdefault("event_counts", {}).update(counts)
+        self._write_json()
+
     def path(self, *parts: str) -> Path:
         """Build a run-scoped output path, creating the parent directory."""
         self._require_started()
@@ -252,12 +224,4 @@ def _flatten(value: Any) -> Any:
 
 
 def _jsonable(value: Any) -> Any:
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, Mapping):
-        return {str(k): _jsonable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_jsonable(v) for v in value]
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-    return str(value)
+    return to_jsonable(value)

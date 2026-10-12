@@ -6,16 +6,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import joblib
 import matplotlib
 import pandas as pd
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
 from sklearn.inspection import permutation_importance
 
-from train import Config, load_sample
+from sdhcal import artifacts, pid_mlp
 
 
 def main() -> int:
@@ -29,7 +27,7 @@ def main() -> int:
     if args.repeats < 1:
         raise SystemExit("--repeats must be positive")
 
-    artifact = joblib.load(args.model)
+    artifact = artifacts.load_bundle(args.model, kind="pid")
     if artifact.get("particles") != ["pi", "proton"]:
         raise ValueError("Permutation importance requires a binary pion/proton artifact")
     features = list(artifact["features"])
@@ -38,14 +36,14 @@ def main() -> int:
     if sigma == "none":
         sigma = None
     seed = int(smearing.get("smear_seed", 42))
-    cfg = Config(
+    cfg = pid_mlp.Config(
         feature_cols=features,
         random_state=seed,
         smear_sigma_ns=sigma,
         max_shards_per_particle=args.max_shards_per_particle,
         max_events_per_particle=args.max_events_per_particle,
     )
-    validation = load_sample("discret", cfg, seed + 10_000)
+    validation = pid_mlp.load_sample("discret", cfg, seed + 10_000)
     x = artifact["scaler"].transform(validation[features])
     y = validation["label"].to_numpy()
     result = permutation_importance(

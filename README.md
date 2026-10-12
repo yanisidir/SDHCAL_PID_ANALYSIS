@@ -96,10 +96,10 @@ or derived shower parameters. Maintained scripts resolve their inputs through
 ```text
 .
 ├── src/sdhcal/              Shared Python library, installed with `pip install -e .`
-│                              paths  rootio  smearing  splits  metrics  target  runlog  calib
+│                              data, models, predictions, configs, provenance, manifests
 ├── cpp/                     Shared C++ used by the ROOT stages
-│   ├── include/                ShowerAnalyzer.h, SdhcalPaths.h
-│   └── src/                    ShowerAnalyzer.cpp
+│   ├── include/                analysis, feature records and ROOT contracts
+│   └── src/                    shared scientific calculation and ROOT I/O
 │
 ├── analysis/                THE CHAIN, one directory per stage
 │   ├── 1_shower_features/      digitized hits -> shower variables  (C++/ROOT)
@@ -133,6 +133,7 @@ See also:
 
 - [Project handover](docs/HANDOVER.md)
 - [Data pipeline](docs/data_pipeline.md)
+- [Execution and reproducibility](docs/reproducibility.md)
 - [Results summary](docs/results_summary.md)
 
 ## Internship Report
@@ -186,6 +187,8 @@ anything:
 ```bash
 make pid PID_ARGS="--no-timing"
 make energy ENERGY_ARGS="--particles pi --seeds 10 --require-contained"
+make test PYTHON=/path/to/python
+make cpp ROOT_CONFIG=/path/to/root-config
 ```
 
 Each target simply calls the stage's own script, so you can always call it
@@ -211,6 +214,11 @@ Every run writes its full configuration - feature list, smearing width, seeds,
 git commit, package versions - to `$SDHCAL_OUT_DIR/<study>/runs/*.json`, so a
 figure can be traced back to the configuration that produced it. See
 [analysis/README.md](analysis/README.md) for the conventions every stage shares.
+For future published result sets, `tools/create_release.py` writes a portable
+manifest under `results/<release-id>/` without moving or duplicating the existing
+models and predictions. Explicit run selection, environment snapshots and the
+manifest schema are documented in
+[docs/reproducibility.md](docs/reproducibility.md).
 
 ## Representative Results and Figures
 
@@ -282,11 +290,10 @@ Read these before quoting any number from this repository.
 
 - Re-run every study with the corrected estimators and publish a single
   benchmark table with uncertainties from the multi-seed runs.
-- Add a small synthetic fixture so the pipelines, not just the shared package,
-  can be smoke-tested in CI.
 - Scan the timing resolution instead of fixing sigma = 0.1 ns, now that the
   smearing is independent per variable and configurable.
-- Record a container or lock file for the ROOT and Python versions.
+- Validate and, if appropriate, publish a fully locked cross-platform scientific
+  environment beyond the Linux/Python 3.11 reference constraints used in CI.
 - Treat `Begin = 48` as a categorical "not found" flag for the neural models
   rather than an extreme numerical value.
 

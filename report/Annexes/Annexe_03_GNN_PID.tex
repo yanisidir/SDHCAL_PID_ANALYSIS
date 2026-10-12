@@ -20,14 +20,18 @@ Chaque hit est décrit par ses informations brutes \((x,\; y,\; z,\; t,\; \mathr
 
 \section{Construction du graphe}
 
-Chaque événement est converti en graphe orienté reliant les hits selon un critère de proximité spatiale et de causalité longitudinale, afin de reconstruire une topologie cohérente avec la propagation de la gerbe.
+Chaque événement est converti en graphe reliant les hits selon un critère de proximité spatiale et de causalité longitudinale, afin de reconstruire une topologie cohérente avec la propagation de la gerbe. L'orientation effective du graphe transmis au réseau fait l'objet d'une réserve précisée plus bas.
 
 Pour chaque nœud \(i\), on retient ses \(k = 8\) plus proches voisins au sens de la distance sur coordonnées normalisées,
 \[
 d_{ij}^{2} =
 (x'_i-x'_j)^2 + (y'_i-y'_j)^2 + (z'_i-z'_j)^2,
 \]
-parmi les seuls hits situés en amont du développement : la \textbf{contrainte causale} \(z_j < z_i\) interdit les arêtes entre régions tardives et précoces, qui n'auraient pas de sens physique. Une \textbf{fenêtre temporelle} \(|t_i - t_j| < \Delta t\), avec \(\Delta t = 2.0\), élimine enfin les connexions incompatibles avec la chronologie du dépôt. Le graphe résultant associe à chaque événement un ensemble de nœuds porteurs de leurs sept caractéristiques et un ensemble d'arêtes locales cohérentes en profondeur comme en temps, ce qui permet au réseau d'exploiter la morphologie tridimensionnelle sans imposer de discrétisation en voxels.
+parmi les seuls hits situés en amont du développement : la \textbf{contrainte causale} \(z_j < z_i\) interdit les arêtes entre régions tardives et précoces, qui n'auraient pas de sens physique. Une \textbf{fenêtre temporelle} \(|t_i - t_j| < \Delta t\), avec \(\Delta t = 2.0\), élimine enfin les connexions incompatibles avec la chronologie du dépôt. Le graphe résultant associe à chaque événement un ensemble de nœuds porteurs de leurs sept caractéristiques et un ensemble d'arêtes locales cohérentes en temps, ce qui permet au réseau d'exploiter la morphologie tridimensionnelle sans imposer de discrétisation en voxels.
+
+\paragraph{Réserve sur l'orientation effective.} La description ci-dessus est celle du critère de sélection ; elle n'est pas celle du graphe finalement transmis au réseau. Les exécutions ayant produit les résultats cités activent conjointement la contrainte causale et une symétrisation du graphe, appliquée après la sélection des voisins. Or cette symétrisation rétablit chaque arête dans les deux sens. Sur un événement de contrôle de soixante nœuds, le graphe causal seul ne contient aucune arête remontant en profondeur, tandis que le graphe causal \emph{et} symétrisé en contient exactement la moitié — la contrainte \(z_j < z_i\) est donc intégralement annulée.
+
+L'effet n'est pas pour autant nul : la contrainte modifie l'ensemble des paires \emph{sélectionnées} par le \(k\)-NN, de sorte que le graphe obtenu diffère de celui qu'aurait produit une construction non causale ($888$ arêtes contre $616$ sur le même événement de contrôle). Ce qui est perdu est l'orientation, non la sélection. Les performances rapportées pour le GNN doivent donc se lire comme celles d'un graphe de voisinage local non orienté : l'apport propre d'une orientation longitudinale reste à mesurer, et demanderait de désactiver la symétrisation.
 
 \section{Architecture et entraînement}
 
@@ -90,7 +94,7 @@ Dimension d’entrée &
 7 variables par nœud. \\
 
 Construction des arêtes &
-Voisinage \(k\)-NN causal avec \(k=8\), contrainte en profondeur et fenêtre temporelle \(\Delta t = 2.0\). \\
+Voisinage \(k\)-NN avec \(k=8\), sélection sous contrainte de profondeur et fenêtre temporelle \(\Delta t = 2.0\), graphe symétrisé. \\
 
 Prétraitement &
 \texttt{RobustScaler} pour l’espace, \texttt{QuantileTransformer} pour le temps. \\

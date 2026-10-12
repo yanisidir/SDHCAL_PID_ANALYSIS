@@ -256,3 +256,40 @@ def test_every_third_party_import_is_declared():
     assert not undeclared, "imported but not declared: " + ", ".join(
         f"{name} (e.g. {where})" for name, where in sorted(undeclared.items())
     )
+
+
+def test_every_two_class_stage_is_pinned_to_the_corrected_shard_lot():
+    """The 2class targets must not inherit the default shard directory.
+
+    ``paths.shards_dir()`` defaults to ``new_data_params``, the lot produced
+    before the ShowerAnalyzer corrections. Reading it raises nothing: it yields
+    the inverted eccentricity and the unbounded Gaisser-Hillas fit, and a model
+    trained on them reports plausible numbers. The MLP was trained that way once
+    and the only symptom was an AUC of 0.599 instead of 0.677.
+
+    So ``TWO_CLASS`` pins both variables, and every 2class recipe goes through
+    it. A stage added later without the prefix is the way this comes back.
+    """
+    makefile = (REPO / "Makefile").read_text(encoding="utf-8")
+
+    definition = re.search(r"^TWO_CLASS\s*:?=\s*(.+)$", makefile, re.MULTILINE)
+    assert definition, "the Makefile no longer defines TWO_CLASS"
+    assert "SDHCAL_PARAMS_SET=2class" in definition.group(1)
+    assert "SDHCAL_SHARDS_DIR=" in definition.group(1), (
+        "TWO_CLASS must pin SDHCAL_SHARDS_DIR; without it the 2class targets "
+        "silently read the pre-correction lot"
+    )
+
+    unpinned, target = [], None
+    for line in makefile.splitlines():
+        header = re.match(r"^([\w.-]+)\s*:[^=]", line)
+        if header:
+            target = header.group(1)
+        elif line.startswith("\t") and target and target.endswith("-2class"):
+            # Recipe lines that run a Python stage must carry the environment.
+            if "$(PYTHON)" in line and "$(TWO_CLASS)" not in line:
+                unpinned.append(f"{target}: {line.strip()}")
+        elif not line.startswith("\t") and line.strip():
+            target = None
+
+    assert not unpinned, "2class recipe(s) missing $(TWO_CLASS): " + "; ".join(unpinned)

@@ -11,9 +11,10 @@
 # table is over one sample: 6,027 events for the PID, where the hit-level
 # networks saw the fewest, and 100,744 for the energy.
 
+# shellcheck source=scripts/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 step "predictions, comparison tables, ROOT figures, report/Fig"
-make predictions-2class benchmark-2class
+make predictions-2class benchmark-2class PYTHON="$PYTHON" ROOT="$ROOT_EXE"
 
 step "done"

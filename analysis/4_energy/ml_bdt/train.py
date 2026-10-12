@@ -48,13 +48,10 @@ from __future__ import annotations
 
 import argparse
 import logging
-import random
-import sys
-from dataclasses import dataclass, field, replace
+from collections.abc import Sequence
+from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
 
-import joblib
 import lightgbm as lgb
 import matplotlib
 import numpy as np
@@ -63,174 +60,30 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # the backend must be selected before this import
 
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import GridSearchCV, KFold
-
-
-from sdhcal import calib, metrics, paths, rootio, runlog, splits
-from sdhcal.smearing import TimeSmearing, smear_time_columns
-from sdhcal.target import make_target
+from sdhcal import artifacts, calib, metrics, paths, provenance, rootio, runlog, splits
+from sdhcal import config as sdconfig
+from sdhcal.energy_bdt import (
+    Config,
+    build_regressor,  # noqa: F401  historical import surface
+    evaluate,
+    mode_particles,
+    set_global_seeds,
+    train,
+)
+from sdhcal.smearing import smear_time_columns
 
 LOG_FORMAT = "%(asctime)s | %(levelname)8s | %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, datefmt="%H:%M:%S")
 logger = logging.getLogger("energy_reco_lgbm")
 
 #: Particle keys accepted on the command line, plus the inclusive mixture.
-PARTICLE_COLORS: Dict[str, str] = {"pi": "tab:red", "proton": "tab:blue", "kaon": "tab:green", "mixed": "0.3"}
-
-
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-@dataclass
-class Config:
-    """Everything that defines a run. Logged verbatim, feature list included."""
-
-    tree_name: str = "paramsTree"
-    energy_col: str = "primaryEnergy"
-
-    feature_cols: Sequence[str] = field(
-        default_factory=lambda: [
-            "Density",
-            "NClusters",
-            "Zbary",
-            "AvgClustSize",
-            "N3",
-            "N2",
-            "N1",
-            "nHitsTotal",
-            "sumThrTotal",
-        ]
-    )
-
-    # Split: both fractions are of the whole sample.
-    test_size: float = 0.20
-    val_size: float = 0.10
-    random_state: int = 42
-
-    # Target transform.
-    target: str = "log"
-    #: Predict log(E_true / E_chi2) instead of log(E_true). The regressor then
-    #: corrects the semi-digital calibration rather than replacing it, which
-    #: separates two explanations of the graph network's gain: the formulation
-    #: of the target, or the hit-level information it sees.
-    ratio_to_chi2: bool = False
-    correct_target_bias: bool = True
-
-    # Time smearing. sigma_ns=None means "ideal timing".
-    smear_sigma_ns: Optional[float] = None
-    smear_columns: Sequence[str] = ("tMin", "tMax", "tMean", "tSpread")
-
-    # Event selection. The chi2 chain rejects showers that reach the last layer;
-    # applying the same cut here is what makes the two methods comparable.
-    require_contained: bool = False
-    last_layer: int = 47
-
-    #: Drop the events of the held-out file before splitting, so the coupling
-    #: study evaluates the regressor on events it never saw.
-    exclude_holdout: bool = False
-
-    # LightGBM.
-    learning_rate: float = 0.05
-    n_estimators: int = 2000
-    num_leaves: int = 127
-    max_depth: int = -1
-    reg_alpha: float = 0.0
-    reg_lambda: float = 0.1
-    min_child_samples: int = 20
-    subsample: float = 0.8
-    colsample_bytree: float = 0.8
-    early_stopping_rounds: int = 50
-
-    # Evaluation.
-    n_bins: int = 13
-    log_bins: bool = False
-    core_method: str = "truncated_rms"
-    core_frac: float = 0.9
-
-    grid_search: bool = False
-    param_grid: Dict[str, List] = field(
-        default_factory=lambda: {
-            "num_leaves": [63, 127, 255],
-            "max_depth": [-1, 8, 12],
-            "learning_rate": [0.01, 0.05, 0.1],
-            "n_estimators": [1000, 2000],
-        }
-    )
-
-    def smearing(self) -> TimeSmearing:
-        return TimeSmearing(
-            sigma_ns=self.smear_sigma_ns,
-            columns=tuple(self.smear_columns),
-            seed=self.random_state,
-        )
-
-    def loggable(self, mode: str) -> Dict[str, object]:
-        """Flat description of the run for the parameter log."""
-        out: Dict[str, object] = {
-            "mode": mode,
-            "tree_name": self.tree_name,
-            "energy_col": self.energy_col,
-            "test_size": self.test_size,
-            "val_size": self.val_size,
-            "random_state": self.random_state,
-            "target": self.target,
-            "correct_target_bias": int(self.correct_target_bias),
-            "require_contained": int(self.require_contained),
-            "exclude_holdout": int(self.exclude_holdout),
-            "learning_rate": self.learning_rate,
-            "n_estimators": self.n_estimators,
-            "num_leaves": self.num_leaves,
-            "max_depth": self.max_depth,
-            "reg_alpha": self.reg_alpha,
-            "reg_lambda": self.reg_lambda,
-            "min_child_samples": self.min_child_samples,
-            "subsample": self.subsample,
-            "colsample_bytree": self.colsample_bytree,
-            "early_stopping_rounds": self.early_stopping_rounds,
-            "core_method": self.core_method,
-            "core_frac": self.core_frac,
-            "n_bins": self.n_bins,
-            "log_bins": int(self.log_bins),
-            "grid_search": int(self.grid_search),
-        }
-        out.update(self.smearing().as_dict())
-        return out
-
-
-def set_global_seeds(seed: int) -> None:
-    """Seed Python and NumPy. LightGBM on several threads stays slightly jittery."""
-    random.seed(seed)
-    np.random.seed(seed)
+PARTICLE_COLORS: dict[str, str] = {"pi": "tab:red", "proton": "tab:blue", "kaon": "tab:green", "mixed": "0.3"}
 
 
 # ---------------------------------------------------------------------------
 # Data
 # ---------------------------------------------------------------------------
-def mode_particles(mode: str) -> Tuple[str, ...]:
-    """Particles feeding a mode.
-
-    ``pi`` trains on pions alone; ``mixed`` trains a single inclusive regressor on
-    all three species; ``mix-pi-proton`` trains one inclusive regressor on the
-    listed subset, which is what the old ``pion_proton_Ereco_lgbm.py`` did.
-    """
-    if mode == "mixed":
-        # Every species of the active study, which is two in the pion/proton
-        # study and three in the original one.
-        return tuple(paths.active_particles())
-    if mode.startswith("mix-"):
-        wanted = tuple(mode.split("-")[1:])
-        unknown = [p for p in wanted if p not in paths.active_particles()]
-        if unknown or len(wanted) < 2:
-            raise SystemExit(
-                f"bad mixture {mode!r}: expected mix-<particle>-<particle>[...] "
-                f"with particles among {paths.active_particles()}"
-            )
-        return wanted
-    return (mode,)
-
-
-def input_files(mode: str) -> List[Path]:
+def input_files(mode: str) -> list[Path]:
     """ROOT files feeding a mode."""
     return [paths.dataset("params_merged", particle) for particle in mode_particles(mode)]
 
@@ -251,9 +104,7 @@ def load_dataset(mode: str, cfg: Config) -> pd.DataFrame:
     df = rootio.clean(df, columns=needed)
 
     if cfg.exclude_holdout:
-        holdout = rootio.load_trees(
-            paths.dataset("holdout"), cfg.tree_name, ["particlePDG", "eventNumber"]
-        )
+        holdout = rootio.load_trees(paths.dataset("holdout"), cfg.tree_name, ["particlePDG", "eventNumber"])
         df, dropped = splits.exclude_keys(df, splits.event_keys(holdout))
         logger.info("Mode %-7s excluded %d held-out events", mode, dropped)
         if not dropped:
@@ -304,148 +155,15 @@ def apply_containment(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# Model
-# ---------------------------------------------------------------------------
-def build_regressor(cfg: Config, seed: int) -> lgb.LGBMRegressor:
-    return lgb.LGBMRegressor(
-        objective="regression",
-        learning_rate=cfg.learning_rate,
-        n_estimators=cfg.n_estimators,
-        num_leaves=cfg.num_leaves,
-        max_depth=cfg.max_depth,
-        reg_alpha=cfg.reg_alpha,
-        reg_lambda=cfg.reg_lambda,
-        min_child_samples=cfg.min_child_samples,
-        subsample=cfg.subsample,
-        colsample_bytree=cfg.colsample_bytree,
-        random_state=seed,
-        n_jobs=-1,
-        metric="l2",
-        verbose=-1,
-    )
-
-
-def train(
-    x_train: pd.DataFrame,
-    y_train: np.ndarray,
-    x_val: pd.DataFrame,
-    y_val: np.ndarray,
-    cfg: Config,
-    seed: int,
-):
-    """Fit the regressor on the transformed target, early-stopping on validation.
-
-    Both evaluation sets are registered, in the order their names declare, so
-    ``evals_result_`` really contains a train curve and a validation curve.
-    """
-    target = make_target(cfg.target, correct_bias=cfg.correct_target_bias)
-    z_train, z_val = target.forward(y_train), target.forward(y_val)
-
-    params = {}
-    if cfg.grid_search:
-        logger.info("Running GridSearchCV on the training split")
-        grid = GridSearchCV(
-            build_regressor(cfg, seed),
-            cfg.param_grid,
-            cv=KFold(n_splits=5, shuffle=True, random_state=seed),
-            scoring="neg_root_mean_squared_error",
-            n_jobs=-1,
-            verbose=1,
-        )
-        grid.fit(x_train, z_train)
-        params = grid.best_params_
-        logger.info("Best parameters: %s", params)
-
-    model = build_regressor(cfg, seed)
-    if params:
-        model.set_params(**params)
-    model.fit(
-        x_train,
-        z_train,
-        eval_set=[(x_train, z_train), (x_val, z_val)],
-        eval_names=["train", "valid"],
-        eval_metric="l2",
-        callbacks=[
-            lgb.early_stopping(cfg.early_stopping_rounds, verbose=False),
-            lgb.log_evaluation(period=200),
-        ],
-    )
-
-    # The bias correction of the back-transform is measured on validation data,
-    # never on the test set.
-    factor = target.fit_correction(y_val, model.predict(x_val))
-    logger.info(
-        "Back-transform bias correction (Duan smearing factor): %.5f  [%+.2f %% on the energy scale]",
-        factor,
-        100.0 * (factor - 1.0),
-    )
-    return model, target, params
-
-
-def evaluate(
-    model: lgb.LGBMRegressor,
-    target,
-    x_test: pd.DataFrame,
-    y_test: np.ndarray,
-    cfg: Config,
-    scale: np.ndarray | None = None,
-) -> Tuple[Dict[str, float], np.ndarray]:
-    """Compute the test metrics, keeping bias and resolution apart.
-
-    ``scale`` puts both the truth and the prediction back into GeV when the
-    regressor was trained on a ratio. A resolution quoted on a ratio is not
-    comparable with anything else in the benchmark, so the conversion happens
-    here rather than being left to the caller.
-    """
-    y_pred = target.inverse(model.predict(x_test))
-    if scale is not None:
-        y_pred = y_pred * scale
-        y_test = y_test * scale
-
-    core = metrics.core_bias_resolution(
-        metrics.relative_residual(y_test, y_pred),
-        method=cfg.core_method,
-        frac=cfg.core_frac,
-    )
-    out = {
-        "rmse_gev": float(mean_squared_error(y_test, y_pred) ** 0.5),
-        "mae_gev": float(mean_absolute_error(y_test, y_pred)),
-        "r2": float(r2_score(y_test, y_pred)),
-        "bias": core.bias,
-        "bias_err": core.bias_err,
-        "resolution": core.sigma,
-        "resolution_err": core.sigma_err,
-        "energy_scale": float(np.mean(y_pred) / np.mean(y_test)),
-        # Historical definition, kept so older rows stay comparable.
-        "rms_rel_about_zero": metrics.rms_relative_about_zero(y_test, y_pred),
-        "n_test": int(y_test.size),
-        "best_iteration": int(getattr(model, "best_iteration_", 0) or 0),
-        "target_bias_correction": float(getattr(target, "factor", 1.0)),
-    }
-    logger.info(
-        "Test: RMSE=%.3f GeV  MAE=%.3f GeV  R2=%.4f | bias=%+.4f+-%.4f  resolution=%.4f+-%.4f "
-        "| scale=%.4f  (historical rms=%.4f)",
-        out["rmse_gev"],
-        out["mae_gev"],
-        out["r2"],
-        out["bias"],
-        out["bias_err"],
-        out["resolution"],
-        out["resolution_err"],
-        out["energy_scale"],
-        out["rms_rel_about_zero"],
-    )
-    return out, y_pred
-
-
-# ---------------------------------------------------------------------------
 # Plots
 # ---------------------------------------------------------------------------
-def plot_training_curve(evals: Dict[str, Dict[str, List[float]]], out: Path) -> None:
+def plot_training_curve(evals: dict[str, dict[str, list[float]]], out: Path) -> None:
     train_curve = evals.get("train", {}).get("l2", [])
     valid_curve = evals.get("valid", {}).get("l2", [])
     if not train_curve or not valid_curve:
-        logger.warning("No training curve available (train=%d, valid=%d points)", len(train_curve), len(valid_curve))
+        logger.warning(
+            "No training curve available (train=%d, valid=%d points)", len(train_curve), len(valid_curve)
+        )
         return
     plt.figure(figsize=(6, 4))
     plt.plot(train_curve, label="train")
@@ -463,7 +181,7 @@ def plot_training_curve(evals: Dict[str, Dict[str, List[float]]], out: Path) -> 
 def plot_linearity(y_true: np.ndarray, y_pred: np.ndarray, out: Path, cfg: Config) -> None:
     bins = metrics.energy_bins(float(y_true.min()), float(y_true.max()), cfg.n_bins, log=cfg.log_bins)
     centers, means, errors = [], [], []
-    for lo, hi in zip(bins[:-1], bins[1:]):
+    for lo, hi in zip(bins[:-1], bins[1:], strict=True):
         mask = (y_true >= lo) & (y_true < hi)
         if mask.sum() < 20:
             continue
@@ -487,7 +205,9 @@ def plot_linearity(y_true: np.ndarray, y_pred: np.ndarray, out: Path, cfg: Confi
     plt.close()
 
 
-def plot_bias_and_resolution(y_true: np.ndarray, y_pred: np.ndarray, out: Path, cfg: Config) -> Dict[str, np.ndarray]:
+def plot_bias_and_resolution(
+    y_true: np.ndarray, y_pred: np.ndarray, out: Path, cfg: Config
+) -> dict[str, np.ndarray]:
     """Bias and resolution versus true energy, on one figure, with error bars."""
     binned = metrics.binned_bias_resolution(
         y_true,
@@ -538,7 +258,13 @@ def plot_feature_importance(model: lgb.LGBMRegressor, features: Sequence[str], o
 # ---------------------------------------------------------------------------
 # One mode, one or several seeds
 # ---------------------------------------------------------------------------
-def run_single_seed(mode: str, cfg: Config, seed: int, log: runlog.RunLogger) -> Dict[str, float]:
+def run_single_seed(
+    mode: str,
+    cfg: Config,
+    seed: int,
+    log: runlog.RunLogger,
+    resolved_config: dict | None = None,
+) -> dict[str, float]:
     """Train and evaluate once, write the artifacts, return the test metrics."""
     set_global_seeds(seed)
     seeded = replace(cfg, random_state=seed)
@@ -565,9 +291,7 @@ def run_single_seed(mode: str, cfg: Config, seed: int, log: runlog.RunLogger) ->
         )
         y = y / baseline
 
-    split = splits.split_indices(
-        len(df), test_size=seeded.test_size, val_size=seeded.val_size, seed=seed
-    )
+    split = splits.split_indices(len(df), test_size=seeded.test_size, val_size=seeded.val_size, seed=seed)
     logger.info("Split sizes: %s", split.sizes())
 
     model, target, best_params = train(
@@ -588,7 +312,18 @@ def run_single_seed(mode: str, cfg: Config, seed: int, log: runlog.RunLogger) ->
     tag = f"{mode}_{log.run_id}_seed{seed}"
     plots = log.base_dir / "plots"
     model_path = log.path("models", f"lgbm_regressor_{tag}.joblib")
-    joblib.dump(
+    dependencies = None
+    if seeded.ratio_to_chi2:
+        dependencies = {
+            "chi2_pi_calibration": provenance.file_reference(calib.coefficients_path(), include_sha256=True)
+        }
+    artifact_config = (
+        sdconfig.update_resolved_values(resolved_config, mode=mode, random_state=seed)
+        if resolved_config is not None
+        else {**seeded.loggable(mode), "ratio_to_chi2": int(seeded.ratio_to_chi2)}
+    )
+    artifacts.save_bundle(
+        model_path,
         {
             "model": model,
             "target": target,
@@ -597,7 +332,20 @@ def run_single_seed(mode: str, cfg: Config, seed: int, log: runlog.RunLogger) ->
             # correction factor and nothing downstream would notice.
             "baseline": "chi2_pi" if seeded.ratio_to_chi2 else None,
         },
-        model_path,
+        kind="energy",
+        model_family="lightgbm",
+        preprocessing={
+            "target": target.as_dict(),
+            "smearing": seeded.smearing().as_dict(),
+        },
+        training_counts={
+            "train": int(len(split.train)),
+            "validation": int(len(split.val)),
+            "test": int(len(split.test)),
+        },
+        configuration=artifact_config,
+        dependencies=dependencies,
+        provenance=provenance.environment_fingerprint(),
     )
 
     plot_training_curve(model.evals_result_, log.path("plots", f"training_curve_{tag}.png"))
@@ -626,17 +374,31 @@ def run_single_seed(mode: str, cfg: Config, seed: int, log: runlog.RunLogger) ->
     return results
 
 
-def run_mode(mode: str, cfg: Config, n_seeds: int) -> Dict[str, float]:
+def run_mode(
+    mode: str,
+    cfg: Config,
+    n_seeds: int,
+    resolved_config: dict | None = None,
+) -> dict[str, float]:
     """Run one mode with ``n_seeds`` independent splits and summarise."""
     out_dir = paths.output_dir() / "energy_reco_lgbm" / mode
     log = runlog.RunLogger(out_dir, name="energy_reco")
     log.start(cfg.loggable(mode), features=list(cfg.feature_cols))
+    if resolved_config is not None:
+        mode_config = sdconfig.update_resolved_values(resolved_config, mode=mode)
+        resolved_path = sdconfig.write_resolved_config(
+            log.path("runs", f"energy_reco_{log.run_id}_resolved_config.json"),
+            mode_config,
+        )
+        log.log_artifacts(resolved_config=resolved_path)
     logger.info("=== mode %s | run %d | %d seed(s) ===", mode, log.run_id, n_seeds)
 
-    per_seed = [run_single_seed(mode, cfg, cfg.random_state + i, log) for i in range(n_seeds)]
+    per_seed = [
+        run_single_seed(mode, cfg, cfg.random_state + i, log, resolved_config) for i in range(n_seeds)
+    ]
     pd.DataFrame(per_seed).to_csv(log.path("tables", f"per_seed_{mode}_{log.run_id}.csv"), index=False)
 
-    summary: Dict[str, float] = {"n_seeds": n_seeds}
+    summary: dict[str, float] = {"n_seeds": n_seeds}
     for key in ("rmse_gev", "mae_gev", "r2", "bias", "resolution", "energy_scale", "rms_rel_about_zero"):
         values = np.array([r[key] for r in per_seed], dtype=float)
         summary[key] = float(values.mean())
@@ -681,7 +443,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--ratio-to-chi2",
         action="store_true",
         help="predict log(E_true / E_chi2) rather than the energy: the regressor "
-             "corrects the semi-digital calibration instead of replacing it",
+        "corrects the semi-digital calibration instead of replacing it",
     )
     p.add_argument(
         "--no-bias-correction",
@@ -690,9 +452,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--features", nargs="+", default=None, help="override the feature list")
     p.add_argument(
-        "--exclude-holdout", action="store_true",
+        "--exclude-holdout",
+        action="store_true",
         help="drop the held-out events before splitting, so the coupling study evaluates "
-             "on events this regressor never saw",
+        "on events this regressor never saw",
     )
     p.add_argument(
         "--sigma-time",
@@ -716,10 +479,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="resolution estimator",
     )
     p.add_argument("--grid-search", action="store_true", help="search hyper-parameters first")
+    p.add_argument("--config", type=Path, default=None, help="optional versioned JSON configuration")
     return p
 
 
-def resolve_modes(requested: Sequence[str]) -> List[str]:
+def resolve_modes(requested: Sequence[str]) -> list[str]:
     if "all" in requested:
         return list(paths.active_particles())
     allowed = (*paths.active_particles(), "mixed")
@@ -734,30 +498,73 @@ def resolve_modes(requested: Sequence[str]) -> List[str]:
     return list(dict.fromkeys(requested))
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = build_parser().parse_args(argv)
-    if args.seeds < 1:
+def resolve_configuration(
+    argv: Sequence[str] | None = None,
+) -> tuple[Config, list[str], int, dict]:
+    args, explicit = sdconfig.parse_cli(build_parser(), argv)
+    defaults = asdict(Config())
+    defaults.update(particles=["all"], seeds=1)
+
+    document = None
+    file_values = {}
+    if args.config is not None:
+        document = sdconfig.load_config(args.config)
+        file_values = sdconfig.workflow_values(document, "energy_bdt", params_set=paths.params_set())
+
+    cli_values = {}
+    mapping = {
+        "particles": "particles",
+        "target": "target",
+        "ratio_to_chi2": "ratio_to_chi2",
+        "features": "feature_cols",
+        "exclude_holdout": "exclude_holdout",
+        "sigma_time": "smear_sigma_ns",
+        "require_contained": "require_contained",
+        "seeds": "seeds",
+        "n_bins": "n_bins",
+        "log_bins": "log_bins",
+        "core_method": "core_method",
+        "grid_search": "grid_search",
+    }
+    for cli_name, config_name in mapping.items():
+        if cli_name in explicit:
+            cli_values[config_name] = explicit[cli_name]
+    if explicit.get("no_bias_correction"):
+        cli_values["correct_target_bias"] = False
+
+    effective = sdconfig.merge_config(
+        defaults,
+        file_values,
+        cli_values,
+        nullable_types={"smear_sigma_ns": (int, float)},
+    )
+    config_keys = set(asdict(Config()))
+    cfg = Config(**{key: effective[key] for key in config_keys})
+    requested = list(effective["particles"])
+    n_seeds = effective["seeds"]
+    resolved = sdconfig.build_resolved_config(
+        "energy_bdt",
+        {**asdict(cfg), "particles": requested, "seeds": n_seeds},
+        config_path=args.config,
+        cli_overrides=[key for key in explicit if key != "config"],
+        profile=document.get("profile") if document else None,
+        dataset=document.get("dataset") if document else None,
+    )
+    return cfg, requested, n_seeds, resolved
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    try:
+        cfg, requested, n_seeds, resolved = resolve_configuration(argv)
+    except sdconfig.ConfigError as error:
+        raise SystemExit(f"configuration error: {error}") from error
+    if n_seeds < 1:
         raise SystemExit("--seeds must be at least 1")
 
-    cfg = Config(
-        target=args.target,
-        ratio_to_chi2=args.ratio_to_chi2,
-        correct_target_bias=not args.no_bias_correction,
-        smear_sigma_ns=args.sigma_time,
-        require_contained=args.require_contained,
-        exclude_holdout=args.exclude_holdout,
-        n_bins=args.n_bins,
-        log_bins=args.log_bins,
-        core_method=args.core_method,
-        grid_search=args.grid_search,
-    )
-    if args.features:
-        cfg = replace(cfg, feature_cols=list(args.features))
-
     summaries = {}
-    for mode in resolve_modes(args.particles):
+    for mode in resolve_modes(requested):
         try:
-            summaries[mode] = run_mode(mode, cfg, args.seeds)
+            summaries[mode] = run_mode(mode, cfg, n_seeds, resolved)
         except (paths.DatasetNotFound, FileNotFoundError) as exc:
             logger.error("%s: %s", mode, exc)
             return 1

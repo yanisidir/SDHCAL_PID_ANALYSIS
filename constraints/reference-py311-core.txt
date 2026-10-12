@@ -1,0 +1,15 @@
+# Direct-dependency snapshot validated on Linux with Python 3.11 during R10.
+# This is an optional reference constraint set, not a cross-platform lockfile.
+# Install with: pip install -r requirements.txt -c constraints/reference-py311-core.txt
+numpy==2.4.6
+pandas==3.0.6
+uproot==5.7.7
+awkward==2.14.0
+scikit-learn==1.9.1
+lightgbm==4.7.0
+imbalanced-learn==0.14.2
+joblib==1.6.0
+matplotlib==3.11.2
+seaborn==0.13.2
+pytest==9.1.1
+ruff==0.16.10

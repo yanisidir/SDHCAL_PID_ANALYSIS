@@ -5,8 +5,9 @@ later stage reads the output of this one.
 
 ```bash
 make features                                       # every particle
-./extract <input.root> tree <output.root>      # one file
-IN=... OUT=... ./parallel.sh                     # many files, in parallel
+make shower-analyzer                               # both C++ applications
+./extract <input.root> tree <output.root>           # one file
+IN=... OUT=... ./parallel.sh                        # many files, in parallel
 ```
 
 **Reads** `$SDHCAL_DATA_DIR/digitized/130k_<particle>_E1to130_digitized.root`,
@@ -24,6 +25,9 @@ tree `tree`, branches `thr`, `K`, `x`, `y`, `z`, `I`, `J`, `time`,
   existing tree, for use with GNU parallel.
 - `parallel.sh`: driver for the parallel variant; directories come from
   `IN`, `OUT` and `SDHCAL_DATA_DIR`.
+- `../../cpp/include/RootShowerIO.h`: shared ROOT branch binding and writing.
+- `../../cpp/include/ShowerFeatures.h`: flat event record and the adapter around
+  the unchanged `ShowerAnalyzer` calculations.
 
 The observable computation itself lives in [`../../cpp/`](../../cpp/) -
 `cpp/include/ShowerAnalyzer.h` and `cpp/src/ShowerAnalyzer.cpp` - because the
@@ -60,3 +64,6 @@ observables, `particlePDG`, `eventNumber` and `touchesLastLayer`.
 
 Compiled objects and binaries are build products, not source: `extract`
 and `extract_parallel` are git-ignored, and `make clean` removes them.
+
+The complete input/output schema, build checks and known duplicate-branch defect
+are documented in [`../../docs/cpp_root_architecture.md`](../../docs/cpp_root_architecture.md).

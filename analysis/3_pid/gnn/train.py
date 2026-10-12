@@ -7,22 +7,15 @@ from datetime import datetime
 from pathlib import Path
 
 import joblib
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch import nn
-from torch.nn import functional as F
-from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
-from torch_geometric.nn import GATConv, GraphConv, GraphNorm, global_max_pool, global_mean_pool
 
 from sdhcal import clustering
 from sdhcal import paths as sdhcal_paths
-from sdhcal.graph import build_knn_graph
 from sdhcal.hit_eval import event_energies, save_predictions
+from sdhcal.hit_gnn import ParticleGNN, create_graphs, evaluate, train_epoch
 from sdhcal.hit_pid import (
     FEATURE_NAMES,
     HitPreprocessor,
@@ -33,137 +26,8 @@ from sdhcal.hit_pid import (
     split_events,
     write_json,
 )
-
-
-def create_graphs(frame, preprocessor: HitPreprocessor, args) -> list[Data]:
-    graphs: list[Data] = []
-    for event_id, hits in frame.groupby("event_id", sort=False):
-        features = preprocessor.transform(hits)
-        edge_index = build_knn_graph(
-            features,
-            hits["time"].to_numpy(),
-            k=args.k,
-            time_window=args.time_window,
-            causal=args.causal,
-            undirected=args.undirected,
-            chunk_size=args.knn_chunk_size,
-        )
-        graph = Data(
-            x=torch.from_numpy(features),
-            edge_index=edge_index,
-            y=torch.tensor([int(hits["label"].iloc[0])], dtype=torch.long),
-            num_nodes=len(features),
-        )
-        # Plain attribute, not a tensor: PyG collates tensors but leaves a string
-        # list alone, which is what lets an external score find its event again.
-        graph.event_id = str(event_id)
-        graphs.append(graph)
-    if not graphs:
-        raise ValueError("No events were found in this data split")
-    return graphs
-
-
-class ParticleGNN(nn.Module):
-    def __init__(self, in_channels: int, hidden_dim: int = 128, dropout: float = 0.3):
-        super().__init__()
-        self.encoder = nn.Sequential(nn.Linear(in_channels, hidden_dim), nn.GELU())
-        self.conv1 = GATConv(hidden_dim, hidden_dim // 4, heads=4, dropout=dropout)
-        self.conv2 = GraphConv(hidden_dim, hidden_dim)
-        self.conv3 = GraphConv(hidden_dim, hidden_dim)
-        self.norm1 = GraphNorm(hidden_dim)
-        self.norm2 = GraphNorm(hidden_dim)
-        self.dropout = nn.Dropout(dropout)
-        self.classifier = nn.Sequential(
-            nn.Linear(2 * hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, 2),
-        )
-
-    def forward(self, data) -> torch.Tensor:
-        x = self.encoder(data.x)
-        first = F.gelu(self.norm1(self.conv1(x, data.edge_index), data.batch))
-        second = F.gelu(self.norm2(self.conv2(self.dropout(first), data.edge_index), data.batch))
-        x = F.gelu(self.conv3(self.dropout(second), data.edge_index)) + second
-        pooled = torch.cat(
-            [global_max_pool(x, data.batch), global_mean_pool(x, data.batch)], dim=1
-        )
-        return self.classifier(pooled)
-
-
-def train_epoch(model, loader, optimizer, loss_fn, device) -> float:
-    model.train()
-    total = 0.0
-    for batch in loader:
-        batch = batch.to(device)
-        optimizer.zero_grad(set_to_none=True)
-        loss = loss_fn(model(batch), batch.y)
-        loss.backward()
-        optimizer.step()
-        total += loss.item() * batch.num_graphs
-    return total / len(loader.dataset)
-
-
-def evaluate(model, loader, loss_fn, device):
-    model.eval()
-    total = 0.0
-    probabilities: list[float] = []
-    labels_out: list[int] = []
-    with torch.no_grad():
-        for batch in loader:
-            batch = batch.to(device)
-            logits = model(batch)
-            total += loss_fn(logits, batch.y).item() * batch.num_graphs
-            probabilities.extend(torch.softmax(logits, dim=1)[:, 1].cpu().tolist())
-            labels_out.extend(batch.y.cpu().tolist())
-    probabilities_array = np.asarray(probabilities)
-    labels_array = np.asarray(labels_out)
-    return (
-        total / len(loader.dataset),
-        binary_metrics(labels_array, probabilities_array),
-        probabilities_array,
-        labels_array,
-    )
-
-
-def plot_results(run_dir: Path, history, probabilities, labels, metrics) -> None:
-    epochs = np.arange(1, len(history["train_loss"]) + 1)
-    figure, axes = plt.subplots(1, 2, figsize=(11, 4))
-    axes[0].plot(epochs, history["train_loss"], label="train")
-    axes[0].plot(epochs, history["val_loss"], label="validation")
-    axes[0].set(xlabel="Epoch", ylabel="Cross-entropy", title="Loss")
-    axes[0].legend()
-    axes[1].plot(epochs, history["val_auc"], label="AUC")
-    axes[1].plot(epochs, history["val_balanced_accuracy"], label="Balanced accuracy")
-    axes[1].set(xlabel="Epoch", ylabel="Metric", ylim=(0, 1), title="Validation")
-    axes[1].legend()
-    figure.tight_layout()
-    figure.savefig(run_dir / "training.png", dpi=160)
-    plt.close(figure)
-
-    figure, axes = plt.subplots(1, 2, figsize=(11, 4))
-    axes[0].hist(probabilities[labels == 0], bins=40, alpha=0.6, label="pion")
-    axes[0].hist(probabilities[labels == 1], bins=40, alpha=0.6, label="proton")
-    axes[0].set(xlabel="P(proton)", ylabel="Events", title="Test scores")
-    axes[0].legend()
-    matrix = np.asarray(metrics["confusion_matrix"])
-    normalized = matrix / np.maximum(matrix.sum(axis=1, keepdims=True), 1)
-    axes[1].imshow(normalized, vmin=0, vmax=1, cmap="Blues")
-    for row in range(2):
-        for column in range(2):
-            axes[1].text(column, row, f"{normalized[row, column]:.1%}", ha="center", va="center")
-    axes[1].set(
-        xticks=[0, 1],
-        yticks=[0, 1],
-        xticklabels=["pion", "proton"],
-        yticklabels=["pion", "proton"],
-        xlabel="Predicted",
-        ylabel="True",
-        title="Test confusion matrix",
-    )
-    figure.tight_layout()
-    figure.savefig(run_dir / "test_performance.png", dpi=160)
-    plt.close(figure)
+from sdhcal.hit_plots import plot_results
+from sdhcal.hit_training import BestAucEarlyStopping, balanced_class_weights, new_history
 
 
 def parse_args() -> argparse.Namespace:
@@ -248,8 +112,7 @@ def main() -> None:
     }
 
     train_labels = np.asarray([int(graph.y.item()) for graph in datasets["train"]])
-    counts = np.bincount(train_labels, minlength=2)
-    class_weights = len(train_labels) / (2 * np.maximum(counts, 1))
+    class_weights = balanced_class_weights(train_labels)
     loss_fn = nn.CrossEntropyLoss(weight=torch.tensor(class_weights, dtype=torch.float32, device=device))
     n_features = preprocessor.n_features(splits["train"])
     model = ParticleGNN(n_features, args.hidden_dim).to(device)
@@ -262,9 +125,8 @@ def main() -> None:
     run_dir = args.output_dir / run_name
     run_dir.mkdir(parents=True, exist_ok=False)
     checkpoint = run_dir / "best_model.pt"
-    history = {"train_loss": [], "val_loss": [], "val_auc": [], "val_balanced_accuracy": []}
-    best_auc = -np.inf
-    stale_epochs = 0
+    history = new_history()
+    stopping = BestAucEarlyStopping(args.patience)
     for epoch in range(1, args.epochs + 1):
         train_loss = train_epoch(model, loaders["train"], optimizer, loss_fn, device)
         val_loss, val_metrics, _, _ = evaluate(model, loaders["val"], loss_fn, device)
@@ -277,21 +139,18 @@ def main() -> None:
             f"epoch={epoch:03d} train_loss={train_loss:.4f} val_loss={val_loss:.4f} "
             f"val_auc={val_metrics['auc']:.4f} val_bacc={val_metrics['balanced_accuracy']:.4f}"
         )
-        if val_metrics["auc"] > best_auc:
-            best_auc = val_metrics["auc"]
-            stale_epochs = 0
+        improved, should_stop = stopping.update(val_metrics["auc"])
+        if improved:
             torch.save(model.state_dict(), checkpoint)
-        else:
-            stale_epochs += 1
-            if stale_epochs >= args.patience:
-                print(f"early stopping after {epoch} epochs")
-                break
+        elif should_stop:
+            print(f"early stopping after {epoch} epochs")
+            break
 
     model.load_state_dict(torch.load(checkpoint, map_location=device))
     test_loss, test_metrics, probabilities, labels = evaluate(model, loaders["test"], loss_fn, device)
     test_metrics.update(
         loss=test_loss,
-        best_validation_auc=float(best_auc),
+        best_validation_auc=float(stopping.best_auc),
         events=len(datasets["test"]),
     )
 

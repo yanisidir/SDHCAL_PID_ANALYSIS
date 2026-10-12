@@ -264,7 +264,7 @@ regressor trained on everything would not be like-for-like. Hence:
 ```bash
 make energy-2class       # regressors trained with --require-contained
 make chi2-2class         # calibration fitted under the same cut
-make coupling-2class     # five scenarios, all with --require-contained
+make coupling-2class     # six scenarios, all with --require-contained
 ```
 
 The cut keeps about half the events (100 744 of 200 000 in the evaluation lot).

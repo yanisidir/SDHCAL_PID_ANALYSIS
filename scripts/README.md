@@ -29,16 +29,38 @@ scripts/10_tabular.sh && scripts/20_pid_hits.sh && scripts/30_energy_gnn.sh && s
 matter, and none of them announce themselves when wrong — the run reads a
 different sample and reports numbers that look entirely reasonable:
 
-- `SDHCAL_SHARDS_DIR` — **the one to watch.** It defaults to `new_data_params`,
-  the lot produced *before* the `ShowerAnalyzer` corrections. Every published
-  result uses `new_data_params_v2`. Training without it set means training on
-  the inverted eccentricity and the unbounded Gaisser–Hillas fit. This already
-  happened once, to the MLP, and was caught only because its AUC came out at
-  0.599 instead of 0.677.
+- `SDHCAL_SHARDS_DIR` — **the one to watch.** The Python library defaults to
+  `new_data_params`, the lot produced *before* the `ShowerAnalyzer` corrections;
+  these recipes override it with `new_data_params_v2`. Training without it set
+  means training on the inverted eccentricity and the unbounded Gaisser–Hillas
+  fit. This already happened once, to the MLP, and was caught only because its
+  AUC came out at 0.599 instead of 0.677.
 - `SDHCAL_HIT_SHARDS_DIR` — raw hit shards, defaults to `new_data`.
 - `SDHCAL_PARAMS_SET=2class` — pion/proton layout and `chi2_coefficients_2class.json`.
 
-Override `PYTHON` if the conda environment lives elsewhere.
+`PYTHON` vaut `python3` par défaut et peut viser n'importe quel environnement
+activé ou interpréteur explicite, sans activation automatique de Conda :
+
+```bash
+PYTHON=/chemin/vers/python scripts/10_tabular.sh
+```
+
+`10_tabular.sh` publishes the seed-42 artifacts under `models/`, after keeping
+all five seeds in `output/` for the uncertainty estimate. The benchmark can
+therefore run immediately after the four scripts above.
+
+Pour éviter le choix historique par date de modification, fournir les variables
+`PID_BDT_RUN_ID`, `PID_MLP_RUN_ID`, `ENERGY_BDT_PI_RUN_ID`,
+`ENERGY_BDT_PROTON_RUN_ID`, `ENERGY_BDT_MIXED_RUN_ID` et
+`ENERGY_BDT_RATIO_RUN_ID`. Les deux imports GNN acceptent de même
+`ENERGY_GNN_RATIO_RUN_ID` et `ENERGY_GNN_RUN_ID`. Une variable absente conserve
+le repli historique « fichier le plus récent » avec un avertissement ; un
+identifiant fourni doit correspondre exactement à un fichier existant.
+
+`N_TRAIN` reste surchargeable pour compatibilité. Il représente le budget
+historique demandé dans les sidecars récents ; les tailles exactes sont lues du
+`run.json` lorsqu'elles y sont disponibles. Voir
+[la documentation de reproductibilité](../docs/reproducibility.md).
 
 ## Why the control runs are not optional
 

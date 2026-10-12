@@ -1,0 +1,5 @@
+# Optional deep-learning snapshot validated separately from the core environment.
+# Use together with reference-py311-core.txt and requirements-gnn.txt.
+torch==2.14.1
+torch-geometric==2.8.0.post1
+tqdm==4.70.1

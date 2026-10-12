@@ -25,59 +25,57 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import glob
 import json
 import logging
+import re
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 
-from sdhcal import benchmark, paths, shards
+from sdhcal.manifest import EVENT_COUNT_FIELDS, event_counts_from_run_record
+from sdhcal.prediction_io import (
+    PARTICLE_ALIASES,  # noqa: F401 - historical import surface
+    ROLE_TO_SAMPLE,  # noqa: F401 - historical import surface
+    find_newest,
+    npz_to_frame,
+    parse_event_id,  # noqa: F401 - historical import surface
+    prediction_path,
+    write_prediction_table,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)8s | %(message)s")
 logger = logging.getLogger("import_predictions")
 
-#: Which lot a role name refers to, so the shard stem can be read with the right
-#: naming convention.
-ROLE_TO_SAMPLE = {"validation": "discret", "val": "discret", "train": "200k"}
+
+def _run_record(source: Path) -> Path | None:
+    """Locate metadata written beside known hit-level prediction formats."""
+    direct = source.parent / "run.json"
+    if direct.is_file():
+        return direct
+    match = re.search(r"_run([0-9]+)$", source.stem)
+    if match:
+        candidate = source.parent.parent / "runs" / f"gnn_energy_{match.group(1)}.json"
+        if candidate.is_file():
+            return candidate
+    return None
 
 
-#: The networks spell the pion differently from the rest of the pipeline.
-PARTICLE_ALIASES = {"pion": "pi", "pi": "pi", "proton": "proton"}
-
-
-def parse_event_id(event_id: str) -> tuple[str, str, int]:
-    """Turn a network's own event identifier into the pipeline's global key.
-
-    Two spellings are in use, because the two families read different files:
-
-    ``role:particle:shard stem:event number``
-        the energy GNN, which reads the digitized shards and knows their names.
-    ``particle:shard index:event number``
-        the hit-level PID networks, which read the exported CSVs where the shard
-        id is already a column.
-
-    Both end at the same place: the shard id folded into the event number exactly
-    as :func:`sdhcal.shards.global_event_number` does, because the shard-local
-    number alone repeats across files.
-    """
-    parts = event_id.split(":")
-    if len(parts) == 4:
-        role, particle, stem, number = parts
-        sample = ROLE_TO_SAMPLE.get(role)
-        if sample is None:
-            raise ValueError(f"unknown sample role {role!r} in {event_id!r}; known: {sorted(ROLE_TO_SAMPLE)}")
-        shard = shards.shard_id(sample, f"{stem}_params.root")
-    elif len(parts) == 3:
-        role, (particle, shard_text, number) = "validation", parts
-        shard = int(shard_text)
-    else:
-        raise ValueError(f"cannot read an event id from {event_id!r}; expected three or four fields")
-
-    if particle not in PARTICLE_ALIASES:
-        raise ValueError(f"unknown particle {particle!r} in {event_id!r}")
-    return role, PARTICLE_ALIASES[particle], int(shards.global_event_number(shard, np.array([int(number)]))[0])
+def _recorded_counts(source: Path, n_train: int | None, n_evaluation: int) -> tuple[dict, Path | None]:
+    """Keep requested budgets distinct from exact counts recorded by trainers."""
+    record_path = _run_record(source)
+    counts = dict.fromkeys(EVENT_COUNT_FIELDS)
+    counts["requested_training_budget"] = n_train
+    counts["external_evaluation_events"] = n_evaluation
+    if record_path is not None:
+        try:
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as error:
+            logger.warning("cannot read run metadata %s: %s", record_path, error)
+        else:
+            for name, value in event_counts_from_run_record(record).items():
+                if value is not None:
+                    counts[name] = value
+    return counts, record_path
 
 
 def main(argv=None) -> int:
@@ -89,57 +87,42 @@ def main(argv=None) -> int:
         "--n-train",
         type=int,
         default=None,
-        help="events this model was trained on; recorded beside the predictions so a "
-             "comparison cannot quote the number without the budget that produced it",
+        help="historical requested/recorded training budget; retained as n_train for "
+        "benchmark compatibility and kept separate from exact run metadata",
     )
     args = parser.parse_args(argv)
 
-    matches = sorted(glob.glob(args.npz), key=lambda p: Path(p).stat().st_mtime)
-    if not matches:
-        raise SystemExit(f"no file matches {args.npz!r}")
-    source = Path(matches[-1])
+    try:
+        source = find_newest(args.npz)
+    except FileNotFoundError as error:
+        raise SystemExit(str(error)) from error
     payload = np.load(source, allow_pickle=True)
     logger.info("reading %s (%s)", source.name, ", ".join(sorted(payload.files)))
 
-    required = {
-        "energy": ("y_true", "y_pred", "event_id"),
-        # PID carries the true energy rather than a truth label: the species is
-        # already in the event id, and the comparison needs the energy to break
-        # efficiency down by it.
-        "pid": ("y_score", "event_id", "primary_energy"),
-    }[args.kind]
-    missing = [k for k in required if k not in payload.files]
-    if missing:
-        raise SystemExit(f"{source.name} lacks {', '.join(missing)}; it holds {sorted(payload.files)}")
-
-    event_ids = [str(v) for v in payload["event_id"]]
-    parsed = [parse_event_id(e) for e in event_ids]
-    roles = {role for role, _, _ in parsed}
+    try:
+        table, roles = npz_to_frame(payload, args.kind)
+    except KeyError as error:
+        raise SystemExit(f"{source.name} {error.args[0]}") from error
     if roles != {"validation"} and roles != {"val"}:
-        logger.warning("predictions mix roles %s; the benchmark expects the validation lot only", sorted(roles))
+        logger.warning(
+            "predictions mix roles %s; the benchmark expects the validation lot only", sorted(roles)
+        )
 
-    table = pd.DataFrame(
+    out = prediction_path(args.kind, args.name)
+    counts, record_path = _recorded_counts(source, args.n_train, len(table))
+    write_prediction_table(
+        out,
+        table,
+        args.kind,
         {
-            "eventNumber": [number for _, _, number in parsed],
-            "particlePDG": [paths.PARTICLE_PDG[particle] for _, particle, _ in parsed],
-            "primaryEnergy": np.asarray(
-                payload["y_true" if args.kind == "energy" else "primary_energy"], dtype=float
-            ),
-        }
-    )
-    if args.kind == "energy":
-        table["energyPred"] = np.asarray(payload["y_pred"], dtype=float)
-    else:
-        table["score"] = np.asarray(payload["y_score"], dtype=float)
-
-    benchmark.check_predictions(table, args.kind)
-
-    out = paths.output_dir() / "benchmark" / args.kind / f"{args.name}.csv"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    table.to_csv(out, index=False)
-    out.with_suffix(".json").write_text(
-        json.dumps({"name": args.name, "kind": args.kind, "n_events": len(table), "n_train": args.n_train, "source": str(source)}, indent=2),
-        encoding="utf-8",
+            "name": args.name,
+            "kind": args.kind,
+            "n_events": len(table),
+            "n_train": args.n_train,
+            "source": str(source),
+            "run_record": str(record_path) if record_path is not None else None,
+            "event_counts": counts,
+        },
     )
     logger.info("wrote %s (%d events, %d energy points)", out, len(table), table["primaryEnergy"].nunique())
     return 0

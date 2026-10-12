@@ -22,6 +22,8 @@
 #include "TGraphErrors.h"
 #include "TLatex.h"
 #include "TLegend.h"
+#include "TLine.h"
+#include "TList.h"
 #include "TMultiGraph.h"
 #include "TF1.h"
 #include "TStyle.h"
@@ -313,6 +315,175 @@ void plotPid(const std::string& dir, const std::string& outDir) {
   save(cEff, outDir + "/pid_efficiency_vs_energy");
 }
 
+
+// ---------------------------------------------------------------------------
+// PID-energy coupling
+// ---------------------------------------------------------------------------
+// One figure per regressor, so that the comparison the text makes - what the
+// species label is worth, at fixed regressor - is the comparison the eye makes.
+// The three label sources sit on one pad; the two regressors never share one.
+struct Scenario {
+  const char* file;    // stem of the curve table
+  const char* legend;
+};
+
+void plotCouplingArm(const std::string& dir, const std::string& outDir, const char* reco,
+                     const char* recoLabel, const std::vector<Scenario>& arms,
+                     const char* species, const char* speciesLabel) {
+  TMultiGraph mgRes;
+  TMultiGraph mgLin;
+  TLegend legRes(0.58, 0.72, 0.95, 0.90);
+  TLegend legLin(0.58, 0.17, 0.95, 0.35);
+  legRes.SetTextSize(0.032);
+  legLin.SetTextSize(0.032);
+
+  for (size_t i = 0; i < arms.size(); ++i) {
+    const std::string path = dir + "/" + arms[i].file + "_reco-" + reco + "__" + species + ".csv";
+    if (gSystem->AccessPathName(path.c_str())) {
+      std::cerr << "missing " << path << "\n";
+      continue;
+    }
+    Table t = readCsv(path);
+    const size_t n = t.columns.at("energy").size();
+
+    auto* gr = new TGraphErrors(n, t.columns.at("energy").data(), t.columns.at("resolution").data(),
+                                nullptr, t.columns.at("resolution_err").data());
+    auto* gl = new TGraphErrors(n, t.columns.at("energy").data(), t.columns.at("response").data(),
+                                nullptr, t.columns.at("response_err").data());
+    for (auto* g : {gr, gl}) {
+      g->SetMarkerStyle(kMarker[i % 6]);
+      g->SetMarkerColor(kColour[i % 6]);
+      g->SetLineColor(kColour[i % 6]);
+      g->SetMarkerSize(1.15);
+    }
+    mgRes.Add(gr, "P");
+    mgLin.Add(gl, "P");
+    legRes.AddEntry(gr, arms[i].legend, "p");
+    legLin.AddEntry(gl, arms[i].legend, "p");
+  }
+
+  if (mgRes.GetListOfGraphs() == nullptr || mgRes.GetListOfGraphs()->GetSize() == 0) {
+    std::cerr << "no curve for reco=" << reco << " species=" << species << "; figure skipped\n";
+    return;
+  }
+
+  const std::string tag = std::string(reco) + "_" + species;
+  const std::string detail = std::string(speciesLabel) + ", " + recoLabel;
+
+  TCanvas cRes(("cRes_" + tag).c_str(), "", 800, 600);
+  cRes.SetLogx();
+  mgRes.Draw("A");
+  mgRes.GetXaxis()->SetTitle("E_{true} [GeV]");
+  mgRes.GetYaxis()->SetTitle("#sigma(E)/E");
+  mgRes.GetYaxis()->SetRangeUser(0.0, 0.30);
+  mgRes.GetXaxis()->SetLimits(4.0, 130.0);
+  legRes.Draw();
+  drawHeader(detail.c_str());
+  save(cRes, outDir + "/coupling_resolution_" + tag);
+
+  TCanvas cLin(("cLin_" + tag).c_str(), "", 800, 600);
+  cLin.SetLogx();
+  mgLin.Draw("A");
+  mgLin.GetXaxis()->SetTitle("E_{true} [GeV]");
+  mgLin.GetYaxis()->SetTitle("#LT E_{rec} #GT / E_{true}");
+  mgLin.GetYaxis()->SetRangeUser(0.90, 1.12);
+  mgLin.GetXaxis()->SetLimits(4.0, 130.0);
+  auto* unity = new TLine(mgLin.GetXaxis()->GetXmin(), 1.0, mgLin.GetXaxis()->GetXmax(), 1.0);
+  unity->SetLineStyle(3);
+  unity->SetLineColor(kGray + 2);
+  unity->Draw();
+  legLin.Draw();
+  drawHeader(detail.c_str());
+  save(cLin, outDir + "/coupling_linearity_" + tag);
+}
+
+
+// One scenario, the two species side by side: what chapter 7 shows, where the
+// question is how a single estimator treats pions and protons differently.
+void plotCouplingSpecies(const std::string& dir, const std::string& outDir,
+                         const char* scenario, const char* detail) {
+  const std::vector<std::pair<const char*, const char*>> species = {{"pi-", "#pi^{-}"}, {"p", "p"}};
+  TMultiGraph mgRes;
+  TMultiGraph mgLin;
+  TLegend legRes(0.70, 0.74, 0.95, 0.90);
+  TLegend legLin(0.70, 0.17, 0.95, 0.33);
+  legRes.SetTextSize(0.034);
+  legLin.SetTextSize(0.034);
+
+  for (size_t i = 0; i < species.size(); ++i) {
+    const std::string path = dir + "/" + scenario + "__" + species[i].first + ".csv";
+    if (gSystem->AccessPathName(path.c_str())) {
+      std::cerr << "missing " << path << "\n";
+      continue;
+    }
+    Table t = readCsv(path);
+    const size_t n = t.columns.at("energy").size();
+    auto* gr = new TGraphErrors(n, t.columns.at("energy").data(), t.columns.at("resolution").data(),
+                                nullptr, t.columns.at("resolution_err").data());
+    auto* gl = new TGraphErrors(n, t.columns.at("energy").data(), t.columns.at("response").data(),
+                                nullptr, t.columns.at("response_err").data());
+    for (auto* g : {gr, gl}) {
+      g->SetMarkerStyle(kMarker[i % 6]);
+      g->SetMarkerColor(kColour[i % 6]);
+      g->SetLineColor(kColour[i % 6]);
+      g->SetMarkerSize(1.15);
+    }
+    mgRes.Add(gr, "P");
+    mgLin.Add(gl, "P");
+    legRes.AddEntry(gr, species[i].second, "p");
+    legLin.AddEntry(gl, species[i].second, "p");
+  }
+  if (mgRes.GetListOfGraphs() == nullptr || mgRes.GetListOfGraphs()->GetSize() == 0) {
+    std::cerr << "no curve for " << scenario << "; figure skipped\n";
+    return;
+  }
+
+  TCanvas cRes((std::string("cResSp_") + scenario).c_str(), "", 800, 600);
+  cRes.SetLogx();
+  mgRes.Draw("A");
+  mgRes.GetXaxis()->SetTitle("E_{true} [GeV]");
+  mgRes.GetYaxis()->SetTitle("#sigma(E)/E");
+  mgRes.GetYaxis()->SetRangeUser(0.0, 0.30);
+  mgRes.GetXaxis()->SetLimits(4.0, 130.0);
+  legRes.Draw();
+  drawHeader(detail);
+  save(cRes, outDir + "/species_resolution_" + scenario);
+
+  TCanvas cLin((std::string("cLinSp_") + scenario).c_str(), "", 800, 600);
+  cLin.SetLogx();
+  mgLin.Draw("A");
+  mgLin.GetXaxis()->SetTitle("E_{true} [GeV]");
+  mgLin.GetYaxis()->SetTitle("#LT E_{rec} #GT / E_{true}");
+  mgLin.GetYaxis()->SetRangeUser(0.90, 1.12);
+  mgLin.GetXaxis()->SetLimits(4.0, 130.0);
+  auto* unity = new TLine(4.0, 1.0, 130.0, 1.0);
+  unity->SetLineStyle(3);
+  unity->SetLineColor(kGray + 2);
+  unity->Draw();
+  legLin.Draw();
+  drawHeader(detail);
+  save(cLin, outDir + "/species_linearity_" + scenario);
+}
+
+void plotCoupling(const std::string& dir, const std::string& outDir) {
+  const std::vector<Scenario> arms = {
+      {"pid-none", "no species label"},
+      {"pid-bdt", "predicted label"},
+      {"pid-true", "true label"},
+  };
+  for (const char* species : {"all", "pi-", "p"}) {
+    const char* label = std::string(species) == "all"    ? "#pi^{-}/p"
+                        : std::string(species) == "pi-" ? "#pi^{-}"
+                                                        : "protons";
+    plotCouplingArm(dir, outDir, "chi2", "#chi^{2} calibration", arms, species, label);
+    plotCouplingArm(dir, outDir, "bdt", "BDT regressor", arms, species, label);
+  }
+  plotCouplingSpecies(dir, outDir, "pid-none_reco-chi2", "#chi^{2} calibration, no species label");
+  plotCouplingSpecies(dir, outDir, "pid-none_reco-bdt", "BDT regressor, no species label");
+  plotCouplingSpecies(dir, outDir, "pid-bdt_reco-chi2", "#chi^{2} calibration, predicted label");
+  plotCouplingSpecies(dir, outDir, "pid-bdt_reco-bdt", "BDT regressor, predicted label");
+}
+
 }  // namespace
 
 void plots(const char* kind = "energy") {
@@ -327,8 +498,10 @@ void plots(const char* kind = "energy") {
     plotEnergy(dir, outDir);
   } else if (what == "pid") {
     plotPid(dir, outDir);
+  } else if (what == "coupling") {
+    plotCoupling(dir, outDir);
   } else {
-    std::cerr << "unknown kind '" << what << "'; expected energy or pid\n";
+    std::cerr << "unknown kind '" << what << "'; expected energy, pid or coupling\n";
     return;
   }
   std::cout << "wrote plots to " << outDir << "\n";

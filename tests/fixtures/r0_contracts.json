@@ -1,0 +1,112 @@
+{
+  "feature_order": {
+    "pid_bdt": [
+      "Thr1", "Thr2", "Thr3", "Begin", "Radius", "Density", "NClusters",
+      "Zbary", "Zrms", "PctHitsFirst10", "PlanesWithClusmore2", "AvgClustSize",
+      "MaxClustSize", "lambda1", "lambda2", "tMin", "tMax", "tMean",
+      "Nmax", "z0_fit", "Xmax", "lambda", "nTrackSegments", "eccentricity3D"
+    ],
+    "pid_mlp": [
+      "Thr1", "Thr2", "Thr3", "Begin", "Radius", "Density", "NClusters",
+      "Zbary", "Zrms", "PctHitsFirst10", "PlanesWithClusmore2", "AvgClustSize",
+      "MaxClustSize", "lambda1", "lambda2", "tMin", "tMax", "tMean",
+      "Nmax", "z0_fit", "Xmax", "lambda", "nTrackSegments", "eccentricity3D"
+    ],
+    "energy_bdt": [
+      "Density", "NClusters", "Zbary", "AvgClustSize", "N3", "N2", "N1",
+      "nHitsTotal", "sumThrTotal"
+    ],
+    "energy_mlp": [
+      "Thr1", "Thr2", "Thr3", "Radius", "Density", "NClusters", "ratioThr23",
+      "Zbary", "Zrms", "PctHitsFirst10", "PlanesWithClusmore2", "AvgClustSize",
+      "MaxClustSize", "N1", "N2", "N3"
+    ],
+    "hit_pid": ["x", "y", "z", "time", "thr1", "thr2", "thr3"],
+    "cluster": ["x", "y", "z", "time", "size", "frac_thr1", "frac_thr2", "frac_thr3"]
+  },
+  "cli": {
+    "pid_bdt": {
+      "path": "analysis/3_pid/bdt/train.py",
+      "flags": ["--particles", "--features", "--exclude-holdout", "--sigma-time", "--no-timing", "--no-smote", "--seeds", "--grid-search", "--config"],
+      "defaults": {"features": null, "exclude_holdout": false, "sigma_time": 0.1, "no_timing": false, "no_smote": false, "seeds": 1, "grid_search": false, "config": null}
+    },
+    "pid_mlp": {
+      "path": "analysis/3_pid/mlp/train.py",
+      "flags": ["--output-dir", "--sigma-time", "--no-timing", "--calibration-size", "--max-epochs", "--patience", "--batch-size", "--seed", "--grid-search", "--max-shards-per-particle", "--max-events-per-particle", "--comment", "--config"],
+      "defaults": {"sigma_time": 0.1, "no_timing": false, "calibration_size": 0.1, "max_epochs": 300, "patience": 20, "batch_size": 256, "seed": 42, "grid_search": false, "comment": "", "config": null}
+    },
+    "pid_cnn": {
+      "path": "analysis/3_pid/cnn/train.py",
+      "flags": ["--pion-csv", "--proton-csv", "--output-dir", "--run-name", "--comment", "--sigma-time", "--hidden-dim", "--batch-size", "--external-pion-csv", "--external-proton-csv", "--cluster-hits", "--epochs", "--patience", "--learning-rate", "--seed", "--num-workers"],
+      "defaults": {"run_name": null, "comment": "", "sigma_time": 0.1, "hidden_dim": 128, "batch_size": 64, "external_pion_csv": null, "external_proton_csv": null, "cluster_hits": false, "epochs": 50, "patience": 10, "learning_rate": 0.001, "seed": 42, "num_workers": 0}
+    },
+    "pid_gnn": {
+      "path": "analysis/3_pid/gnn/train.py",
+      "flags": ["--pion-csv", "--proton-csv", "--output-dir", "--run-name", "--comment", "--sigma-time", "--hidden-dim", "--batch-size", "--external-pion-csv", "--external-proton-csv", "--cluster-hits", "--epochs", "--patience", "--learning-rate", "--k", "--time-window", "--causal", "--undirected", "--knn-chunk-size", "--seed", "--num-workers"],
+      "defaults": {"run_name": null, "comment": "", "sigma_time": 0.1, "hidden_dim": 128, "batch_size": 32, "external_pion_csv": null, "external_proton_csv": null, "cluster_hits": false, "epochs": 50, "patience": 10, "learning_rate": 0.001, "k": 8, "time_window": 2.0, "causal": true, "undirected": true, "knn_chunk_size": 512, "seed": 42, "num_workers": 0}
+    },
+    "energy_bdt": {
+      "path": "analysis/4_energy/ml_bdt/train.py",
+      "flags": ["--particles", "--target", "--ratio-to-chi2", "--no-bias-correction", "--features", "--exclude-holdout", "--sigma-time", "--require-contained", "--seeds", "--n-bins", "--log-bins", "--core-method", "--grid-search", "--config"],
+      "defaults": {"particles": ["all"], "target": "log", "ratio_to_chi2": false, "no_bias_correction": false, "features": null, "exclude_holdout": false, "sigma_time": null, "require_contained": false, "seeds": 1, "n_bins": 13, "log_bins": false, "core_method": "truncated_rms", "grid_search": false, "config": null}
+    },
+    "energy_mlp": {
+      "path": "analysis/4_energy/ml_mlp/train.py",
+      "flags": ["--particles", "--target", "--no-bias-correction", "--features", "--sigma-time", "--calibration-size", "--max-epochs", "--patience", "--batch-size", "--seed", "--n-bins", "--grid-search", "--max-shards-per-particle", "--max-events-per-particle", "--comment", "--config"],
+      "defaults": {"particles": ["all"], "target": "log", "no_bias_correction": false, "calibration_size": 0.1, "max_epochs": 500, "patience": 20, "batch_size": 256, "seed": 42, "n_bins": 13, "grid_search": false, "comment": "", "config": null}
+    },
+    "energy_gnn": {
+      "path": "analysis/4_energy/gnn/train.py",
+      "flags": ["--particles", "--pi-train-dir", "--pi-validation-dir", "--proton-train-dir", "--proton-validation-dir", "--tree-name", "--output-dir", "--comment", "--max-shards-per-particle", "--max-events-per-shard", "--calibration-size", "--split-energy-bins", "--sigma-time", "--require-contained", "--scaler-max-hits", "--hidden-dim", "--dropout", "--batch-size", "--epochs", "--patience", "--learning-rate", "--k", "--time-window", "--causal", "--undirected", "--knn-chunk-size", "--architecture", "--deepsets-blocks", "--target", "--baseline-coefficients", "--cluster-hits", "--bias-correction", "--n-energy-bins", "--seed", "--num-workers"],
+      "defaults": {"particles": "mix-pi-proton", "tree_name": "tree", "comment": "", "calibration_size": 0.1, "split_energy_bins": 10, "sigma_time": 0.1, "require_contained": false, "scaler_max_hits": 500000, "hidden_dim": 128, "dropout": 0.3, "batch_size": 32, "epochs": 50, "patience": 10, "learning_rate": 0.001, "k": 8, "time_window": 2.0, "causal": true, "undirected": true, "knn_chunk_size": 512, "architecture": "gat", "deepsets_blocks": 6, "target": "energy", "baseline_coefficients": "pi", "cluster_hits": false, "bias_correction": true, "n_energy_bins": 13, "seed": 42, "num_workers": 0}
+    },
+    "coupling": {
+      "path": "analysis/5_pid_energy/study.py",
+      "flags": ["--pid", "--reco", "--particles", "--sigma-time", "--no-timing", "--require-contained", "--skip-disjointness-check", "--classifier", "--regressor", "--n-bins"],
+      "defaults": {"pid": "bdt", "reco": "bdt", "sigma_time": 0.1, "no_timing": false, "require_contained": false, "skip_disjointness_check": false, "classifier": null, "regressor": [], "n_bins": 13}
+    },
+    "predict": {
+      "path": "tools/predict.py",
+      "flags": ["--kind", "--model", "--chi2", "--name", "--n-train", "--positive-pdg", "--require-contained"],
+      "defaults": {"model": null, "chi2": false, "n_train": null, "require_contained": false}
+    },
+    "import_predictions": {
+      "path": "tools/import_predictions.py",
+      "flags": ["--kind", "--npz", "--name", "--n-train"],
+      "defaults": {"n_train": null}
+    },
+    "compare_models": {
+      "path": "tools/compare_models.py",
+      "flags": ["--kind", "--models", "--positive-pdg", "--efficiencies", "--core-method"],
+      "defaults": {"efficiencies": [0.5, 0.8, 0.9], "core_method": "truncated_rms"}
+    },
+    "export_hits": {
+      "path": "tools/export_hits.py",
+      "flags": ["--role", "--events-per-shard", "--particles", "--out-dir"],
+      "defaults": {"role": "val", "events_per_shard": 50, "out_dir": null}
+    },
+    "build_2class": {
+      "path": "tools/build_2class_params.py",
+      "flags": ["--roles", "--particles", "--check", "--check-manifest"],
+      "defaults": {"check": false, "check_manifest": false}
+    }
+  },
+  "artifact_schemas": {
+    "pid_bdt": ["model", "features", "particles", "label_to_pdg", "smearing"],
+    "pid_mlp": ["model", "scaler", "features", "particles", "label_to_pdg", "smearing"],
+    "energy_bdt": ["model", "target", "features", "baseline"],
+    "energy_mlp": ["model", "scaler", "target", "features", "particles", "smearing"]
+  },
+  "prediction_schemas": {
+    "pid_csv": ["eventNumber", "particlePDG", "primaryEnergy", "score"],
+    "energy_csv": ["eventNumber", "particlePDG", "primaryEnergy", "energyPred"],
+    "pid_external_npz_required": ["y_score", "event_id", "primary_energy"],
+    "pid_external_npz_with_labels": ["y_score", "event_id", "primary_energy", "label"],
+    "energy_hit_npz": ["y_true", "y_pred", "source_index", "event_id", "particle", "bin_center", "bin_bias", "bin_resolution", "train_loss", "calibration_loss"]
+  },
+  "workflow": {
+    "scripts": ["scripts/10_tabular.sh", "scripts/20_pid_hits.sh", "scripts/30_energy_gnn.sh", "scripts/40_benchmark.sh"],
+    "make_targets": ["params-2class", "pid-2class", "mlp-2class", "energy-2class", "chi2-2class", "study-2class", "hits-2class", "predictions-2class", "benchmark-2class", "report-figures"],
+    "environment": ["SDHCAL_SHARDS_DIR", "SDHCAL_HIT_SHARDS_DIR", "SDHCAL_PARAMS_SET"]
+  }
+}

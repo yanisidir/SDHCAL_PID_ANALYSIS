@@ -9,280 +9,44 @@ training and provides the external validation curves and metrics.
 from __future__ import annotations
 
 import argparse
-import copy
 import logging
-import random
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Sequence
 
-import joblib
 import matplotlib
 import numpy as np
-import pandas as pd
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import GridSearchCV, KFold, train_test_split
-from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 
-from sdhcal import metrics, paths, runlog, shards
-from sdhcal.smearing import TimeSmearing, smear_time_columns
-from sdhcal.target import make_target
+from sdhcal import (
+    artifacts,
+    energy_mlp,
+    metrics,
+    paths,
+    provenance,
+    runlog,
+    tabular,
+)
+from sdhcal import config as sdconfig
 
-
-LOGGER = logging.getLogger("energy_mlp_train")
-MODES = ("pi", "proton", "mix-pi-proton")
-
-
-@dataclass
-class Config:
-    feature_cols: Sequence[str] = field(
-        default_factory=lambda: [
-            "Thr1", "Thr2", "Thr3", "Radius", "Density", "NClusters",
-            "ratioThr23", "Zbary", "Zrms", "PctHitsFirst10",
-            "PlanesWithClusmore2", "AvgClustSize", "MaxClustSize", "N1", "N2", "N3",
-        ]
-    )
-    calibration_size: float = 0.10
-    random_state: int = 42
-    target: str = "log"
-    correct_target_bias: bool = True
-    smear_sigma_ns: float | None = None
-    hidden_layer_sizes: tuple[int, ...] = (128, 64, 32)
-    alpha: float = 1e-4
-    batch_size: int = 256
-    learning_rate_init: float = 1e-3
-    max_epochs: int = 500
-    patience: int = 20
-    n_bins: int = 13
-    core_method: str = "truncated_rms"
-    core_frac: float = 0.9
-    grid_search: bool = False
-    max_shards_per_particle: int | None = None
-    max_events_per_particle: int | None = None
-
-    def smearing(self, seed: int) -> TimeSmearing:
-        return TimeSmearing(
-            sigma_ns=self.smear_sigma_ns,
-            columns=("tMin", "tMax", "tMean", "tSpread"),
-            seed=seed,
-        )
-
-    def loggable(self, mode: str) -> dict[str, object]:
-        return {
-            "mode": mode,
-            "shards_dir": str(paths.shards_dir()),
-            "train_sample": "200k",
-            "validation_sample": "discret",
-            "calibration_size": self.calibration_size,
-            "random_state": self.random_state,
-            "target": self.target,
-            "correct_target_bias": int(self.correct_target_bias),
-            "smear_sigma_ns": self.smear_sigma_ns,
-            "hidden_layer_sizes": "x".join(map(str, self.hidden_layer_sizes)),
-            "alpha": self.alpha,
-            "batch_size": self.batch_size,
-            "learning_rate_init": self.learning_rate_init,
-            "max_epochs": self.max_epochs,
-            "patience": self.patience,
-            "grid_search": int(self.grid_search),
-            "max_shards_per_particle": self.max_shards_per_particle,
-            "max_events_per_particle": self.max_events_per_particle,
-        }
-
-
-def particles_for_mode(mode: str) -> tuple[str, ...]:
-    return ("pi", "proton") if mode == "mix-pi-proton" else (mode,)
+LOGGER = energy_mlp.LOGGER
+MODES = energy_mlp.MODES
+Config = energy_mlp.Config
+particles_for_mode = energy_mlp.particles_for_mode
+load_sample = energy_mlp.load_sample
+train_calibration_indices = energy_mlp.train_calibration_indices
+base_model = energy_mlp.base_model
+choose_hyperparameters = energy_mlp.choose_hyperparameters
+fit_model = energy_mlp.fit_model
+validation_bins = energy_mlp.validation_bins
+evaluate = energy_mlp.evaluate
 
 
 def set_seeds(seed: int) -> None:
-    random.seed(seed)
-    np.random.seed(seed)
-
-
-def load_sample(sample: str, mode: str, cfg: Config, seed: int) -> pd.DataFrame:
-    frames = [
-        shards.read_sample(
-            sample,
-            particle,
-            features=cfg.feature_cols,
-            limit=cfg.max_shards_per_particle,
-        )
-        for particle in particles_for_mode(mode)
-    ]
-    frame = pd.concat(frames, ignore_index=True)
-    if cfg.max_events_per_particle is not None:
-        frame = pd.concat(
-            [
-                group.sample(
-                    n=min(len(group), cfg.max_events_per_particle),
-                    random_state=seed,
-                )
-                for _, group in frame.groupby("particlePDG", sort=False)
-            ],
-            ignore_index=True,
-        )
-    needed = [*cfg.feature_cols, "primaryEnergy", "particlePDG", "eventNumber"]
-    frame = frame.replace([np.inf, -np.inf], np.nan).dropna(subset=needed)
-    frame = frame[frame["primaryEnergy"] > 0].reset_index(drop=True)
-    frame = smear_time_columns(frame, cfg.smearing(seed))
-    if frame.empty:
-        raise RuntimeError(f"No usable event in {sample}/{mode}")
-    LOGGER.info("%s/%s: %d events", sample, mode, len(frame))
-    return frame
-
-
-def train_calibration_indices(frame: pd.DataFrame, cfg: Config) -> tuple[np.ndarray, np.ndarray]:
-    if not 0 < cfg.calibration_size < 1:
-        raise ValueError("calibration-size must lie strictly between zero and one")
-    particle = frame["particlePDG"].to_numpy()
-    energy = frame["primaryEnergy"].to_numpy()
-    last_error = None
-    for n_bins in range(10, 0, -1):
-        quantile = np.zeros(len(frame), dtype=int)
-        for value in np.unique(particle):
-            selected = particle == value
-            edges = np.unique(np.quantile(energy[selected], np.linspace(0, 1, n_bins + 1)))
-            quantile[selected] = np.digitize(energy[selected], edges[1:-1])
-        strata = np.asarray(
-            [f"{kind}:{bin_}" for kind, bin_ in zip(particle, quantile, strict=True)]
-        )
-        try:
-            return train_test_split(
-                np.arange(len(frame)),
-                test_size=cfg.calibration_size,
-                random_state=cfg.random_state,
-                stratify=strata,
-            )
-        except ValueError as error:
-            last_error = error
-    raise ValueError(f"Cannot create the train/calibration split: {last_error}")
-
-
-def base_model(cfg: Config, **overrides) -> MLPRegressor:
-    parameters = {
-        "hidden_layer_sizes": cfg.hidden_layer_sizes,
-        "alpha": cfg.alpha,
-        "batch_size": cfg.batch_size,
-        "learning_rate_init": cfg.learning_rate_init,
-        "activation": "relu",
-        "solver": "adam",
-        "shuffle": True,
-        "random_state": cfg.random_state,
-    }
-    parameters.update(overrides)
-    return MLPRegressor(**parameters)
-
-
-def choose_hyperparameters(x: np.ndarray, z: np.ndarray, cfg: Config) -> dict[str, object]:
-    if not cfg.grid_search:
-        return {}
-    search = GridSearchCV(
-        base_model(cfg, early_stopping=True, max_iter=cfg.max_epochs),
-        {
-            "hidden_layer_sizes": [(64, 32), (128, 64, 32)],
-            "alpha": [1e-5, 1e-4, 1e-3],
-            "learning_rate_init": [5e-4, 1e-3],
-        },
-        scoring="neg_root_mean_squared_error",
-        cv=KFold(5, shuffle=True, random_state=cfg.random_state),
-        n_jobs=-1,
-    )
-    search.fit(x, z)
-    LOGGER.info("Best grid-search parameters: %s", search.best_params_)
-    return search.best_params_
-
-
-def fit_model(
-    x_train: np.ndarray,
-    y_train: np.ndarray,
-    x_calibration: np.ndarray,
-    y_calibration: np.ndarray,
-    cfg: Config,
-):
-    target = make_target(cfg.target, correct_bias=cfg.correct_target_bias)
-    z_train = target.forward(y_train)
-    z_calibration = target.forward(y_calibration)
-    best_parameters = choose_hyperparameters(x_train, z_train, cfg)
-    model = base_model(cfg, **best_parameters)
-    history = {"train_loss": [], "calibration_loss": []}
-    best_model = None
-    best_loss = np.inf
-    stale = 0
-    rng = np.random.default_rng(cfg.random_state)
-    for epoch in range(1, cfg.max_epochs + 1):
-        order = rng.permutation(len(z_train))
-        model.partial_fit(x_train[order], z_train[order])
-        train_loss = float(model.loss_)
-        calibration_prediction = model.predict(x_calibration)
-        calibration_loss = float(mean_squared_error(z_calibration, calibration_prediction))
-        history["train_loss"].append(train_loss)
-        history["calibration_loss"].append(calibration_loss)
-        if epoch == 1 or epoch % 10 == 0:
-            LOGGER.info(
-                "epoch=%03d train_mse=%.6f calibration_mse=%.6f",
-                epoch,
-                train_loss,
-                calibration_loss,
-            )
-        if calibration_loss < best_loss - 1e-7:
-            best_loss = calibration_loss
-            best_model = copy.deepcopy(model)
-            stale = 0
-        else:
-            stale += 1
-            if stale >= cfg.patience:
-                LOGGER.info("Early stopping after %d epochs", epoch)
-                break
-    if best_model is None:
-        raise RuntimeError("MLP training did not produce a checkpoint")
-    correction = target.fit_correction(y_calibration, best_model.predict(x_calibration))
-    LOGGER.info("Back-transform correction fitted on 200k calibration: %.6f", correction)
-    return best_model, target, history, best_parameters, best_loss
-
-
-def validation_bins(y_true: np.ndarray, fallback_bins: int) -> np.ndarray:
-    points = np.unique(np.asarray(y_true, dtype=float))
-    if len(points) == 1:
-        margin = max(0.5, 0.05 * abs(float(points[0])))
-        return np.asarray([points[0] - margin, points[0] + margin])
-    if len(points) <= 100:
-        middle = 0.5 * (points[:-1] + points[1:])
-        return np.concatenate(
-            [[points[0] - 0.5 * (points[1] - points[0])], middle,
-             [points[-1] + 0.5 * (points[-1] - points[-2])]]
-        )
-    return metrics.energy_bins(float(points.min()), float(points.max()), fallback_bins)
-
-
-def evaluate(model, target, x: np.ndarray, y: np.ndarray, cfg: Config):
-    prediction = target.inverse(model.predict(x))
-    core = metrics.core_bias_resolution(
-        metrics.relative_residual(y, prediction), method=cfg.core_method, frac=cfg.core_frac
-    )
-    r2 = float("nan") if np.ptp(y) == 0 else float(r2_score(y, prediction))
-    result = {
-        "rmse_gev": float(mean_squared_error(y, prediction) ** 0.5),
-        "mae_gev": float(mean_absolute_error(y, prediction)),
-        "r2": r2,
-        "bias": core.bias,
-        "bias_err": core.bias_err,
-        "resolution": core.sigma,
-        "resolution_err": core.sigma_err,
-        "energy_scale": float(np.mean(prediction) / np.mean(y)),
-        "rms_rel_about_zero": metrics.rms_relative_about_zero(y, prediction),
-        "n_validation": int(len(y)),
-        "target_bias_correction": float(getattr(target, "factor", 1.0)),
-    }
-    LOGGER.info(
-        "External validation: RMSE=%.3f GeV MAE=%.3f GeV bias=%+.4f resolution=%.4f",
-        result["rmse_gev"], result["mae_gev"], result["bias"], result["resolution"],
-    )
-    return result, prediction
+    tabular.seed_python_numpy(seed)
 
 
 def save_plots(history: dict, y: np.ndarray, prediction: np.ndarray, bins: np.ndarray, log, tag: str):
@@ -338,12 +102,28 @@ def save_plots(history: dict, y: np.ndarray, prediction: np.ndarray, bins: np.nd
     return binned
 
 
-def run_mode(mode: str, cfg: Config, comment: str) -> dict[str, float]:
+def run_mode(
+    mode: str,
+    cfg: Config,
+    comment: str,
+    resolved_config: dict | None = None,
+) -> dict[str, float]:
     set_seeds(cfg.random_state)
     output = paths.output_dir() / "energy_reco_mlp" / mode
     log = runlog.RunLogger(output, name="energy_mlp")
     log.start(cfg.loggable(mode), features=list(cfg.feature_cols))
     log.log_comment(comment)
+    mode_config = (
+        sdconfig.update_resolved_values(resolved_config, mode=mode)
+        if resolved_config is not None
+        else None
+    )
+    if mode_config is not None:
+        resolved_path = sdconfig.write_resolved_config(
+            log.path("runs", f"energy_mlp_{log.run_id}_resolved_config.json"),
+            mode_config,
+        )
+        log.log_artifacts(resolved_config=resolved_path)
     continuous = load_sample("200k", mode, cfg, cfg.random_state)
     validation = load_sample("discret", mode, cfg, cfg.random_state + 10_000)
     train_index, calibration_index = train_calibration_indices(continuous, cfg)
@@ -363,11 +143,30 @@ def run_mode(mode: str, cfg: Config, comment: str) -> dict[str, float]:
     result["best_parameters"] = ";".join(f"{k}={v}" for k, v in best.items())
     tag = f"{mode}_{log.run_id}"
     model_path = log.path("models", f"mlp_energy_{tag}.joblib")
-    joblib.dump(
-        {"model": model, "scaler": scaler, "target": target, "features": list(cfg.feature_cols),
-         "particles": list(particles_for_mode(mode)),
-         "smearing": cfg.smearing(cfg.random_state).as_dict()},
+    artifacts.save_bundle(
         model_path,
+        {
+            "model": model,
+            "scaler": scaler,
+            "target": target,
+            "features": list(cfg.feature_cols),
+            "particles": list(particles_for_mode(mode)),
+            "smearing": cfg.smearing(cfg.random_state).as_dict(),
+        },
+        kind="energy",
+        model_family="sklearn_mlp",
+        preprocessing={
+            "scaler": type(scaler).__name__,
+            "target": target.as_dict(),
+            "smearing": cfg.smearing(cfg.random_state).as_dict(),
+        },
+        training_counts={
+            "train": int(len(train_index)),
+            "calibration": int(len(calibration_index)),
+            "external_validation": int(len(validation)),
+        },
+        configuration=mode_config if mode_config is not None else cfg.loggable(mode),
+        provenance=provenance.environment_fingerprint(),
     )
     bins = validation_bins(y_validation, cfg.n_bins)
     binned = save_plots(history, y_validation, prediction, bins, log, tag)
@@ -393,7 +192,7 @@ def run_mode(mode: str, cfg: Config, comment: str) -> dict[str, float]:
     return result
 
 
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--particles", nargs="+", default=["all"], metavar="MODE")
     parser.add_argument("--target", choices=("log", "linear"), default="log")
@@ -410,7 +209,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-shards-per-particle", type=int)
     parser.add_argument("--max-events-per-particle", type=int)
     parser.add_argument("--comment", default="")
-    return parser.parse_args(argv)
+    parser.add_argument("--config", type=Path, default=None, help="optional versioned JSON configuration")
+    return parser
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    return build_parser().parse_args(argv)
 
 
 def resolve_modes(requested: Sequence[str]) -> list[str]:
@@ -424,33 +228,85 @@ def resolve_modes(requested: Sequence[str]) -> list[str]:
     return list(dict.fromkeys(normalized))
 
 
+def resolve_configuration(
+    argv: Sequence[str] | None = None,
+) -> tuple[Config, list[str], str, dict]:
+    args, explicit = sdconfig.parse_cli(build_parser(), argv)
+    defaults = asdict(Config())
+    defaults.update(particles=["all"], comment="")
+
+    document = None
+    file_values = {}
+    if args.config is not None:
+        document = sdconfig.load_config(args.config)
+        file_values = sdconfig.workflow_values(
+            document, "energy_mlp", params_set=paths.params_set()
+        )
+
+    cli_values = {}
+    mapping = {
+        "particles": "particles",
+        "target": "target",
+        "features": "feature_cols",
+        "sigma_time": "smear_sigma_ns",
+        "calibration_size": "calibration_size",
+        "max_epochs": "max_epochs",
+        "patience": "patience",
+        "batch_size": "batch_size",
+        "seed": "random_state",
+        "n_bins": "n_bins",
+        "grid_search": "grid_search",
+        "max_shards_per_particle": "max_shards_per_particle",
+        "max_events_per_particle": "max_events_per_particle",
+        "comment": "comment",
+    }
+    for cli_name, config_name in mapping.items():
+        if cli_name in explicit:
+            cli_values[config_name] = explicit[cli_name]
+    if explicit.get("no_bias_correction"):
+        cli_values["correct_target_bias"] = False
+
+    effective = sdconfig.merge_config(
+        defaults,
+        file_values,
+        cli_values,
+        nullable_types={
+            "smear_sigma_ns": (int, float),
+            "max_shards_per_particle": int,
+            "max_events_per_particle": int,
+        },
+    )
+    config_keys = set(asdict(Config()))
+    cfg = Config(**{key: effective[key] for key in config_keys})
+    if explicit.get("no_timing"):
+        cfg = replace(cfg, smear_sigma_ns=None)
+    requested = list(effective["particles"])
+    comment = effective["comment"]
+    resolved = sdconfig.build_resolved_config(
+        "energy_mlp",
+        {**asdict(cfg), "particles": requested, "comment": comment},
+        config_path=args.config,
+        cli_overrides=[key for key in explicit if key != "config"],
+        profile=document.get("profile") if document else None,
+        dataset=document.get("dataset") if document else None,
+    )
+    return cfg, requested, comment, resolved
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    args = parse_args(argv)
-    if args.max_epochs < 1 or args.patience < 1 or args.batch_size < 1 or args.n_bins < 1:
+    try:
+        cfg, requested, comment, resolved = resolve_configuration(argv)
+    except sdconfig.ConfigError as error:
+        raise SystemExit(f"configuration error: {error}") from error
+    if cfg.max_epochs < 1 or cfg.patience < 1 or cfg.batch_size < 1 or cfg.n_bins < 1:
         raise SystemExit("epochs, patience, batch size and n-bins must be positive")
     for name in ("max_shards_per_particle", "max_events_per_particle"):
-        value = getattr(args, name)
+        value = getattr(cfg, name)
         if value is not None and value < 1:
             raise SystemExit(f"--{name.replace('_', '-')} must be positive")
-    cfg = Config(
-        calibration_size=args.calibration_size,
-        random_state=args.seed,
-        target=args.target,
-        correct_target_bias=not args.no_bias_correction,
-        smear_sigma_ns=args.sigma_time,
-        batch_size=args.batch_size,
-        max_epochs=args.max_epochs,
-        patience=args.patience,
-        n_bins=args.n_bins,
-        grid_search=args.grid_search,
-        max_shards_per_particle=args.max_shards_per_particle,
-        max_events_per_particle=args.max_events_per_particle,
-    )
-    if args.features:
-        cfg.feature_cols = args.features
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)8s | %(message)s")
-    for mode in resolve_modes(args.particles):
-        run_mode(mode, cfg, args.comment)
+    for mode in resolve_modes(requested):
+        run_mode(mode, cfg, comment, resolved)
     return 0
 
 

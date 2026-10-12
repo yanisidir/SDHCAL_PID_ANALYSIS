@@ -14,7 +14,7 @@ on:
 
 jobs:
   python:
-    name: Python ${{ matrix.python-version }}
+    name: Core Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -34,11 +34,14 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
 
+      - name: Record the resolved environment
+        run: python -m pip freeze --all
+
       - name: Every Python file compiles
         run: make compile
 
       - name: Test suite
-        run: python -m pytest tests/ -q
+        run: python -m pytest tests/ -q -ra
 
       - name: The committed calibration file loads
         run: |
@@ -63,8 +66,43 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install ruff
-      - run: ruff check src tools tests
-      - run: ruff format --check src tests
+      - run: make lint PYTHON=python
+
+  deep-learning:
+    name: Optional PyTorch / PyG
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install the isolated deep-learning environment
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-gnn.txt \
+            -c constraints/reference-py311-core.txt \
+            -c constraints/reference-py311-gnn.txt
+          pip install -e . --no-deps
+      - name: Synthetic CNN, GNN and hit-energy tests
+        run: |
+          python -m pytest -q -ra \
+            tests/test_hit_cnn_module.py \
+            tests/test_hit_gnn_module.py \
+            tests/test_hit_training.py \
+            tests/test_hit_energy.py \
+            tests/test_hit_energy_models.py \
+            tests/test_energy_target.py
+
+  shell:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install --yes shellcheck
+      - name: Check active workflows
+        run: shellcheck scripts/*.sh analysis/1_shower_features/parallel.sh
 
   cpp:
     name: C++ / ROOT
@@ -72,5 +110,9 @@ jobs:
     container: rootproject/root:6.32.02-ubuntu24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Syntax-check the ROOT sources
-        run: make cpp
+      - name: Install lightweight Python integration dependencies
+        run: python -m pip install pytest numpy pandas uproot awkward
+      - name: Compile and run C++ characterization
+        run: make cpp cpp-test REQUIRE_ROOT=1 PYTHON=python
+      - name: Keep the ROOT/uproot integration limitation visible
+        run: PYTHONPATH=src python -m pytest tests/test_cpp_root_pipeline.py -q -ra

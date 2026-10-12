@@ -42,7 +42,7 @@ hadroniques font que les distributions correspondantes se recouvrent largement �
         \textbf{Caractéristique} &
         \textbf{Pion $\pi^-$} &
         \textbf{Proton $p$} &
-        \textbf{Kaon neutre long $K^0_L$} \\
+        \textbf{Kaon neutre $K^0$} \\
         \hline
         Signal d'ionisation avant gerbe    & Oui               & Oui               & Non \\
         Fraction électromagnétique moyenne & Élevée            & Plus faible       & Variable \\
@@ -84,9 +84,12 @@ réduite, d'un entraînement plus rapide et d'une interprétation physique plus 
 
 \begin{figure}[!ht]
   \centering
-  \includegraphics[width=0.72\linewidth]{Fig/correlation_matrix.png}
-  \caption{Matrice de corrélation de Pearson des variables d'entrée utilisées pour la
-           classification.}
+  \includegraphics[width=0.72\linewidth]{Fig/bench_correlation_matrix.png}
+  \caption{Matrice de corrélation de Pearson des vingt-quatre variables d'entrée
+           effectivement utilisées par la classification. Deux variables présentes dans
+           une version antérieure de cette figure, \texttt{ratioThr23} et \texttt{tSpread},
+           en ont été retirées : étant des transformations monotones d'une seule colonne,
+           elles n'apportent rien à un modèle fondé sur des arbres.}
   \label{fig:corr-matrix}
 \end{figure}
 

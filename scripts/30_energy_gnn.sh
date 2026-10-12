@@ -17,6 +17,7 @@
 # DeepSets rather than attention: measured at 18.5 vs 17.6 ms/event/epoch, the
 # architecture was not the lever. Clustering was.
 
+# shellcheck source=scripts/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 # Sampling budget. The network sees fewer events than the BDT (79,451 against
@@ -25,22 +26,34 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 SAMPLING=(--max-shards-per-particle 40 --max-events-per-shard 2500)
 COMMON=(--architecture deepsets --cluster-hits --require-contained
         --particles mix-pi-proton --epochs 30 --batch-size 128)
-N_TRAIN=79451
+# Historical requested/recorded budget kept for the n_train comparison column.
+# Future exact post-selection split sizes come from RunLogger metadata.
+: "${N_TRAIN:=79451}"
+: "${ENERGY_GNN_RATIO_RUN_ID:=}"
+: "${ENERGY_GNN_RUN_ID:=}"
 
 step "energy GNN, ratio target (published)"
-$PYTHON analysis/4_energy/gnn/train.py "${COMMON[@]}" "${SAMPLING[@]}" \
+"$PYTHON" analysis/4_energy/gnn/train.py "${COMMON[@]}" "${SAMPLING[@]}" \
     --target ratio-chi2 --baseline-coefficients pi \
     --patience 8 --output-dir "$REPO/output/energy_reco_gnn_ratio"
 
 step "energy GNN, plain energy target (control)"
-$PYTHON analysis/4_energy/gnn/train.py "${COMMON[@]}" "${SAMPLING[@]}"
+"$PYTHON" analysis/4_energy/gnn/train.py "${COMMON[@]}" "${SAMPLING[@]}"
 
 step "import both into the benchmark"
-$PYTHON tools/import_predictions.py --kind energy \
-    --npz "output/energy_reco_gnn_ratio/mix-pi-proton/arrays/validation_predictions_*.npz" \
+ratio_predictions="output/energy_reco_gnn_ratio/mix-pi-proton/arrays/validation_predictions_*.npz"
+plain_predictions="output/energy_reco_gnn/mix-pi-proton/arrays/validation_predictions_*.npz"
+if [ -n "$ENERGY_GNN_RATIO_RUN_ID" ]; then
+    ratio_predictions="output/energy_reco_gnn_ratio/mix-pi-proton/arrays/validation_predictions_mix-pi-proton_run${ENERGY_GNN_RATIO_RUN_ID}.npz"
+fi
+if [ -n "$ENERGY_GNN_RUN_ID" ]; then
+    plain_predictions="output/energy_reco_gnn/mix-pi-proton/arrays/validation_predictions_mix-pi-proton_run${ENERGY_GNN_RUN_ID}.npz"
+fi
+"$PYTHON" tools/import_predictions.py --kind energy \
+    --npz "$ratio_predictions" \
     --name gnn_ratio --n-train "$N_TRAIN"
-$PYTHON tools/import_predictions.py --kind energy \
-    --npz "output/energy_reco_gnn/mix-pi-proton/arrays/validation_predictions_*.npz" \
+"$PYTHON" tools/import_predictions.py --kind energy \
+    --npz "$plain_predictions" \
     --name gnn --n-train "$N_TRAIN"
 
 step "done"

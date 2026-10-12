@@ -34,10 +34,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
-import joblib
 import matplotlib
 
 matplotlib.use("Agg")
@@ -47,15 +46,13 @@ import pandas as pd  # noqa: E402
 from sklearn.inspection import permutation_importance  # noqa: E402
 from sklearn.metrics import balanced_accuracy_score  # noqa: E402
 
-from sdhcal import paths, rootio, runlog  # noqa: E402
+from sdhcal import artifacts, paths, rootio, runlog  # noqa: E402
 from sdhcal.smearing import TimeSmearing, smear_time_columns  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s | %(levelname)8s | %(message)s", datefmt="%H:%M:%S"
 )
 logger = logging.getLogger("pid_interpretation")
-
-CLASS_NAMES = {"pi": r"$\pi^-$", "proton": "p", "kaon": r"$K^0_L$"}
 
 
 def default_classifier() -> Path:
@@ -64,7 +61,10 @@ def default_classifier() -> Path:
 
 
 def load_bundle(path: Path) -> dict:
-    bundle = joblib.load(path)
+    try:
+        bundle = artifacts.load_bundle(path, kind="pid")
+    except artifacts.ArtifactError as error:
+        raise SystemExit(f"{path} is not a PID bundle: {error}") from error
     missing = [k for k in ("model", "features", "particles") if k not in bundle]
     if missing:
         raise SystemExit(

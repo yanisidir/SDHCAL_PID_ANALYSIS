@@ -52,9 +52,7 @@ def build_knn_graph(
             prior_layer = coordinates[:, 2].unsqueeze(0) < coordinates[start:stop, 2].unsqueeze(1)
             distances.masked_fill_(~prior_layer, torch.inf)
         if time_window > 0:
-            compatible_time = (
-                times[start:stop].unsqueeze(1) - times.unsqueeze(0)
-            ).abs() <= time_window
+            compatible_time = (times[start:stop].unsqueeze(1) - times.unsqueeze(0)).abs() <= time_window
             distances.masked_fill_(~compatible_time, torch.inf)
 
         values, indices = torch.topk(distances, neighbours, dim=1, largest=False)

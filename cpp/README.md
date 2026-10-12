@@ -6,9 +6,13 @@ Code C++ utilisé par plusieurs étapes de l'analyse.
 cpp/
 ├── include/
 │   ├── ShowerAnalyzer.h    la classe documentée ci-dessous
+│   ├── ShowerFeatures.h    enregistrement plat et adaptateur scientifique
+│   ├── RootShowerIO.h      contrat de branches ROOT partagé
 │   └── SdhcalPaths.h       résolution des chemins de données, côté C++
 └── src/
-    └── ShowerAnalyzer.cpp
+    ├── ShowerAnalyzer.cpp
+    ├── ShowerFeatures.cpp
+    └── RootShowerIO.cpp
 ```
 
 `SdhcalPaths.h` expose la même convention que `src/sdhcal/paths.py` : les chemins
@@ -19,6 +23,9 @@ n'importe quel répertoire.
 Vérification de la compilation : `make cpp` depuis la racine du dépôt. Pour
 construire l'exécutable principal sans lancer l'analyse :
 `make analysis/1_shower_features/extract`.
+
+L'architecture, le contrat ROOT, les tests et les défauts connus sont détaillés
+dans [`../docs/cpp_root_architecture.md`](../docs/cpp_root_architecture.md).
 
 ## ShowerAnalyzer – Analyse de gerbes hadroniques
 

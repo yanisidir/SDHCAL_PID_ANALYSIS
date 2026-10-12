@@ -17,6 +17,7 @@ DATA_DIR=${SDHCAL_DATA_DIR:-$SCRIPT_DIR/../data}
 BIN=${BIN:-$SCRIPT_DIR/extract_parallel}
 IN=${IN:-$DATA_DIR/digitized}
 OUT=${OUT:-$DATA_DIR/params}
+export BIN OUT
 
 if [ ! -x "$BIN" ]; then
   echo "binary not found: $BIN" >&2
@@ -32,17 +33,20 @@ mkdir -p "$OUT"
 # (Optionnel) pour faire taire le message de citation :
 # parallel --bibtex >/dev/null 2>&1 || true
 
+# The single-quoted program is intentionally evaluated by each GNU parallel
+# worker; BIN and OUT are exported above for that worker environment.
+# shellcheck disable=SC2016
 parallel -j 40 --bar '
   f={};                                 # fichier dentrée
   base=$(basename "$f" .root)
-  out="'$OUT'/${base}_params.root"
+  out="$OUT/${base}_params.root"
 
   if [ -f "$out" ]; then
     echo "[SKIP] $out existe"
     exit 0
   fi
 
-  "'$BIN'" "$f" "$out" tree && echo "[OK]  $base" || echo "[ERR] $base"
+  "$BIN" "$f" "$out" tree && echo "[OK]  $base" || echo "[ERR] $base"
 ' ::: "$IN"/*.root
 
 

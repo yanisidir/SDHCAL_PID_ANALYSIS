@@ -8,7 +8,7 @@ La granularité du SDHCAL et sa lecture à trois seuils donnent accès à la mor
 
 L'identification des particules (\emph{Particle Identification}, PID) constitue une étape importante dans les expériences de physique des hautes énergies. Dans les états finals hadroniques, les particules produites forment souvent des jets issus de la fragmentation de quarks et de gluons, et une mauvaise identification des espèces peut conduire à une association incorrecte des dépôts d'énergie, à une calibration inadéquate ou à une dégradation de la résolution globale \cite{pdg2024}. Une telle séparation est importante non seulement pour la classification des événements, mais aussi pour la reconstruction de l'énergie, puisque la réponse calorimétrique dépend de l'espèce incidente. Elle s'inscrit plus largement dans la logique des approches de type \emph{Particle Flow}, où la qualité de la reconstruction globale repose sur une identification correcte des objets détectés.
 
-Les trois espèces étudiées présentent des différences de masse, de charge et de structure interne qui influencent leur mode d'interaction avec la matière et donc la structure moyenne de leurs gerbes. Ces propriétés, et les conséquences calorimétriques attendues, sont rassemblées dans le Tableau~\ref{tab:hadrons}. Les \textbf{pions chargés} sont des mésons légers : avant leur première interaction nucléaire, ils déposent de l'énergie par ionisation dans les premières couches du calorimètre, puis la production de pions neutres secondaires, suivie de la désintégration $\pi^0 \to \gamma\gamma$, alimente la composante électromagnétique de la cascade — leurs gerbes présentent ainsi souvent un développement relativement précoce et un cœur électromagnétique marqué. Les \textbf{protons} sont des baryons de masse plus élevée, dont la nature baryonique modifie la dynamique de la cascade, notamment à travers la conservation du nombre baryonique : à énergie identique, leurs gerbes tendent en moyenne à être plus hadroniques, plus profondes et plus diffuses, avec une fraction électromagnétique généralement plus faible. Les \textbf{kaons neutres longs}, enfin, ne portent pas de charge électrique et ne déposent donc pas d'énergie par ionisation avant leur première interaction nucléaire ; le point de départ de leur gerbe, gouverné par leur libre parcours moyen dans le matériau, est nettement plus variable, et leur contenu en étrangeté implique des voies de réaction différentes de celles des pions et des protons.
+Les trois espèces étudiées présentent des différences de masse, de charge et de structure interne qui influencent leur mode d'interaction avec la matière et donc la structure moyenne de leurs gerbes. Ces propriétés, et les conséquences calorimétriques attendues, sont rassemblées dans le Tableau~\ref{tab:hadrons}. Les \textbf{pions chargés} sont des mésons légers : avant leur première interaction nucléaire, ils déposent de l'énergie par ionisation dans les premières couches du calorimètre, puis la production de pions neutres secondaires, suivie de la désintégration $\pi^0 \to \gamma\gamma$, alimente la composante électromagnétique de la cascade — leurs gerbes présentent ainsi souvent un développement relativement précoce et un cœur électromagnétique marqué. Les \textbf{protons} sont des baryons de masse plus élevée, dont la nature baryonique modifie la dynamique de la cascade, notamment à travers la conservation du nombre baryonique : à énergie identique, leurs gerbes tendent en moyenne à être plus hadroniques, plus profondes et plus diffuses, avec une fraction électromagnétique généralement plus faible. Les \textbf{kaons neutres}, enfin, ne portent pas de charge électrique et ne déposent donc pas d'énergie par ionisation avant leur première interaction nucléaire ; le point de départ de leur gerbe, gouverné par leur libre parcours moyen dans le matériau, est nettement plus variable, et leur contenu en étrangeté implique des voies de réaction différentes de celles des pions et des protons.
 
 \begin{table}[!ht]
     \centering
@@ -29,7 +29,7 @@ Les trois espèces étudiées présentent des différences de masse, de charge e
         Proton $p$
             & 938.27 & $+1$ & stable & $uud$ & Baryon
             & Gerbe plus hadronique et plus profonde \\
-        Kaon neutre long $K^0_L$
+        Kaon neutre $K^0$
             & 497.61 & $0$ & $51.2$~ns
             & $\frac{1}{\sqrt{2}}(d\bar{s}-s\bar{d})$ & Méson neutre
             & Pas d'ionisation initiale ; départ de gerbe variable \\
@@ -50,12 +50,16 @@ Le SDHCAL possède néanmoins plusieurs caractéristiques favorables à cette t�
 
 Dans ce contexte, une approche par apprentissage supervisé s'impose naturellement : les descripteurs extraits sont nombreux, souvent corrélés, et leur pouvoir discriminant repose sur des dépendances non linéaires difficiles à exploiter au moyen de simples coupures séquentielles. L'objectif est donc d'entraîner un classificateur capable d'apprendre automatiquement une frontière de séparation efficace entre espèces à partir de leur signature calorimétrique.
 
-Plusieurs familles de modèles ont été comparées sur un même jeu de variables d'entrée : perceptrons multicouches \cite{rumelhart1986, goodfellow2016}, forêts aléatoires et arbres de décision boostés \cite{hastie2009}. Les méthodes de boosting se sont révélées les plus performantes pour ce problème tabulaire, plus précises que les forêts aléatoires tout en nécessitant moins d'ajustements fins qu'un réseau dense. L'implémentation \textbf{LightGBM} \cite{ke2017} a été retenue comme modèle de référence pour la classification multiclasse $\pi^-$, $p$, $K^0_L$, notamment pour l'accès direct qu'elle donne à des indicateurs d'importance des variables, utiles à l'interprétation physique. Le détail de la comparaison entre modèles et les hyperparamètres retenus figurent en Annexe~\ref{app:pid_hyperparams}.
+Plusieurs familles de modèles ont été comparées sur un même jeu de variables d'entrée : perceptrons multicouches \cite{rumelhart1986, goodfellow2016}, forêts aléatoires et arbres de décision boostés \cite{hastie2009}. Les méthodes de boosting se sont révélées les plus performantes pour ce problème tabulaire, plus précises que les forêts aléatoires tout en nécessitant moins d'ajustements fins qu'un réseau dense. L'implémentation \textbf{LightGBM} \cite{ke2017} a été retenue comme modèle de référence pour la classification multiclasse $\pi^-$, $p$, $K^0$, notamment pour l'accès direct qu'elle donne à des indicateurs d'importance des variables, utiles à l'interprétation physique. Le détail de la comparaison entre modèles et les hyperparamètres retenus figurent en Annexe~\ref{app:pid_hyperparams}.
 
 \section{Données simulées et descripteurs physiques}
 \label{sec:pid-donnees}
 
-L'étude repose sur des échantillons simulés de particules mono-énergétiques correspondant aux trois espèces considérées : pions négatifs \(\pi^-\), protons \(p\) et kaons neutres longs \(K^0_L\). Chaque classe contient environ \(1.3\times10^{5}\) événements, générés entre 1 et 130~GeV. Ce domaine couvre à la fois les interactions de basse énergie, où les gerbes restent peu développées, et les régimes plus énergétiques, caractérisés par une activité hadronique plus étendue et plus fluctuante.
+L'étude repose sur des échantillons simulés de particules mono-énergétiques correspondant aux trois espèces considérées : pions négatifs \(\pi^-\), protons \(p\) et kaons neutres \(K^0\). Chaque classe contient environ \(1.3\times10^{5}\) événements, générés entre 1 et 130~GeV.
+
+La troisième espèce appelle une précision, car elle conditionne la lecture des résultats qui suivent. La branche \texttt{particlePDG} vaut \(311\) pour la totalité de ces événements, code du \(K^0\) et non du \(K^0_L\), dont le code est \(130\). Le primaire est donc un état propre de saveur, que le transport Monte-Carlo décompose en un mélange de \(K^0_S\) et de \(K^0_L\). Les deux composantes ne se comportent pas de la même façon : le \(K^0_L\), de longueur de désintégration kilométrique aux énergies considérées, atteint le calorimètre et y interagit hadroniquement, tandis qu'une fraction des \(K^0_S\) se désintègre avant ou pendant la gerbe, en \(\pi^+\pi^-\) dans deux cas sur trois et en \(\pi^0\pi^0\) dans le troisième.
+
+Cette contamination est visible dans les données. Sur l'échantillon de validation non numérisé, \(1{,}2\,\%\) des événements \(K^0\) présentent une fraction électromagnétique exactement égale à l'unité, population strictement absente des pions et des protons (\(0{,}00\,\%\) dans les deux cas) : ce sont des gerbes purement électromagnétiques, signature attendue d'une désintégration \(K^0_S \to \pi^0\pi^0\). L'effet reste marginal — le reste de la distribution suit celle des pions — mais il implique que la classe n'est pas un faisceau pur de \(K^0_L\), et que les performances qui lui sont associées comportent une contribution, faible, d'événements dont la topologie n'est pas celle d'une gerbe de kaon. Ce domaine couvre à la fois les interactions de basse énergie, où les gerbes restent peu développées, et les régimes plus énergétiques, caractérisés par une activité hadronique plus étendue et plus fluctuante.
 
 Plutôt que d'utiliser directement la liste exhaustive des hits du détecteur, nous construisons un ensemble de descripteurs physiques résumant les principales propriétés morphologiques de chaque événement. Ces variables sont extraites à l'aide de l'outil \texttt{ShowerAnalyzer} et regroupées en familles complémentaires :
 
@@ -94,7 +98,7 @@ La matrice de confusion normalisée obtenue sur l'échantillon de test est repr�
 \begin{itemize}
     \item \textbf{Pions $\pi^-$} : environ $48.8\,\%$ des événements sont correctement identifiés, tandis que $\sim47.9\,\%$ sont confondus avec des protons ;
     \item \textbf{Protons $p$} : la séparation est meilleure, avec $\sim68.6\,\%$ d'identifications correctes, l'erreur dominante correspondant à une attribution vers la classe pion ($\sim27.4\,\%$) ;
-    \item \textbf{Kaons neutres $K^0_L$} : la classification est nettement plus performante, avec environ $86.0\,\%$ des événements correctement reconstruits.
+    \item \textbf{Kaons neutres $K^0$} : la classification est nettement plus performante, avec environ $86.0\,\%$ des événements correctement reconstruits.
 \end{itemize}
 
 Ces trois valeurs sont les \emph{rappels} par classe, c'est-à-dire les termes diagonaux de la matrice normalisée par ligne. Leur moyenne non pondérée définit l'\textbf{accuracy équilibrée} :
@@ -111,14 +115,14 @@ métrique de référence ici car indépendante des effectifs relatifs des trois 
 
 \begin{figure}[!ht]
   \centering
-  \includegraphics[width=0.50\linewidth]{Fig/confusion_matrix_9.png}
-  \caption{Matrice de confusion normalisée sur l'échantillon de test (pourcentages par ligne). Les classes sont ordonnées selon \{$\pi^-$, $p$, $K^0_L$\}.}
+  \includegraphics[width=0.50\linewidth]{Fig/bench_confusion_matrix.png}
+  \caption{Matrice de confusion normalisée sur l'échantillon de test (pourcentages par ligne). Les classes sont ordonnées selon \{$\pi^-$, $p$, $K^0$\}.}
   \label{fig:cm}
 \end{figure}
 
 \paragraph{Étude binaire pion/proton.}
 
-Une configuration binaire, utilisée ensuite pour le routage des modèles d'énergie, a également été entraînée sur environ $2\times10^{5}$ événements par espèce entre 1 et 130~GeV. Elle atteint une accuracy globale proche de $61\,\%$. La matrice de confusion associée donne $49.1\,\%$ de pions et $73.0\,\%$ de protons correctement identifiés ; $50.9\,\%$ des pions sont classés comme protons et $27.0\,\%$ des protons comme pions. Cette asymétrie doit être conservée à l'esprit pour interpréter les biais de la chaîne complète.
+Une configuration binaire, utilisée ensuite pour le routage des modèles d'énergie, a également été entraînée sur environ $2\times10^{5}$ événements par espèce entre 1 et 130~GeV. Répétée sur cinq graines, elle atteint une accuracy équilibrée de $61{,}3 \pm 0{,}1\,\%$, avec $49{,}7 \pm 0{,}2\,\%$ de pions et $72{,}9 \pm 0{,}2\,\%$ de protons correctement identifiés ; $50{,}3\,\%$ des pions sont classés comme protons et $27{,}1\,\%$ des protons comme pions. Cette asymétrie doit être conservée à l'esprit pour interpréter les biais de la chaîne complète.
 
 \paragraph{Apport de l'information temporelle.}
 
@@ -128,18 +132,38 @@ L'intérêt potentiel d'une information temporelle fine a été étudié par CAL
 
 \paragraph{Interprétation physique.}
 
-La meilleure séparation des $K^0_L$ s'explique par une dynamique hadronique différente de celle des pions et des protons. Dans les interactions se produisant dans l'absorbeur, les états finals sont très souvent dominés par la production de pions : leur faible masse les rend énergétiquement faciles à produire, les symétries approximatives de l'interaction forte — notamment l'isospin — et un espace de phase favorable renforcent cette dominance, et aucune création de quark étrange supplémentaire n'est requise. La production de kaons nécessite au contraire la création d'étrangeté ($s\bar{s}$) et implique des masses plus élevées : elle est donc statistiquement moins probable aux énergies considérées, et les cascades secondaires initiées par un $K^0_L$ diffèrent en moyenne de celles dominées par les pions. S'y ajoute le rôle des $\pi^0$, dont les fluctuations de production influencent directement la compacité locale, la densité d'activité et le développement longitudinal observés dans le calorimètre.
+La séparation des $K^0$ a d'abord une cause élémentaire, annoncée au chapitre~\ref{sec:interactions} : le $K^0$ est neutre. Il n'ionise pas et ne dépose donc rien avant sa première interaction nucléaire, là où un $\pi^-$ ou un proton, chargés, laissent une trace au minimum d'ionisation dès la première couche. La variable \texttt{Begin}, qui repère le début de la gerbe, le montre directement sur l'échantillon à trois espèces :
+
+\begin{table}[!ht]
+\centering
+\caption{Couche de démarrage de la gerbe par espèce, sur $1{,}3\times10^{5}$ événements par espèce. L'écart interquartile mesure la variabilité du point de départ.}
+\label{tab:pid_begin}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Espèce & \texttt{Begin} médian & Écart interquartile & Démarrage après la couche 10 \\
+\midrule
+$\pi^-$ & $0$ & $1$  & $4\,\%$ \\
+$p$     & $0$ & $1$  & $4\,\%$ \\
+$K^0$   & $6$ & $10$ & $29\,\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ce tableau rend compte des deux moitiés du résultat d'un seul coup. Le $K^0$ démarre six couches plus loin, avec une dispersion dix fois plus large, et près d'un tiers de ses gerbes s'amorcent au-delà de la couche 10 contre $4\,\%$ pour les espèces chargées : le classificateur dispose là d'un discriminant franc. Mais $\pi^-$ et proton sont \emph{rigoureusement indiscernables} sur cette même variable — mêmes médiane, même écart interquartile, même fraction tardive. Le verrou pion/proton et la facilité du $K^0$ ont donc une origine commune, et aucun modèle ne peut tirer de la profondeur de démarrage une information que les gerbes n'y ont pas mise.
+
+S'y ajoute, au second ordre, une dynamique hadronique différente, le $1{,}2\,\%$ d'événements électromagnétiques identifiés plus haut étant trop peu nombreux pour en rendre compte. Dans les interactions se produisant dans l'absorbeur, les états finals sont très souvent dominés par la production de pions : leur faible masse les rend énergétiquement faciles à produire, les symétries approximatives de l'interaction forte — notamment l'isospin — et un espace de phase favorable renforcent cette dominance, et aucune création de quark étrange supplémentaire n'est requise. La production de kaons nécessite au contraire la création d'étrangeté ($s\bar{s}$) et implique des masses plus élevées : elle est donc statistiquement moins probable aux énergies considérées, et les cascades secondaires initiées par un $K^0$ diffèrent en moyenne de celles dominées par les pions. S'y ajoute le rôle des $\pi^0$, dont les fluctuations de production influencent directement la compacité locale, la densité d'activité et le développement longitudinal observés dans le calorimètre.
 
 À l'inverse, protons et pions chargés interagissent tous deux par interaction forte sans dynamique d'étrangeté, et leurs gerbes restent largement dominées par les fluctuations de première interaction nucléaire et par la variabilité de la composante électromagnétique secondaire. Il en résulte un recouvrement important dans l'espace des variables tabulaires utilisées ici. La confusion résiduelle pion/proton ne traduit donc pas une faiblesse particulière du modèle, mais la proximité physique réelle de leurs signatures. Il est par ailleurs probable que cette difficulté dépende de l'énergie incidente : à basse énergie, la faible multiplicité de hits accentue les fluctuations statistiques, tandis qu'à plus haute énergie certaines signatures morphologiques deviennent plus marquées — une étude différentielle par tranches d'énergie constituerait un prolongement naturel.
 
 \paragraph{Probabilités prédites.}
 
-Les histogrammes des probabilités de sortie (Figure~\ref{fig:hists}) confirment ces tendances et renseignent sur le degré de confiance des prédictions. Les vrais $K^0_L$ reçoivent majoritairement des probabilités élevées pour leur classe correcte, avec une superposition limitée avec les distributions des pions et des protons. En revanche, les probabilités associées à la classe proton présentent un recouvrement significatif entre vrais protons et vrais pions : une fraction non négligeable des événements des deux classes reçoit des scores intermédiaires, traduisant une zone d'ambiguïté où la décision devient moins robuste. La confusion observée ne provient donc pas uniquement de limites algorithmiques, mais d'un recouvrement intrinsèque entre classes dans l'espace des variables utilisées. Ces distributions suggèrent enfin qu'une exploitation probabiliste des sorties — seuils ajustés, calibration des scores, sélection d'événements de haute pureté — constituerait une piste intéressante selon les besoins d'analyse.
+Les histogrammes des probabilités de sortie (Figure~\ref{fig:hists}) confirment ces tendances et renseignent sur le degré de confiance des prédictions. Les vrais $K^0$ reçoivent majoritairement des probabilités élevées pour leur classe correcte, avec une superposition limitée avec les distributions des pions et des protons. En revanche, les probabilités associées à la classe proton présentent un recouvrement significatif entre vrais protons et vrais pions : une fraction non négligeable des événements des deux classes reçoit des scores intermédiaires, traduisant une zone d'ambiguïté où la décision devient moins robuste. La confusion observée ne provient donc pas uniquement de limites algorithmiques, mais d'un recouvrement intrinsèque entre classes dans l'espace des variables utilisées. Ces distributions suggèrent enfin qu'une exploitation probabiliste des sorties — seuils ajustés, calibration des scores, sélection d'événements de haute pureté — constituerait une piste intéressante selon les besoins d'analyse.
 
 \begin{figure}[!ht]
   \centering
   \includegraphics[width=\linewidth]{Fig/prob_hists_9.png}
-  \caption{Histogrammes des probabilités prédites : (gauche) $P(\mathrm{classe}=p)$ pour vrais $\pi^-$ et vrais $p$ ; (centre) $P(\mathrm{classe}=K^0)$ pour vrais $\pi^-$ et vrais $K^0_L$ ; (droite) $P(\mathrm{classe}=K^0)$ pour vrais $p$ et vrais $K^0_L$.}
+  \caption{Histogrammes des probabilités prédites : (gauche) $P(\mathrm{classe}=p)$ pour vrais $\pi^-$ et vrais $p$ ; (centre) $P(\mathrm{classe}=K^0)$ pour vrais $\pi^-$ et vrais $K^0$ ; (droite) $P(\mathrm{classe}=K^0)$ pour vrais $p$ et vrais $K^0$.}
   \label{fig:hists}
 \end{figure}
 
@@ -172,7 +196,7 @@ La hiérarchie de variables décrite ci-dessus est physiquement plausible, mais 
 
 \paragraph{Systématiques liées à la simulation.}
 
-Comme toute approche supervisée entraînée sur simulation, les performances mesurées dépendent du réalisme du modèle physique utilisé pour générer les gerbes hadroniques. Ce point constitue la limite la plus structurante de ce travail : le classificateur apprend les régularités de la simulation, et rien ne garantit a priori que celles-ci se retrouvent dans les données. L'impact du choix de la liste de physique hadronique de Geant4 \cite{geant4update} n'a pas été évalué ici, pas plus que celui des paramètres de réponse du détecteur, des inefficacités instrumentales, ou de la modélisation temporelle des signaux. Une comparaison entre plusieurs configurations de simulation, puis une confrontation aux données de test faisceau, seraient nécessaires pour estimer l'incertitude systématique associée au classificateur — d'autant que la séparation des $K^0_L$ repose précisément sur des différences de production d'étrangeté, dont la modélisation varie selon les listes de physique.
+Comme toute approche supervisée entraînée sur simulation, les performances mesurées dépendent du réalisme du modèle physique utilisé pour générer les gerbes hadroniques. Ce point constitue la limite la plus structurante de ce travail : le classificateur apprend les régularités de la simulation, et rien ne garantit a priori que celles-ci se retrouvent dans les données. L'impact du choix de la liste de physique hadronique de Geant4 \cite{geant4update} n'a pas été évalué ici, pas plus que celui des paramètres de réponse du détecteur, des inefficacités instrumentales, ou de la modélisation temporelle des signaux. Une comparaison entre plusieurs configurations de simulation, puis une confrontation aux données de test faisceau, seraient nécessaires pour estimer l'incertitude systématique associée au classificateur — d'autant que la séparation des $K^0$ repose précisément sur des différences de production d'étrangeté, dont la modélisation varie selon les listes de physique.
 
 \paragraph{Prolongements sur ce chapitre.}
 
@@ -192,11 +216,11 @@ Cette piste, engagée en fin de stage, a d'abord permis de mettre en place la re
 \section{Approfondissement de la confusion pion/proton}
 \label{sec:pid-approfondissement}
 
-Les sections précédentes établissent un résultat net et un verrou. Le résultat est la séparation des $K^0_L$, dont le rappel de $86\,\%$ s'explique par une dynamique d'étrangeté distincte. Le verrou est la confusion pion/proton, qui concentre à elle seule l'essentiel des erreurs et dont l'interprétation donnée plus haut — un recouvrement réel des signatures plutôt qu'une faiblesse du modèle — reste une hypothèse tant qu'elle n'a pas été mise à l'épreuve.
+Les sections précédentes établissent un résultat net et un verrou. Le résultat est la séparation des $K^0$, dont le rappel de $86\,\%$ s'explique par une dynamique d'étrangeté distincte. Le verrou est la confusion pion/proton, qui concentre à elle seule l'essentiel des erreurs et dont l'interprétation donnée plus haut — un recouvrement réel des signatures plutôt qu'une faiblesse du modèle — reste une hypothèse tant qu'elle n'a pas été mise à l'épreuve.
 
 Deux objections pouvaient lui être opposées. La première est que les descripteurs tabulaires ne conservent qu'une partie de l'information topologique : un modèle lisant directement les hits pourrait voir ce qu'ils résument. La seconde est que le volume d'entraînement limitait la performance. Cette section répond à la première ; la littérature répond à la seconde.
 
-\paragraph{Protocole.} L'étude est menée sur deux productions Geant4 pion/proton indépendantes : une production continue de $2\times10^{5}$ événements par espèce entre 1 et 130~GeV pour l'entraînement, et une production à énergies fixes de $10^{5}$ événements par espèce, couvrant vingt points de 5 à 100~GeV, réservée à l'évaluation. L'échantillon d'évaluation n'est donc pas prélevé dans celui d'entraînement : il provient d'une simulation distincte. Ces lots ne contenant pas de $K^0_L$, l'étude porte exactement sur le cas difficile.
+\paragraph{Protocole.} L'étude est menée sur deux productions Geant4 pion/proton indépendantes : une production continue de $2\times10^{5}$ événements par espèce entre 1 et 130~GeV pour l'entraînement, et une production à énergies fixes de $10^{5}$ événements par espèce, couvrant vingt points de 5 à 100~GeV, réservée à l'évaluation. L'échantillon d'évaluation n'est donc pas prélevé dans celui d'entraînement : il provient d'une simulation distincte. Ces lots ne contenant pas de $K^0$, l'étude porte exactement sur le cas difficile.
 
 Quatre classificateurs sont comparés sur les mêmes événements : le BDT et un perceptron, qui lisent les descripteurs de gerbe, face à un réseau convolutif et un réseau de graphes, qui lisent les amas de hits. Les amas sont formés par quatre-connexité dans chaque couche, selon la définition même de l'observable \texttt{NClusters} (Annexe~\ref{annexe:showeranalyzer}), ce qui divise par environ quatre le nombre d'objets à traiter — $753$ hits deviennent $191$ amas par événement — sans perdre l'information, puisque chaque amas conserve sa position, sa taille et sa composition en seuils.
 
@@ -226,16 +250,37 @@ GNN & amas de hits          & $8\,400$   & $0{,}649$ & $3{,}54$ \\
 \label{fig:pid_rejection}
 \end{figure}
 
-La valeur intégrée pourrait cependant masquer une dépendance en énergie : un modèle meilleur seulement à basse énergie, là où la statistique est la plus forte, se confondrait avec un modèle uniformément moyen. La Figure~\ref{fig:pid_efficacite_comp} écarte cette lecture.
+La valeur intégrée pourrait par ailleurs masquer une dépendance en énergie : un modèle meilleur seulement à basse énergie, là où la statistique pèse le plus, se confondrait avec un modèle uniformément moyen. La Figure~\ref{fig:pid_efficacite_comp} écarte cette lecture.
 
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=0.74\linewidth]{Fig/bench_pid_efficiency.png}
-\caption{Efficacité pion au point de fonctionnement à $50\,\%$, par tranche d'énergie vraie. Les barres sont binomiales. La séparation s'améliore lentement avec l'énergie, de $\sim\!0{,}40$ à 5~GeV à $\sim\!0{,}60$ à 100~GeV, mais les quatre modèles restent compatibles dans chaque tranche.}
+\caption{Efficacité pion au point de fonctionnement à $50\,\%$, par tranche d'énergie vraie. Les barres sont binomiales. La séparation s'améliore lentement avec l'énergie, de $\sim\!0{,}40$ à 5~GeV à $\sim\!0{,}60$ à 100~GeV. Les barres par tranche, d'environ $0{,}05$, sont trop larges pour y retrouver le classement intégré : aucun modèle ne doit donc son écart global à une région d'énergie particulière.}
 \label{fig:pid_efficacite_comp}
 \end{figure}
 
-\paragraph{L'accès aux hits ne lève pas le verrou.} Le BDT et le perceptron sont indiscernables l'un de l'autre : sur les descripteurs de gerbe, un arbre renforcé et un réseau dense extraient la même information, ce qui situe la limite dans les variables et non dans la classe de modèle. Les deux réseaux lisant les hits ne font pas mieux — ils sont même en retrait d'environ trois écarts-types — avec la réserve qu'ils ont vu vingt fois moins d'événements. La première objection est donc levée dans le sens de l'hypothèse : l'information topologique fine, que les descripteurs résument, ne contient pas de pouvoir séparateur supplémentaire accessible dans ces conditions.
+\paragraph{Lecture des écarts.} Comparer quatre AUC sur $6\,027$ événements demande de savoir ce qu'un écart doit valoir pour compter. Deux sources d'incertitude interviennent. L'échantillon d'évaluation d'abord : un bootstrap apparié, qui rééchantillonne les mêmes événements pour tous les modèles et élimine donc la part commune de la fluctuation, donne les écarts du Tableau~\ref{tab:pid_ecarts}. La graine d'initialisation ensuite : répété sur cinq graines, le MLP donne une AUC de $0{,}6589 \pm 0{,}0006$ et le BDT $0{,}6580 \pm 0{,}0015$ sur leur échantillon de validation interne.
+
+\begin{table}[!ht]
+\centering
+\caption{Écarts d'AUC par paire sur les $6\,027$ événements communs, par bootstrap apparié ($B = 2000$). L'incertitude ne couvre que l'échantillonnage ; la dispersion de graine, de l'ordre de $0{,}0016$ pour les deux modèles tabulaires, s'y ajoute en quadrature.}
+\label{tab:pid_ecarts}
+\small
+\begin{tabular}{lrr}
+\toprule
+Paire & $\Delta$AUC & $p$ \\
+\midrule
+MLP $-$ BDT & $+0{,}0053 \pm 0{,}0022$ & $0{,}02$ \\
+BDT $-$ CNN & $+0{,}0188 \pm 0{,}0047$ & $<0{,}001$ \\
+BDT $-$ GNN & $+0{,}0252 \pm 0{,}0051$ & $<0{,}001$ \\
+CNN $-$ GNN & $+0{,}0064 \pm 0{,}0048$ & $0{,}18$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{L'accès aux hits ne lève pas le verrou.} Le MLP devance le BDT de $0{,}0053$, soit environ deux écarts-types une fois la dispersion de graine ajoutée : l'écart est trop ténu pour les départager, et sur les descripteurs de gerbe un arbre renforcé et un réseau dense extraient en pratique la même information. La limite est donc dans les variables, non dans la classe de modèle.
+
+Les deux réseaux lisant les hits, eux, ne font pas mieux : ils sont nettement en retrait, de quatre à cinq écarts-types, et ne se départagent pas entre eux. Cet écart ne démontre pas que les hits portent moins d'information que leur résumé, car ces réseaux ont vu vingt fois moins d'événements ; il borne seulement ce que leur lecture directe apporte, et cette borne est négative. La première objection est levée dans le sens de l'hypothèse : dans ces conditions, l'information topologique fine que les descripteurs résument ne livre pas de pouvoir séparateur supplémentaire.
 
 \paragraph{Le volume d'entraînement n'est pas davantage en cause.} C'est ici que la littérature tranche la seconde objection. L'étude DHCAL déjà citée~\cite{borysova2025dhcalgnn} entraîne ses réseaux sur $2{,}4$ millions d'événements, soit près de trois cents fois le budget employé ici, avec d'autres architectures et un autre détecteur. Elle rapporte une efficacité pion de 46 à $52\,\%$ et la même confusion dominante : $34\,\%$ des pions classés protons et $26\,\%$ des protons classés pions. Le plafond ne se déplace pas.
 

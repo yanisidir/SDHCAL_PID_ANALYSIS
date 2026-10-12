@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "profile": "two_class",
+  "dataset": {
+    "params_set": "2class",
+    "training_sample": "200k",
+    "validation_sample": "discret"
+  },
+  "workflows": {
+    "pid_bdt": {
+      "particles": ["pi", "proton"]
+    },
+    "pid_mlp": {},
+    "energy_bdt": {
+      "particles": ["all"],
+      "require_contained": true
+    },
+    "energy_mlp": {
+      "particles": ["all"]
+    }
+  }
+}

@@ -9,257 +9,35 @@ final external validation.
 from __future__ import annotations
 
 import argparse
-import copy
 import logging
-import random
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Sequence
 
-import joblib
 import matplotlib
 import numpy as np
-import pandas as pd
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
-from sklearn.metrics import (
-    accuracy_score,
-    balanced_accuracy_score,
-    classification_report,
-    confusion_matrix,
-    log_loss,
-    roc_auc_score,
-)
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
-from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 
-from sdhcal import paths, runlog, shards
-from sdhcal.smearing import TimeSmearing, smear_time_columns
+from sdhcal import artifacts, paths, pid_mlp, provenance, runlog, tabular
+from sdhcal import config as sdconfig
 
-
-LOGGER = logging.getLogger("pid_mlp_train")
-PARTICLES = ("pi", "proton")
-CLASS_NAMES = (r"$\pi^-$", "p")
-
-
-@dataclass
-class Config:
-    feature_cols: Sequence[str] = field(
-        default_factory=lambda: [
-            "Thr1", "Thr2", "Thr3", "Begin", "Radius", "Density", "NClusters",
-            "Zbary", "Zrms", "PctHitsFirst10", "PlanesWithClusmore2", "AvgClustSize",
-            "MaxClustSize", "lambda1", "lambda2", "tMin", "tMax", "tMean",
-            "Nmax", "z0_fit", "Xmax", "lambda", "nTrackSegments", "eccentricity3D",
-        ]
-    )
-    calibration_size: float = 0.10
-    random_state: int = 42
-    smear_sigma_ns: float | None = 0.1
-    hidden_layer_sizes: tuple[int, ...] = (128, 64, 32)
-    alpha: float = 1e-4
-    batch_size: int = 256
-    learning_rate_init: float = 1e-3
-    max_epochs: int = 300
-    patience: int = 20
-    grid_search: bool = False
-    max_shards_per_particle: int | None = None
-    max_events_per_particle: int | None = None
-
-    def smearing(self, seed: int) -> TimeSmearing:
-        return TimeSmearing(
-            sigma_ns=self.smear_sigma_ns,
-            columns=("tMin", "tMax", "tMean"),
-            seed=seed,
-        )
-
-    def loggable(self) -> dict[str, object]:
-        return {
-            "particles": ";".join(PARTICLES),
-            "shards_dir": str(paths.shards_dir()),
-            "train_sample": "200k",
-            "validation_sample": "discret",
-            "calibration_size": self.calibration_size,
-            "random_state": self.random_state,
-            "smear_sigma_ns": self.smear_sigma_ns,
-            "hidden_layer_sizes": "x".join(map(str, self.hidden_layer_sizes)),
-            "alpha": self.alpha,
-            "batch_size": self.batch_size,
-            "learning_rate_init": self.learning_rate_init,
-            "max_epochs": self.max_epochs,
-            "patience": self.patience,
-            "grid_search": int(self.grid_search),
-            "max_shards_per_particle": self.max_shards_per_particle,
-            "max_events_per_particle": self.max_events_per_particle,
-        }
+LOGGER = pid_mlp.LOGGER
+PARTICLES = pid_mlp.PARTICLES
+CLASS_NAMES = pid_mlp.CLASS_NAMES
+Config = pid_mlp.Config
+load_sample = pid_mlp.load_sample
+train_calibration_indices = pid_mlp.train_calibration_indices
+base_model = pid_mlp.base_model
+choose_hyperparameters = pid_mlp.choose_hyperparameters
+fit_model = pid_mlp.fit_model
+evaluate = pid_mlp.evaluate
 
 
 def set_seeds(seed: int) -> None:
-    random.seed(seed)
-    np.random.seed(seed)
-
-
-def load_sample(sample: str, cfg: Config, seed: int) -> pd.DataFrame:
-    frames = [
-        shards.read_sample(
-            sample,
-            particle,
-            features=cfg.feature_cols,
-            limit=cfg.max_shards_per_particle,
-        )
-        for particle in PARTICLES
-    ]
-    frame = pd.concat(frames, ignore_index=True)
-    if cfg.max_events_per_particle is not None:
-        frame = pd.concat(
-            [
-                group.sample(
-                    n=min(len(group), cfg.max_events_per_particle),
-                    random_state=seed,
-                )
-                for _, group in frame.groupby("particlePDG", sort=False)
-            ],
-            ignore_index=True,
-        )
-    needed = [*cfg.feature_cols, "particlePDG", "primaryEnergy", "eventNumber"]
-    frame = frame.replace([np.inf, -np.inf], np.nan).dropna(subset=needed).reset_index(drop=True)
-    labels = {paths.PARTICLE_PDG["pi"]: 0, paths.PARTICLE_PDG["proton"]: 1}
-    frame["label"] = frame["particlePDG"].map(labels).astype(int)
-    frame = smear_time_columns(frame, cfg.smearing(seed))
-    LOGGER.info("%s sample: %d events", sample, len(frame))
-    return frame
-
-
-def train_calibration_indices(frame: pd.DataFrame, cfg: Config) -> tuple[np.ndarray, np.ndarray]:
-    if not 0 < cfg.calibration_size < 1:
-        raise ValueError("calibration-size must lie strictly between zero and one")
-    energy = frame["primaryEnergy"].to_numpy()
-    label = frame["label"].to_numpy()
-    last_error = None
-    for n_bins in range(10, 0, -1):
-        quantile = np.zeros(len(frame), dtype=int)
-        for value in np.unique(label):
-            mask = label == value
-            edges = np.unique(np.quantile(energy[mask], np.linspace(0, 1, n_bins + 1)))
-            quantile[mask] = np.digitize(energy[mask], edges[1:-1])
-        strata = np.asarray(
-            [f"{kind}:{bin_}" for kind, bin_ in zip(label, quantile, strict=True)]
-        )
-        try:
-            return train_test_split(
-                np.arange(len(frame)),
-                test_size=cfg.calibration_size,
-                random_state=cfg.random_state,
-                stratify=strata,
-            )
-        except ValueError as error:
-            last_error = error
-    raise ValueError(f"Cannot create the train/calibration split: {last_error}")
-
-
-def base_model(cfg: Config, **overrides) -> MLPClassifier:
-    parameters = {
-        "hidden_layer_sizes": cfg.hidden_layer_sizes,
-        "alpha": cfg.alpha,
-        "batch_size": cfg.batch_size,
-        "learning_rate_init": cfg.learning_rate_init,
-        "activation": "relu",
-        "solver": "adam",
-        "shuffle": True,
-        "random_state": cfg.random_state,
-    }
-    parameters.update(overrides)
-    return MLPClassifier(**parameters)
-
-
-def choose_hyperparameters(x: np.ndarray, y: np.ndarray, cfg: Config) -> dict[str, object]:
-    if not cfg.grid_search:
-        return {}
-    search = GridSearchCV(
-        base_model(cfg, early_stopping=True, max_iter=cfg.max_epochs),
-        {
-            "hidden_layer_sizes": [(64, 32), (128, 64, 32)],
-            "alpha": [1e-5, 1e-4, 1e-3],
-            "learning_rate_init": [5e-4, 1e-3],
-        },
-        scoring="balanced_accuracy",
-        cv=StratifiedKFold(5, shuffle=True, random_state=cfg.random_state),
-        n_jobs=-1,
-    )
-    search.fit(x, y)
-    LOGGER.info("Best grid-search parameters: %s", search.best_params_)
-    return search.best_params_
-
-
-def fit_model(
-    x_train: np.ndarray,
-    y_train: np.ndarray,
-    x_calibration: np.ndarray,
-    y_calibration: np.ndarray,
-    cfg: Config,
-) -> tuple[MLPClassifier, dict[str, list[float]], dict[str, object]]:
-    best_parameters = choose_hyperparameters(x_train, y_train, cfg)
-    model = base_model(cfg, **best_parameters)
-    history = {"train_loss": [], "calibration_loss": [], "calibration_auc": []}
-    best_model = None
-    best_loss = np.inf
-    stale = 0
-    rng = np.random.default_rng(cfg.random_state)
-    for epoch in range(1, cfg.max_epochs + 1):
-        order = rng.permutation(len(y_train))
-        if epoch == 1:
-            model.partial_fit(x_train[order], y_train[order], classes=np.array([0, 1]))
-        else:
-            model.partial_fit(x_train[order], y_train[order])
-        calibration_probability = model.predict_proba(x_calibration)
-        train_loss = float(model.loss_)
-        calibration_loss = float(
-            log_loss(y_calibration, calibration_probability, labels=[0, 1])
-        )
-        calibration_auc = float(roc_auc_score(y_calibration, calibration_probability[:, 1]))
-        history["train_loss"].append(train_loss)
-        history["calibration_loss"].append(calibration_loss)
-        history["calibration_auc"].append(calibration_auc)
-        if epoch == 1 or epoch % 10 == 0:
-            LOGGER.info(
-                "epoch=%03d train_loss=%.5f calibration_loss=%.5f calibration_auc=%.4f",
-                epoch,
-                train_loss,
-                calibration_loss,
-                calibration_auc,
-            )
-        if calibration_loss < best_loss - 1e-6:
-            best_loss = calibration_loss
-            best_model = copy.deepcopy(model)
-            stale = 0
-        else:
-            stale += 1
-            if stale >= cfg.patience:
-                LOGGER.info("Early stopping after %d epochs", epoch)
-                break
-    if best_model is None:
-        raise RuntimeError("MLP training did not produce a checkpoint")
-    return best_model, history, best_parameters
-
-
-def evaluate(model: MLPClassifier, x: np.ndarray, y: np.ndarray) -> tuple[dict, np.ndarray, np.ndarray]:
-    probability = model.predict_proba(x)
-    prediction = np.argmax(probability, axis=1)
-    matrix = confusion_matrix(y, prediction, labels=[0, 1])
-    results = {
-        "accuracy": float(accuracy_score(y, prediction)),
-        "balanced_accuracy": float(balanced_accuracy_score(y, prediction)),
-        "auc": float(roc_auc_score(y, probability[:, 1])),
-        "log_loss": float(log_loss(y, probability, labels=[0, 1])),
-        "n_validation": int(len(y)),
-    }
-    for index, particle in enumerate(PARTICLES):
-        results[f"efficiency_{particle}"] = float(matrix[index, index] / max(matrix[index].sum(), 1))
-        results[f"purity_{particle}"] = float(matrix[index, index] / max(matrix[:, index].sum(), 1))
-    LOGGER.info("External validation:\n%s", classification_report(y, prediction, target_names=PARTICLES))
-    return results, probability, matrix
+    tabular.seed_python_numpy(seed)
 
 
 def save_plots(history: dict, probability: np.ndarray, y: np.ndarray, matrix: np.ndarray, log) -> None:
@@ -292,7 +70,7 @@ def save_plots(history: dict, probability: np.ndarray, y: np.ndarray, matrix: np
     plt.close(figure)
 
 
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=paths.output_dir() / "pid_mlp")
     parser.add_argument("--sigma-time", type=float, default=0.1)
@@ -306,36 +84,97 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-shards-per-particle", type=int)
     parser.add_argument("--max-events-per-particle", type=int)
     parser.add_argument("--comment", default="")
-    return parser.parse_args(argv)
+    parser.add_argument("--config", type=Path, default=None, help="optional versioned JSON configuration")
+    return parser
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    return build_parser().parse_args(argv)
+
+
+def resolve_configuration(
+    argv: Sequence[str] | None = None,
+) -> tuple[Config, Path, str, dict]:
+    args, explicit = sdconfig.parse_cli(build_parser(), argv)
+    defaults = asdict(Config())
+    defaults.update(output_dir=paths.output_dir() / "pid_mlp", comment="")
+
+    document = None
+    file_values = {}
+    if args.config is not None:
+        document = sdconfig.load_config(args.config)
+        file_values = sdconfig.workflow_values(
+            document, "pid_mlp", params_set=paths.params_set()
+        )
+
+    cli_values = {}
+    mapping = {
+        "output_dir": "output_dir",
+        "sigma_time": "smear_sigma_ns",
+        "calibration_size": "calibration_size",
+        "max_epochs": "max_epochs",
+        "patience": "patience",
+        "batch_size": "batch_size",
+        "seed": "random_state",
+        "grid_search": "grid_search",
+        "max_shards_per_particle": "max_shards_per_particle",
+        "max_events_per_particle": "max_events_per_particle",
+        "comment": "comment",
+    }
+    for cli_name, config_name in mapping.items():
+        if cli_name in explicit:
+            cli_values[config_name] = explicit[cli_name]
+
+    effective = sdconfig.merge_config(
+        defaults,
+        file_values,
+        cli_values,
+        nullable_types={
+            "smear_sigma_ns": (int, float),
+            "max_shards_per_particle": int,
+            "max_events_per_particle": int,
+        },
+    )
+    config_keys = set(asdict(Config()))
+    cfg = Config(**{key: effective[key] for key in config_keys})
+    if explicit.get("no_timing"):
+        cfg = replace(cfg, smear_sigma_ns=None)
+    output_dir = Path(effective["output_dir"])
+    comment = effective["comment"]
+    resolved = sdconfig.build_resolved_config(
+        "pid_mlp",
+        {**asdict(cfg), "output_dir": output_dir, "comment": comment},
+        config_path=args.config,
+        cli_overrides=[key for key in explicit if key != "config"],
+        profile=document.get("profile") if document else None,
+        dataset=document.get("dataset") if document else None,
+    )
+    return cfg, output_dir, comment, resolved
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = parse_args(argv)
-    if args.max_epochs < 1 or args.patience < 1 or args.batch_size < 1:
+    try:
+        cfg, output_dir, comment, resolved = resolve_configuration(argv)
+    except sdconfig.ConfigError as error:
+        raise SystemExit(f"configuration error: {error}") from error
+    if cfg.max_epochs < 1 or cfg.patience < 1 or cfg.batch_size < 1:
         raise SystemExit("epochs, patience and batch size must be positive")
     for name in ("max_shards_per_particle", "max_events_per_particle"):
-        value = getattr(args, name)
+        value = getattr(cfg, name)
         if value is not None and value < 1:
             raise SystemExit(f"--{name.replace('_', '-')} must be positive")
-    cfg = Config(
-        calibration_size=args.calibration_size,
-        random_state=args.seed,
-        smear_sigma_ns=None if args.no_timing else args.sigma_time,
-        batch_size=args.batch_size,
-        max_epochs=args.max_epochs,
-        patience=args.patience,
-        grid_search=args.grid_search,
-        max_shards_per_particle=args.max_shards_per_particle,
-        max_events_per_particle=args.max_events_per_particle,
-    )
-    set_seeds(args.seed)
+    set_seeds(cfg.random_state)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)8s | %(message)s")
-    log = runlog.RunLogger(args.output_dir, name="pid_mlp")
+    log = runlog.RunLogger(output_dir, name="pid_mlp")
     log.start(cfg.loggable(), features=list(cfg.feature_cols))
-    log.log_comment(args.comment)
+    log.log_comment(comment)
+    resolved_path = sdconfig.write_resolved_config(
+        log.path("runs", f"pid_mlp_{log.run_id}_resolved_config.json"), resolved
+    )
+    log.log_artifacts(resolved_config=resolved_path)
 
-    continuous = load_sample("200k", cfg, args.seed)
-    validation = load_sample("discret", cfg, args.seed + 10_000)
+    continuous = load_sample("200k", cfg, cfg.random_state)
+    validation = load_sample("discret", cfg, cfg.random_state + 10_000)
     train_index, calibration_index = train_calibration_indices(continuous, cfg)
     scaler = StandardScaler().fit(continuous.iloc[train_index][list(cfg.feature_cols)])
     x_train = scaler.transform(continuous.iloc[train_index][list(cfg.feature_cols)])
@@ -350,16 +189,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     results["best_parameters"] = ";".join(f"{k}={v}" for k, v in best.items())
     results["best_epoch"] = int(np.argmin(history["calibration_loss"]) + 1)
     model_path = log.path("models", f"pid_mlp_{log.run_id}.joblib")
-    joblib.dump(
+    artifacts.save_bundle(
+        model_path,
         {
             "model": model,
             "scaler": scaler,
             "features": list(cfg.feature_cols),
             "particles": list(PARTICLES),
             "label_to_pdg": {0: paths.PARTICLE_PDG["pi"], 1: paths.PARTICLE_PDG["proton"]},
-            "smearing": cfg.smearing(args.seed).as_dict(),
+            "smearing": cfg.smearing(cfg.random_state).as_dict(),
         },
-        model_path,
+        kind="pid",
+        model_family="sklearn_mlp",
+        preprocessing={
+            "scaler": type(scaler).__name__,
+            "smearing": cfg.smearing(cfg.random_state).as_dict(),
+        },
+        training_counts={
+            "train": int(len(train_index)),
+            "calibration": int(len(calibration_index)),
+            "external_validation": int(len(validation)),
+        },
+        configuration=resolved,
+        provenance=provenance.environment_fingerprint(),
     )
     arrays_path = log.path("arrays", f"validation_{log.run_id}.npz")
     np.savez_compressed(
@@ -380,7 +232,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     log.log_metrics(**results)
     log.log_artifacts(model=model_path, predictions=arrays_path)
     print(f"validation_auc={results['auc']:.4f} validation_bacc={results['balanced_accuracy']:.4f}")
-    print(f"results: {args.output_dir}")
+    print(f"results: {output_dir}")
     return 0
 
 

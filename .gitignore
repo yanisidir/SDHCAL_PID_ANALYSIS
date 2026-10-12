@@ -16,6 +16,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
 .ipynb_checkpoints/
 *.egg-info/
 .venv/
@@ -78,6 +81,7 @@ datasets/
 # directories keeps a stray log or manifest out too.
 new_data/
 new_data_params/
+new_data_params_v2/
 local_data/
 
 # The chi2 calibration is small, textual and the single source of truth shared
@@ -109,6 +113,9 @@ runs/
 wandb/
 *.log
 nohup.out
+core
+core.*
+*.tmp
 
 # ---------------------------------------------------------------------------
 # LaTeX build products

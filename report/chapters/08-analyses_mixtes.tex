@@ -21,15 +21,15 @@ Dans cette chaîne, chaque événement est classé puis traité par le régresse
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=0.76\linewidth]{Fig/PID_Lin_n_Dev_BDT.png}
-\caption{Linéarité et biais relatif de la chaîne PID + BDT.}
+\includegraphics[width=0.76\linewidth]{Fig/bench_coupling_linearity_bdt.png}
+\caption{Réponse moyenne du régresseur BDT selon la source de l'étiquette d'espèce. Les trois courbes sont confondues : l'étiquette, même exacte, ne déplace pas la réponse.}
 \label{fig:linearite_pid_bdt_new}
 \end{figure}
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=0.76\linewidth]{Fig/PID_Resolution_relative_BDT.png}
-\caption{Indicateur de dispersion relative de la chaîne PID + BDT.}
+\includegraphics[width=0.76\linewidth]{Fig/bench_coupling_resolution_bdt.png}
+\caption{Résolution du régresseur BDT selon la source de l'étiquette d'espèce. Les trois courbes se superposent sur toute la gamme.}
 \label{fig:resolution_pid_bdt_new}
 \end{figure}
 
@@ -45,15 +45,22 @@ La référence $\chi^2$ pion vers tous applique une unique calibration à l'ense
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=0.76\linewidth]{Fig/PID_Lin_n_Dev_chi2_pion.png}
-\caption{Linéarité et biais relatif avec la calibration paramétrique pion appliquée à toutes les espèces.}
+\includegraphics[width=0.76\linewidth]{Fig/bench_coupling_linearity_chi2_proton.png}
+\caption{Réponse moyenne pour les \emph{protons} seuls, avec la calibration $\chi^2$. Sans étiquette d'espèce, le proton est reconstruit environ $5\,\%$ trop bas à 5~GeV et l'écart ne se referme qu'au-dessus de 50~GeV ; l'étiquette, prédite ou vraie, ramène la réponse au voisinage de l'unité sur toute la gamme. C'est l'effet que le routage corrige, et il est porté par cette seule espèce.}
+\label{fig:coupling_proton_chi2}
+\end{figure}
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.76\linewidth]{Fig/bench_coupling_linearity_chi2.png}
+\caption{Réponse moyenne de la calibration $\chi^2$ selon la source de l'étiquette d'espèce. Ici l'étiquette compte : sans elle, les coefficients du pion s'appliquent au proton.}
 \label{fig:linearite_param_pion_all_new}
 \end{figure}
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=0.76\linewidth]{Fig/PID_Resolution_relative_chi2_pion.png}
-\caption{Indicateur de dispersion relative avec la calibration paramétrique pion appliquée à toutes les espèces.}
+\includegraphics[width=0.76\linewidth]{Fig/bench_coupling_resolution_chi2.png}
+\caption{Résolution de la calibration $\chi^2$ selon la source de l'étiquette d'espèce.}
 \label{fig:resolution_param_pion_all_new}
 \end{figure}
 
@@ -62,29 +69,31 @@ La référence $\chi^2$ pion vers tous applique une unique calibration à l'ense
 \section{Comparaison quantitative à 20 et 80~GeV}
 \label{sec:mixte-comparaison}
 
-Le Tableau~\ref{tab:mix-bias} rassemble les biais calculés à partir des prédictions événement par événement. Les valeurs sont arrondies à $0.1$ point de pourcentage.
+Le Tableau~\ref{tab:mix-bias} rassemble les biais calculés à partir des prédictions événement par événement, à deux énergies qui encadrent la gamme utile. Il porte sur les deux espèces chargées : l'approfondissement décrit plus bas repose sur des productions pion/proton, et les échantillons à trois espèces exploités au chapitre~\ref{sec:pid_mlp} relèvent d'une production antérieure, dont les tables par événement n'ont pas été conservées.
 
 \begin{table}[!ht]
 \centering
-\caption{Biais relatif $\delta(E)$ en pourcentage à 20 et 80~GeV.}
+\caption{Biais relatif $\delta(E)$ en pourcentage à 20 et 80~GeV, sous la coupure de confinement, avec des coefficients de calibration ajustés hors échantillon. Les incertitudes valent $0{,}2$ à $0{,}3$ point.}
 \label{tab:mix-bias}
 \small
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrrrr}
 \toprule
-& \multicolumn{2}{c}{\(\pi^-\)} & \multicolumn{2}{c}{\(K^0_L\)} & \multicolumn{2}{c}{\(p\)} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
-\textbf{Scénario} & 20 & 80 & 20 & 80 & 20 & 80 \\
+& \multicolumn{2}{c}{\(\pi^-\)} & \multicolumn{2}{c}{\(p\)} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+\textbf{Scénario} & 20 & 80 & 20 & 80 \\
 \midrule
-\(\chi^2\) pion vers tous & \(-0.7\) & \(-4.9\) & \(-6.4\) & \(-5.6\) & \(-6.8\) & \(-4.8\) \\
-BDT + \(\chi^2\)         & \(+2.8\) & \(-4.7\) & \(-2.9\) & \(-5.2\) & \(-1.7\) & \(-4.3\) \\
-BDT + BDT                  & \(+7.1\) & \(+0.9\) & \(+6.3\) & \(0.0\) & \(+3.0\) & \(0.0\) \\
+\(\chi^2\) pion vers tous & \(-0{,}5\) & \(+0{,}1\) & \(-4{,}9\) & \(+1{,}4\) \\
+BDT + \(\chi^2\)          & \(+2{,}5\) & \(-0{,}1\) & \(-0{,}4\) & \(+1{,}3\) \\
+BDT + BDT                 & \(+3{,}8\) & \(+1{,}0\) & \(+1{,}2\) & \(+1{,}3\) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Le résultat principal concerne le biais. À 20~GeV, le routage BDT + $\chi^2$ rapproche les protons et les kaons de zéro par rapport à la calibration pion universelle, mais déplace le biais des pions de $-0.7\,\%$ à $+2.8\,\%$. À 80~GeV, ses gains restent modestes. La chaîne BDT + BDT conduit à des biais positifs plus importants à 20~GeV, mais ramène les trois espèces à moins de $1\,\%$ de biais à 80~GeV.
+L'effet du routage n'est pas le même aux deux bouts de la gamme, et c'est le fait marquant. À 20~GeV, il corrige franchement le proton : la calibration pion appliquée à toutes les espèces le reconstruit $4{,}9\,\%$ trop bas, l'étiquette prédite ramène cet écart à $0{,}4\,\%$. Le prix est un déplacement du pion, de $-0{,}5\,\%$ à $+2{,}5\,\%$, parce que l'ajustement par espèce redistribue l'erreur d'échelle au lieu de la supprimer.
 
-Les courbes de dispersion diminuent avec l'énergie et restent proches entre les trois scénarios. Comme leur largeur a été estimée sur le c\oe ur tronqué des distributions, elles sont utilisées pour une comparaison qualitative et non pour quantifier un gain absolu de résolution. L'effet le plus net du PID dans cette étude concerne donc le contrôle de l'échelle d'énergie.
+À 80~GeV, en revanche, les trois scénarios se rejoignent entre $-0{,}1$ et $+1{,}4\,\%$, et la calibration pion universelle n'est plus la moins bonne. L'avantage du routage est donc concentré à basse énergie, là où les coefficients dépendent le plus de l'espèce ; il s'efface là où les gerbes sont assez développées pour que les compteurs aux trois seuils suffisent.
+
+Les courbes de dispersion diminuent avec l'énergie et restent proches entre les scénarios, comme le montrent les Figures~\ref{fig:resolution_pid_bdt_new} et~\ref{fig:resolution_param_pion_all_new}. L'effet le plus net du PID dans cette comparaison concerne donc le contrôle de l'échelle d'énergie, et seulement en dessous de quelques dizaines de GeV. Cette dépendance en énergie prépare la section~\ref{sec:coupling-revision}, où la comparaison à un régresseur réellement inclusif montre que même ce gain résiduel ne survit pas au changement d'estimateur.
 
 \section{Limites de l'analyse}
 \label{sec:mixte-limites}
@@ -96,11 +105,11 @@ La stabilité des résultats vis-à-vis de la composition du mélange et des inc
 \section{Lever la réserve : le gain vient-il du PID ou du régresseur ?}
 \label{sec:coupling-revision}
 
-La première de ces limites est la plus gênante, car elle porte sur la conclusion elle-même : si la seule référence sans identification est une calibration pion appliquée aux protons, tout estimateur qui tient compte de l'espèce paraîtra meilleur, qu'il ait ou non appris quoi que ce soit de la morphologie des gerbes. Les deux productions pion/proton de la section~\ref{sec:pid-approfondissement} permettent de séparer les deux effets, en croisant la \emph{source de l'étiquette} — aucune, prédite, vraie — avec le \emph{régresseur} qui la consomme.
+La première de ces limites est la plus gênante, car elle porte sur la conclusion elle-même : si la seule référence sans identification est une calibration pion appliquée aux protons, tout estimateur qui tient compte de l'espèce paraîtra meilleur, qu'il ait ou non appris quoi que ce soit de la morphologie des gerbes. Les deux productions pion/proton de la section~\ref{sec:pid-approfondissement} permettent de séparer les deux effets, en croisant la \emph{source de l'étiquette} — aucune, prédite, vraie — avec le \emph{régresseur} qui la consomme. La cellule décisive est celle qui manquait au protocole initial : un régresseur inclusif, entraîné sur le mélange sans jamais recevoir l'espèce.
 
 \begin{table}[!ht]
 \centering
-\caption{Biais moyen et résolution globale selon la source de l'étiquette d'espèce et le régresseur. Même sélection et même échantillon d'évaluation sur toutes les lignes ; les coefficients de calibration sont ajustés hors échantillon.}
+\caption{Biais moyen et résolution globale selon la source de l'étiquette d'espèce et le régresseur. Même coupure de confinement partout, sur $100\,744$ événements, ramenés à $100\,678$ pour les deux lignes à étiquette prédite, où le classificateur n'en couvre pas quelques-uns ; l'écart, de $0{,}07\,\%$, est sans effet sur les quantités citées. Les coefficients de calibration sont ajustés hors échantillon.}
 \label{tab:coupling_revision}
 \small
 \begin{tabular}{llrr}
@@ -111,6 +120,7 @@ aucune (référence pion) & $\chi^2$ & $-1{,}36$ & $0{,}1342$ \\
 prédite (BDT)           & $\chi^2$ & $+0{,}60$ & $0{,}1287$ \\
 vraie                   & $\chi^2$ & $-0{,}27$ & $0{,}1295$ \\
 \midrule
+aucune (régresseur inclusif) & BDT & $+2{,}00$ & $0{,}1199$ \\
 prédite (BDT)           & BDT      & $+2{,}02$ & $0{,}1201$ \\
 vraie                   & BDT      & $+1{,}88$ & $0{,}1199$ \\
 \bottomrule
@@ -119,8 +129,8 @@ vraie                   & BDT      & $+1{,}88$ & $0{,}1199$ \\
 
 Les trois premières lignes reproduisent le résultat du chapitre : à régresseur paramétrique fixé, passer d'une calibration pion universelle à une calibration routée par espèce fait gagner $0{,}005$ en résolution, et l'étiquette prédite suffit — elle fait même marginalement mieux que l'étiquette vraie, ce qui indique que l'écart entre les deux dernières lignes n'est plus significatif à cette statistique.
 
-Les deux dernières lignes renversent la lecture. Dès que le régresseur est un BDT entraîné sur le mélange, l'étiquette ne porte plus rien : remplacer la prédiction du classificateur par la \emph{vérité} ne déplace la résolution que de $0{,}0002$, soit un quart de la dispersion de graine du BDT lui-même ($0{,}1200 \pm 0{,}0008$ sur cinq graines, section~\ref{sec:energie-niveau-hits}). Le changement de régresseur, lui, vaut $0{,}009$ — quarante fois plus.
+Les trois dernières lignes renversent la lecture, et l'énoncé est ici littéral. Dès que le régresseur est un BDT entraîné sur le mélange, l'étiquette ne porte plus rien : sans aucune étiquette la résolution vaut $0{,}1199$, avec l'étiquette prédite $0{,}1201$, avec l'étiquette \emph{vraie} $0{,}1199$. Les trois valeurs sont confondues, à comparer à des incertitudes de $0{,}0003$ et surtout à la dispersion de graine du BDT lui-même, $0{,}1200 \pm 0{,}0008$ sur cinq graines (section~\ref{sec:energie-niveau-hits}). Une identification parfaite ne vaut donc pas davantage qu'aucune identification. Le changement de régresseur, lui, vaut $0{,}009$ — un ordre de grandeur au-dessus.
 
 L'interprétation est que les descripteurs de gerbe utilisés par le régresseur contiennent déjà l'information d'espèce dont il a besoin : ce sont en grande partie ceux-là mêmes sur lesquels le classificateur s'appuie (section~\ref{sec:pid-donnees}). Router explicitement revient alors à lui fournir une projection appauvrie de ce qu'il lit déjà. Le gain attribué au PID au paragraphe précédent était celui du remplacement d'une calibration universelle inadaptée, non celui de la connaissance de l'espèce.
 
-Deux réserves subsistent. Le biais résiduel de $+2\,\%$ de la chaîne BDT n'est pas imputable aux erreurs d'identification, puisque l'étiquette vraie le laisse à $+1{,}88\,\%$ : il appartient au régresseur. Et ce constat est établi pour un mélange pion/proton équilibré ; une composition fortement asymétrique, ou l'ajout d'une espèce que le régresseur n'a pas vue à l'entraînement, pourrait rendre l'étiquette utile à nouveau.
+Deux réserves subsistent. Le biais résiduel de $+2\,\%$ de la chaîne BDT n'est pas imputable aux erreurs d'identification, puisqu'il vaut déjà $+2{,}00\,\%$ sans aucune étiquette et $+1{,}88\,\%$ avec l'étiquette vraie : il appartient au régresseur. Et ce constat est établi pour un mélange pion/proton équilibré ; une composition fortement asymétrique, ou l'ajout d'une espèce que le régresseur n'a pas vue à l'entraînement, pourrait rendre l'étiquette utile à nouveau.

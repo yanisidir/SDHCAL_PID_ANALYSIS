@@ -25,7 +25,6 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import QuantileTransformer, RobustScaler
 
-
 HIT_COLUMNS = ("eventNumber", "x_coords", "y_coords", "z_coords", "time", "thr")
 FEATURE_NAMES = ("x", "y", "z", "time", "thr1", "thr2", "thr3")
 
@@ -69,9 +68,7 @@ def _read_particle(path: str | Path, label: int, particle: str) -> pd.DataFrame:
     # primaryEnergy is per event; I, J and K are the cell indices the clustering
     # needs. None is a model input: they are carried because dropping them here
     # would mean reading the CSV twice to get them back.
-    passthrough = [
-        name for name in ("primaryEnergy", "I", "J", "K") if name in frame.columns
-    ]
+    passthrough = [name for name in ("primaryEnergy", "I", "J", "K") if name in frame.columns]
     selected = [*HIT_COLUMNS, *([shard_column] if shard_column else []), *passthrough]
     frame = frame.loc[:, selected].copy()
     for column in HIT_COLUMNS:
@@ -161,10 +158,7 @@ def split_events(
     }
     if ids["train"] & ids["val"] or ids["train"] & ids["test"] or ids["val"] & ids["test"]:
         raise RuntimeError("Event leakage detected between data splits")
-    return {
-        name: frame[frame["event_id"].isin(event_ids)].copy()
-        for name, event_ids in ids.items()
-    }
+    return {name: frame[frame["event_id"].isin(event_ids)].copy() for name, event_ids in ids.items()}
 
 
 @dataclass
@@ -175,7 +169,7 @@ class HitPreprocessor:
     spatial_scaler: RobustScaler | None = None
     time_scaler: QuantileTransformer | None = None
 
-    def fit(self, train: pd.DataFrame) -> "HitPreprocessor":
+    def fit(self, train: pd.DataFrame) -> HitPreprocessor:
         if train.empty:
             raise ValueError("Cannot fit the hit preprocessor on an empty training set")
         self.spatial_scaler = RobustScaler().fit(train[["x_coords", "y_coords", "z_coords"]])

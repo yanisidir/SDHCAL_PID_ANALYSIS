@@ -1,0 +1,14 @@
+[
+  {"particlePDG": -211, "eventNumber": 0, "primaryEnergy": 5.0},
+  {"particlePDG": -211, "eventNumber": 1, "primaryEnergy": 10.0},
+  {"particlePDG": -211, "eventNumber": 2, "primaryEnergy": 20.0},
+  {"particlePDG": -211, "eventNumber": 3, "primaryEnergy": 50.0},
+  {"particlePDG": -211, "eventNumber": 4, "primaryEnergy": 80.0},
+  {"particlePDG": -211, "eventNumber": 5, "primaryEnergy": 100.0},
+  {"particlePDG": 2212, "eventNumber": 0, "primaryEnergy": 5.0},
+  {"particlePDG": 2212, "eventNumber": 1, "primaryEnergy": 10.0},
+  {"particlePDG": 2212, "eventNumber": 2, "primaryEnergy": 20.0},
+  {"particlePDG": 2212, "eventNumber": 3, "primaryEnergy": 50.0},
+  {"particlePDG": 2212, "eventNumber": 4, "primaryEnergy": 80.0},
+  {"particlePDG": 2212, "eventNumber": 5, "primaryEnergy": 100.0}
+]

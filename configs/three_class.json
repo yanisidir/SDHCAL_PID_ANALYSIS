@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "profile": "three_class",
+  "dataset": {
+    "params_set": "130k",
+    "training_sample": "130k_params",
+    "validation_sample": "holdout"
+  },
+  "workflows": {
+    "pid_bdt": {
+      "particles": ["pi", "proton", "kaon"]
+    },
+    "energy_bdt": {
+      "particles": ["all"]
+    }
+  }
+}

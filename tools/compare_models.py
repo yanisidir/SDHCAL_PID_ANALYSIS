@@ -35,7 +35,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 from pathlib import Path
 
@@ -43,6 +42,7 @@ import numpy as np
 import pandas as pd
 
 from sdhcal import benchmark, paths
+from sdhcal.prediction_io import prediction_path, read_prediction_table, read_sidecar
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)8s | %(message)s")
 logger = logging.getLogger("compare_models")
@@ -56,31 +56,48 @@ def tables_dir(kind: str) -> Path:
     return predictions_dir(kind) / "tables"
 
 
+#: Models whose predictions come from their own training run rather than from
+#: applying a saved artifact. They join the comparison through
+#: tools/import_predictions.py.
+HIT_LEVEL_MODELS = frozenset({"cnn", "gnn", "gnn_ratio"})
+
+
 def load_models(kind: str, names: list[str]) -> dict[str, pd.DataFrame]:
     tables = {}
     for name in names:
-        path = predictions_dir(kind) / f"{name}.csv"
+        path = prediction_path(kind, name)
         if not path.is_file():
-            raise SystemExit(f"no predictions for {name!r}: {path}\nProduce them with tools/predict.py.")
-        tables[name] = pd.read_csv(path)
+            # The hit-level networks do not go through predict.py: they write
+            # their own predictions during training and import_predictions.py
+            # translates them, so pointing at predict.py would send the reader
+            # to a tool that cannot produce this file.
+            how = (
+                "scripts/20_pid_hits.sh / scripts/30_energy_gnn.sh, which train it and import its output"
+                if name in HIT_LEVEL_MODELS
+                else "tools/predict.py"
+            )
+            raise SystemExit(f"no predictions for {name!r}: {path}\nProduce them with {how}.")
+        tables[name] = read_prediction_table(path)
         logger.info("%-14s %7d events%s", name, len(tables[name]), _budget_note(kind, name))
     return tables
 
 
 def _budget(kind: str, name: str) -> int | None:
     """Events the model was trained on, when the prediction step recorded it."""
-    sidecar = predictions_dir(kind) / f"{name}.json"
-    if not sidecar.is_file():
-        return None
-    try:
-        return json.loads(sidecar.read_text(encoding="utf-8")).get("n_train")
-    except json.JSONDecodeError:
-        return None
+    metadata = read_sidecar(prediction_path(kind, name).with_suffix(".json"))
+    return metadata.get("n_train") if metadata is not None else None
 
 
 def _budget_note(kind: str, name: str) -> str:
-    n = _budget(kind, name)
-    return f", trained on {n}" if n else ""
+    metadata = read_sidecar(prediction_path(kind, name).with_suffix(".json"))
+    if metadata is None:
+        return ""
+    counts = metadata.get("event_counts", {})
+    actual = counts.get("training_events") if isinstance(counts, dict) else None
+    if actual is not None:
+        return f", trained on {actual}"
+    n = metadata.get("n_train")
+    return f", recorded budget {n}" if n else ""
 
 
 def _thin(frame: pd.DataFrame, column: str, n: int = 1500) -> pd.DataFrame:
@@ -99,7 +116,9 @@ def _thin(frame: pd.DataFrame, column: str, n: int = 1500) -> pd.DataFrame:
     return frame.iloc[index].reset_index(drop=True)
 
 
-def compare_pid(tables: dict[str, pd.DataFrame], positive_pdg: int, efficiencies: list[float]) -> pd.DataFrame:
+def compare_pid(
+    tables: dict[str, pd.DataFrame], positive_pdg: int, efficiencies: list[float]
+) -> pd.DataFrame:
     out = tables_dir("pid")
     out.mkdir(parents=True, exist_ok=True)
     rows = []
