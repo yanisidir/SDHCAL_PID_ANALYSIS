@@ -207,7 +207,7 @@ La principale limite de l'approche reste toutefois l'utilisation de variables ag
 \section{Étude exploratoire : approche GNN}
 \label{sec:pid-gnn}
 
-Les descripteurs globaux utilisés jusqu'ici ne conservent qu'une partie de l'information spatiale et temporelle contenue dans la topologie fine des gerbes. Une étude exploratoire a donc été engagée à l'aide de réseaux de neurones graphiques (\emph{Graph Neural Networks}, GNN) \cite{scarselli2009, shlomi2021, qu2020}, où chaque événement est représenté par un graphe de hits. Des variantes binaires et multiclasses ont été développées ; leur principe est détaillé en Annexe~\ref{app:gnn}.
+Les descripteurs globaux utilisés jusqu'ici ne conservent qu'une partie de l'information spatiale et temporelle contenue dans la topologie fine des gerbes. Une étude exploratoire a donc été engagée à l'aide de réseaux de neurones graphiques (\emph{Graph Neural Networks}, GNN) \cite{scarselli2009, shlomi2021, qu2020}. La comparaison quantitative retenue ici représente chaque événement par ses amas de pads et confronte une agrégation sans arêtes, de type PointNet, à un graphe de voisinage explicite. Leur principe est détaillé en Annexe~\ref{app:gnn}.
 
 Des travaux récents confortent cette orientation tout en fournissant des points de comparaison méthodologiques. Sur un DHCAL binaire à RPWELL, des architectures GAT et DeepSets exploitant les coordonnées des amas et leur multiplicité reproduisent notamment une confusion importante entre pions et protons \cite{borysova2025dhcalgnn}. Pour la séparation de gerbes dans l'AHCAL, CALICE observe que DGCNN et GravNet tirent davantage parti des structures locales spatio-temporelles que PointNet \cite{calice2024showerseparation}. Ces résultats suggèrent de comparer un modèle d'ensemble simple à des graphes statiques et dynamiques. Ils ne constituent toutefois pas une validation numérique directe : le milieu actif, le mode de lecture, les espèces, les cibles d'apprentissage et les plages d'énergie diffèrent de ceux de cette étude.
 
@@ -222,7 +222,9 @@ Deux objections pouvaient lui être opposées. La première est que les descript
 
 \paragraph{Protocole.} L'étude est menée sur deux productions Geant4 pion/proton indépendantes : une production continue de $2\times10^{5}$ événements par espèce entre 1 et 130~GeV pour l'entraînement, et une production à énergies fixes de $10^{5}$ événements par espèce, couvrant vingt points de 5 à 100~GeV, réservée à l'évaluation. L'échantillon d'évaluation n'est donc pas prélevé dans celui d'entraînement : il provient d'une simulation distincte. Ces lots ne contenant pas de $K^0$, l'étude porte exactement sur le cas difficile.
 
-Quatre classificateurs sont comparés sur les mêmes événements : le BDT et un perceptron, qui lisent les descripteurs de gerbe, face à un réseau convolutif et un réseau de graphes, qui lisent les amas de hits. Les amas sont formés par quatre-connexité dans chaque couche, selon la définition même de l'observable \texttt{NClusters} (Annexe~\ref{annexe:showeranalyzer}), ce qui divise par environ quatre le nombre d'objets à traiter — $753$ hits deviennent $191$ amas par événement — sans perdre l'information, puisque chaque amas conserve sa position, sa taille et sa composition en seuils.
+Quatre classificateurs sont comparés sur les mêmes événements : le BDT et un perceptron, qui lisent les descripteurs de gerbe, face à un réseau de type PointNet et un réseau de graphes, qui lisent les amas de hits. Les amas sont formés par quatre-connexité dans chaque couche, selon la définition même de l'observable \texttt{NClusters} (Annexe~\ref{annexe:showeranalyzer}), ce qui divise par environ quatre le nombre d'objets à traiter — $753$ hits deviennent $191$ amas par événement — sans perdre l'information, puisque chaque amas conserve sa position, sa taille et sa composition en seuils.
+
+Le premier modèle est conservé sous le nom \emph{CNN} dans les fichiers et les figures. Il ne s'agit toutefois pas d'une convolution spatiale entre amas : deux convolutions $1\!\times\!1$ encodent chaque amas indépendamment, puis un maximum et une moyenne globaux produisent la représentation de l'événement. Cette construction invariante par permutation est \textbf{de type PointNet}, sans être une reproduction de l'architecture PointNet originale. Le second modèle est un \textbf{GNN} au sens strict : il construit un graphe $k$-NN et propage l'information par une couche d'attention \texttt{GATConv} puis deux couches \texttt{GraphConv}. L'Annexe~\ref{app:gnn} détaille les deux représentations et leurs différences.
 
 La figure de mérite retenue est le rejet du proton à efficacité pion fixée, et non l'exactitude : celle-ci dépend du mélange $\pi/p$ de l'échantillon de test, qui est un artefact de la génération, alors qu'un rejet cité à une efficacité donnée n'en dépend pas.
 
@@ -237,7 +239,7 @@ Modèle & Entrée & $N_{\mathrm{entr.}}$ & AUC & Rejet $1/\varepsilon_p$ \\
 \midrule
 MLP & descripteurs de gerbe & $176\,000$ & $0{,}679$ & $4{,}07$ \\
 BDT & descripteurs de gerbe & $176\,000$ & $0{,}674$ & $4{,}10$ \\
-CNN & amas de hits          & $8\,400$   & $0{,}655$ & $3{,}62$ \\
+CNN de type PointNet & amas de hits & $8\,400$   & $0{,}655$ & $3{,}62$ \\
 GNN & amas de hits          & $8\,400$   & $0{,}649$ & $3{,}54$ \\
 \bottomrule
 \end{tabular}

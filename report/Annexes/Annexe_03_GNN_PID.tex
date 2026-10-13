@@ -1,33 +1,26 @@
-\chapter{Classification hadronique par réseau de neurones graphique}
+\chapter{Classification hadronique par réseaux sur amas}
 \label{app:gnn}
 
-Cette annexe détaille l'étude exploratoire par réseau de neurones graphique (GNN) présentée à la
-section~\ref{sec:pid-gnn} : construction des graphes, architecture, protocole d'entraînement et
-limites de l'implémentation. Contrairement à l'approche tabulaire, le réseau exploite directement la
-topologie des hits, sans passer par des variables reconstruites manuellement.
+Cette annexe détaille les deux réseaux lisant les amas calorimétriques dans l'étude pion/proton de la section~\ref{sec:pid-gnn}. Le premier, appelé \emph{CNN} dans le code et les figures, est un encodeur d'ensemble de type PointNet sans connectivité explicite. Le second est un réseau de neurones graphique (GNN) qui propage l'information entre amas voisins. Cette distinction est essentielle : seul le second exploite des arêtes explicites. Leur comparaison ne mesure toutefois pas l'effet des seules arêtes, car leurs encodeurs diffèrent également.
 
 \section{Données et prétraitement des nœuds}
 
-Deux variantes ont été étudiées : la séparation binaire pion/proton et la classification multiclasse incluant les kaons. Les fichiers d'entrée sont des tableaux \texttt{CSV} où chaque ligne représente un hit avec ses coordonnées spatiales, son information temporelle et le seuil semi-digital franchi.
+Les résultats comparatifs du chapitre portent sur la séparation binaire pion/proton. Les fichiers d'entrée sont des tableaux \texttt{CSV} où chaque ligne représente initialement un hit avec ses coordonnées spatiales, son temps et le seuil semi-digital franchi. Avant l'apprentissage, les pads quatre-connexes d'une même couche sont regroupés en amas. Chaque amas devient un objet d'entrée pour les deux réseaux.
 
-Le code prévoit un découpage \emph{train / validation / test} au niveau des \textbf{événements} et non des hits, chaque événement recevant un identifiant unique construit à partir de son numéro et de son espèce. Cette précaution évite que les hits d'un même événement soient répartis entre plusieurs sous-échantillons. La configuration documentée utilise un découpage stratifié \texttt{StratifiedShuffleSplit} de $70\,\%/10\,\%/20\,\%$. Son application effective à l'entraînement final ne peut pas être contrôlée sans les entrées. La variable temporelle est discrétisée au centième d'unité,
-\[
-t \longrightarrow \frac{\lfloor 100\,t \rfloor}{100},
-\]
-ce qui limite les fluctuations numériques trop fines tout en conservant l'information utile.
+Le lot continu de $2\times10^{5}$ événements par espèce fournit l'échantillon d'apprentissage. Les événements exportés sont découpés de façon stratifiée en $70\,\%$ pour l'ajustement, $10\,\%$ pour la validation interne et $20\,\%$ pour le test interne. Le découpage est effectué au niveau des \textbf{événements}, jamais au niveau des hits ou des amas. Une seconde production, à énergies fixes, est réservée à l'évaluation externe utilisée dans la comparaison du chapitre. Le temps reçoit un bruit gaussien de largeur $0{,}1$~ns avant la construction des amas ; il n'est pas discrétisé.
 
-Chaque hit est décrit par ses informations brutes \((x,\; y,\; z,\; t,\; \mathrm{thr})\), avec \(\mathrm{thr}\in\{1,2,3\}\). Les coordonnées spatiales sont transformées par un \texttt{RobustScaler} — fondé sur la médiane et l'intervalle interquartile, donc moins sensible aux valeurs extrêmes qu'une standardisation classique — ajusté \emph{uniquement} sur l'échantillon d'entraînement. La variable temporelle, de distribution non gaussienne, est régularisée par un \texttt{QuantileTransformer}, et le seuil est encodé en \emph{one-hot}. Le vecteur d'entrée de chaque nœud comporte ainsi \textbf{7 composantes}.
+Chaque amas est décrit par huit composantes : son centroïde spatial $(x,y,z)$, le temps de son premier hit, les fractions de pads aux trois seuils et $\log(1+N_{\mathrm{pads}})$. Les coordonnées sont transformées par un \texttt{RobustScaler} et le temps par un \texttt{QuantileTransformer}, tous deux ajustés \emph{uniquement} sur l'échantillon d'entraînement. La taille et les fractions de seuil ne sont pas standardisées.
 
 \section{Construction du graphe}
 
-Chaque événement est converti en graphe reliant les hits selon un critère de proximité spatiale et de causalité longitudinale, afin de reconstruire une topologie cohérente avec la propagation de la gerbe. L'orientation effective du graphe transmis au réseau fait l'objet d'une réserve précisée plus bas.
+Pour le GNN, chaque événement est converti en graphe reliant les amas selon un critère de proximité spatiale et de causalité longitudinale. L'orientation effective du graphe transmis au réseau fait l'objet d'une réserve précisée plus bas. Le CNN de type PointNet ne construit aucune arête.
 
 Pour chaque nœud \(i\), on retient ses \(k = 8\) plus proches voisins au sens de la distance sur coordonnées normalisées,
 \[
 d_{ij}^{2} =
 (x'_i-x'_j)^2 + (y'_i-y'_j)^2 + (z'_i-z'_j)^2,
 \]
-parmi les seuls hits situés en amont du développement : la \textbf{contrainte causale} \(z_j < z_i\) interdit les arêtes entre régions tardives et précoces, qui n'auraient pas de sens physique. Une \textbf{fenêtre temporelle} \(|t_i - t_j| < \Delta t\), avec \(\Delta t = 2.0\), élimine enfin les connexions incompatibles avec la chronologie du dépôt. Le graphe résultant associe à chaque événement un ensemble de nœuds porteurs de leurs sept caractéristiques et un ensemble d'arêtes locales cohérentes en temps, ce qui permet au réseau d'exploiter la morphologie tridimensionnelle sans imposer de discrétisation en voxels.
+parmi les seuls amas situés en amont du développement : la \textbf{contrainte causale} \(z_j < z_i\) intervient dans la sélection des voisins. Une \textbf{fenêtre temporelle} \(|t_i - t_j| \leq \Delta t\), avec \(\Delta t = 2.0\)~ns, élimine les connexions trop éloignées en temps. Des boucles propres sont ajoutées à tous les nœuds.
 
 \paragraph{Réserve sur l'orientation effective.} La description ci-dessus est celle du critère de sélection ; elle n'est pas celle du graphe finalement transmis au réseau. Les exécutions ayant produit les résultats cités activent conjointement la contrainte causale et une symétrisation du graphe, appliquée après la sélection des voisins. Or cette symétrisation rétablit chaque arête dans les deux sens. Sur un événement de contrôle de soixante nœuds, le graphe causal seul ne contient aucune arête remontant en profondeur, tandis que le graphe causal \emph{et} symétrisé en contient exactement la moitié — la contrainte \(z_j < z_i\) est donc intégralement annulée.
 
@@ -35,7 +28,9 @@ L'effet n'est pas pour autant nul : la contrainte modifie l'ensemble des paires 
 
 \section{Architecture et entraînement}
 
-Le classificateur combine plusieurs opérateurs de convolution sur graphe afin de capturer à la fois les corrélations locales entre hits voisins, les motifs directionnels de la gerbe et des structures plus globales. Le vecteur d'entrée est d'abord projeté dans un espace latent de dimension \(d_{\mathrm{hidden}} = 64\) par une couche linéaire suivie d'une activation \texttt{GELU}, \(\mathbf{h}^{(0)} = \mathrm{GELU}(W_0 \mathbf{x} + b_0)\). Une couche \texttt{GATConv} à \textbf{quatre têtes d'attention} pondère ensuite différemment les voisins d'un nœud selon leur importance dans la structure locale ; une couche \texttt{TAGConv} agrège l'information sur plusieurs ordres de voisinage, étendant le champ réceptif à des corrélations de moyenne portée ; une couche \texttt{GraphConv} raffine enfin la représentation. Chacune est suivie d'une normalisation \texttt{GraphNorm} et d'une activation ReLU.
+\paragraph{GNN.} Le vecteur d'entrée est projeté dans un espace latent de dimension \(d_{\mathrm{hidden}} = 128\) par une couche linéaire suivie d'une activation \texttt{GELU}. Une couche \texttt{GATConv} à quatre têtes d'attention est suivie de deux couches \texttt{GraphConv}. Les deux premières convolutions sont associées à une \texttt{GraphNorm} ; les activations sont des \texttt{GELU} et du \texttt{Dropout} est appliqué entre les couches. Une connexion résiduelle relie la sortie de la dernière \texttt{GraphConv} à celle de la précédente. L'implémentation utilisée ici ne comporte pas de \texttt{TAGConv}.
+
+\paragraph{CNN de type PointNet.} Deux convolutions unidimensionnelles de noyau $1$ projettent successivement les huit variables de chaque amas dans le même espace latent de dimension 128. Comme le noyau vaut $1$, chaque amas est encodé indépendamment des autres. La seule agrégation entre amas intervient ensuite dans le pooling global. Ce modèle est donc plus justement décrit comme \emph{PointNet-like} que comme un CNN spatial ; cette appellation ne signifie pas qu'il reproduit toutes les composantes de PointNet.
 
 Les embeddings de nœuds sont convertis en une représentation unique de l'événement par concaténation de deux agrégations,
 \[
@@ -46,9 +41,9 @@ Les embeddings de nœuds sont convertis en une représentation unique de l'évé
 \mathrm{MeanPool}(\mathbf{h})
 \right],
 \]
-le \emph{max pooling} captant les signatures locales dominantes et le \emph{mean pooling} l'activité moyenne. Un perceptron final — couche linéaire, \texttt{Dropout}(0.3), activation \texttt{GELU}, sortie à trois neurones — produit les \(\log\)-probabilités des trois classes.
+le \emph{max pooling} captant les signatures locales dominantes et le \emph{mean pooling} l'activité moyenne. Cette même agrégation est utilisée par les deux architectures. Un perceptron final avec activation \texttt{GELU} et \texttt{Dropout}(0.3) produit deux logits, correspondant au pion et au proton.
 
-L'apprentissage minimise la \texttt{Negative Log-Likelihood} multiclasses,
+L'apprentissage minimise une entropie croisée binaire à deux logits, pondérée pour équilibrer les deux classes,
 \[
 \mathcal{L}
 =
@@ -56,13 +51,13 @@ L'apprentissage minimise la \texttt{Negative Log-Likelihood} multiclasses,
 \sum_{i=1}^{N}
 \log p_{\theta}(y_i \mid G_i),
 \]
-où \(G_i\) est le graphe de l'événement \(i\) et \(y_i\) sa classe vraie. L'optimisation utilise \texttt{AdamW} avec un taux initial \(\mathrm{lr} = 10^{-3}\) et une décroissance des poids \(\lambda_{\mathrm{wd}} = 10^{-4}\), sur des mini-lots de taille \(64\), pour un maximum de \(50\) époques. Un scheduler \texttt{ReduceLROnPlateau} divise le taux d'apprentissage par deux lorsque la perte de validation stagne pendant trois époques consécutives, et un arrêt anticipé (patience de 10 époques) retient le modèle maximisant l'accuracy de validation.
+où \(G_i\) désigne l'ensemble ou le graphe d'amas de l'événement \(i\), selon l'architecture, et \(y_i\) sa classe vraie. L'optimisation utilise \texttt{AdamW} avec un taux initial \(\mathrm{lr} = 10^{-3}\) et une décroissance des poids \(\lambda_{\mathrm{wd}} = 10^{-4}\). Le workflow comparatif utilise des mini-lots de 64 pour le CNN et de 32 pour le GNN, au maximum 40 et 30 époques respectivement. Un scheduler \texttt{ReduceLROnPlateau} réduit le taux lorsque la perte de validation stagne. Le meilleur checkpoint est celui qui maximise l'\textbf{AUC de validation} ; l'arrêt anticipé emploie une patience de 8 époques pour le CNN et de 6 pour le GNN.
 
 \section{Résultats, limites et perspectives}
 
-L'implémentation prévoit une évaluation par accuracy, matrice de confusion et courbes d'apprentissage. Cette étude ayant été engagée en fin de stage, elle est présentée comme une \textbf{preuve de faisabilité} de la représentation en graphes plutôt que comme une mesure finale des performances physiques du GNN.
+Les deux modèles sont évalués par accuracy, accuracy équilibrée, AUC et matrice de confusion sur leur test interne. Pour la comparaison avec les modèles tabulaires, le meilleur checkpoint est ensuite appliqué à la production externe à énergies fixes ; le score utilisé est la probabilité pion. L'étude reste exploratoire, notamment parce que les réseaux sur amas ont été entraînés sur beaucoup moins d'événements que les modèles tabulaires.
 
-Trois axes d'amélioration se dégagent. Le \textbf{volume statistique} est le levier le plus direct : la performance d'un modèle profond dépend fortement de la taille de l'échantillon, et une montée en statistique autoriserait des architectures plus expressives, aujourd'hui susceptibles de surapprendre. La \textbf{richesse des variables d'entrée} vient ensuite : le modèle n'exploite que position, temps et seuil, alors que les indices de couche \((I,J,K)\), des informations locales de densité, des voisinages multi-rayons ou des descripteurs hybrides issus de \texttt{ShowerAnalyzer} pourraient être ajoutés — une approche combinant variables expertes et apprentissage profond offrirait vraisemblablement le meilleur compromis. La \textbf{topologie du graphe}, enfin, repose ici sur un unique schéma \(k\)-NN causal à \(k=8\) ; des graphes dynamiques recalculés à chaque couche, un rayon fixe en distance physique, une connectivité hiérarchique entre couches ou des arêtes pondérées par distance et compatibilité temporelle constituent autant d'alternatives non explorées. La définition du graphe étant un choix arbitraire du concepteur, elle représente une source de systématique propre à cette classe de méthodes.
+Trois axes d'amélioration se dégagent. Le \textbf{volume statistique} est le levier le plus direct : la performance d'un modèle profond dépend fortement de la taille de l'échantillon. La \textbf{richesse des variables d'entrée} vient ensuite : les modèles exploitent la position, le temps, la taille et la composition en seuils des amas, mais pas les descripteurs globaux issus de \texttt{ShowerAnalyzer}. La \textbf{topologie du graphe}, enfin, repose ici sur un unique schéma \(k\)-NN à \(k=8\) ; des graphes dynamiques recalculés à chaque couche, un rayon fixe en distance physique, une connectivité hiérarchique entre couches ou des arêtes pondérées par distance constituent autant d'alternatives non explorées.
 
 Trois références récentes fournissent un cadre concret pour cette comparaison. Dans une étude de DHCAL binaire, DeepSets obtient une reconstruction d'énergie compétitive avec une complexité nettement inférieure à celle d'un GAT, ce qui en fait une référence simple à tester avant d'augmenter la sophistication du graphe \cite{borysova2025dhcalgnn}. Pour l'AHCAL, les modèles DGCNN et GravNet exploitent mieux que PointNet les corrélations locales, notamment lorsque le temps est ajouté aux hits \cite{calice2024showerseparation}. Enfin, la reconstruction de pions dans le prototype CMS HGCAL montre qu'un réseau à réduction dynamique, fondé sur EdgeConv et un regroupement hiérarchique des nœuds, peut apprendre une correction événementielle validée sur données de faisceau \cite{aamir2024hgcalgnn}.
 
@@ -72,26 +67,26 @@ Une reprise devrait donc confronter, sur des partitions événementielles strict
 
 \begin{table}[H]
 \centering
-\caption{Résumé du pipeline de classification hadronique par réseau de neurones graphique.}
+\caption{Résumé des deux réseaux sur amas utilisés pour le PID pion/proton.}
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm}X}
 \toprule
 \textbf{Élément} & \textbf{Description} \\
 \midrule
 
 Objectif &
-Classification supervisée binaire ou multiclasse des hadrons, selon la variante du code. \\
+Classification supervisée binaire des pions et des protons. \\
 
 Type de données &
-Événements SDHCAL convertis en graphes, un graphe par événement. \\
+Événements SDHCAL représentés comme ensembles ou graphes d'amas. \\
 
 Nœuds &
-Hits individuels du calorimètre. \\
+Amas de pads quatre-connexes dans une même couche. \\
 
 Features des nœuds &
-Coordonnées spatiales normalisées, temps transformé, encodage one-hot du seuil semi-digital. \\
+Coordonnées, temps transformé, fractions aux trois seuils et logarithme de la taille. \\
 
 Dimension d’entrée &
-7 variables par nœud. \\
+8 variables par amas. \\
 
 Construction des arêtes &
 Voisinage \(k\)-NN avec \(k=8\), sélection sous contrainte de profondeur et fenêtre temporelle \(\Delta t = 2.0\), graphe symétrisé. \\
@@ -100,34 +95,34 @@ Prétraitement &
 \texttt{RobustScaler} pour l’espace, \texttt{QuantileTransformer} pour le temps. \\
 
 Architecture &
-Projection linéaire + \texttt{GATConv} + \texttt{TAGConv} + \texttt{GraphConv}. \\
+CNN/PointNet-like : deux convolutions $1\!\times\!1$ sans arêtes. GNN : projection linéaire + \texttt{GATConv} + deux \texttt{GraphConv}. \\
 
 Pooling global &
 Concaténation \texttt{global max pool} + \texttt{global mean pool}. \\
 
 Classifieur final &
-MLP avec \texttt{Dropout}(0.3) et sortie à trois classes. \\
+MLP avec \texttt{Dropout}(0.3) et sortie à deux classes. \\
 
 Fonction de coût &
-Negative Log-Likelihood multiclasses. \\
+Entropie croisée pondérée, à deux logits. \\
 
 Optimiseur &
 \texttt{AdamW}, taux initial \(10^{-3}\), weight decay \(10^{-4}\). \\
 
 Régularisation &
-Scheduler \texttt{ReduceLROnPlateau} + early stopping (patience = 10). \\
+Scheduler \texttt{ReduceLROnPlateau} + early stopping sur l'AUC (patience 8 pour le CNN, 6 pour le GNN). \\
 
 Découpage des données &
 70\,\% entraînement, 10\,\% validation, 20\,\% test. \\
 
 Métriques &
-Accuracy, matrice de confusion, courbes d’apprentissage. \\
+AUC, accuracy équilibrée, accuracy, matrice de confusion et rejet du proton. \\
 
 Forces &
-Exploitation directe de la topologie 3D des gerbes, pas de features manuelles obligatoires. \\
+Comparaison contrôlée entre une agrégation sans arêtes et un graphe de voisinage explicite. \\
 
 Limites &
-Étude exploratoire nécessitant une comparaison contrôlée avec l'approche tabulaire. \\
+Statistique d'entraînement inférieure à celle des modèles tabulaires ; graphe symétrisé malgré la sélection causale. \\
 
 Perspective &
 PID avancé, correction graphique de l'estimateur d'énergie, Particle Flow, modèles spatio-temporels. \\

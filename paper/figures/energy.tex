@@ -1,0 +1,63 @@
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={group size=2 by 1,horizontal sep=0.75cm},
+  width=0.455\textwidth,
+  height=0.37\textwidth,
+  xmin=4,xmax=101,
+  xmode=log,
+  log basis x=10,
+  xtick={5,10,20,50,100},
+  xticklabels={5,10,20,50,100},
+  xlabel={$E_{\mathrm{true}}$ [GeV]},
+  grid=both,
+  minor grid style={gray!12},
+  major grid style={gray!22},
+  tick label style={font=\footnotesize},
+  label style={font=\small},
+  legend style={font=\scriptsize,draw=none,fill=none,row sep=-1pt},
+  every axis plot/.append style={mark size=1.7pt},
+  error bars/y dir=both,
+  error bars/y explicit,
+]
+\nextgroupplot[
+  ylabel={$\sigma(E)/E$},
+  ymin=0.06,ymax=0.30,
+  legend pos=north east,
+]
+  \addplot+[blue,only marks,mark=o] table[x=energy,y=resolution,y error=resolution_error]
+    {plot_data/energy_deepsets.dat};
+  \addlegendentry{DeepSets correction}
+  \addplot+[blue,no marks,domain=5:100,samples=100,forget plot]
+    {sqrt((0.4545373667^2)/x + 0.0640216038^2)};
+  \addplot+[red!75!black,only marks,mark=square*] table[x=energy,y=resolution,y error=resolution_error]
+    {plot_data/energy_bdt_direct.dat};
+  \addlegendentry{BDT direct}
+  \addplot+[red!75!black,no marks,domain=5:100,samples=100,forget plot]
+    {sqrt((0.5359014700^2)/x + 0.0559016172^2)};
+  \addplot+[green!45!black,only marks,mark=triangle*] table[x=energy,y=resolution,y error=resolution_error]
+    {plot_data/energy_bdt_ratio.dat};
+  \addlegendentry{BDT correction}
+  \addplot+[green!45!black,no marks,domain=5:100,samples=100,forget plot]
+    {sqrt((0.5366583202^2)/x + 0.0556849631^2)};
+  \addplot+[orange!90!black,only marks,mark=triangle*] table[x=energy,y=resolution,y error=resolution_error]
+    {plot_data/energy_chi2.dat};
+  \addlegendentry{Semi-digital}
+  \addplot+[orange!90!black,no marks,domain=5:100,samples=100,forget plot]
+    {sqrt((0.5440617998^2)/x + 0.0697165648^2)};
+
+\nextgroupplot[
+  ylabel={$\langle E_{\mathrm{rec}}\rangle/E_{\mathrm{true}}$},
+  ymin=0.955,ymax=1.065,
+  legend pos=north east,
+]
+  \addplot+[black,densely dotted,no marks,domain=4:101] {1};
+  \addplot+[blue,only marks,mark=o] table[x=energy,y=response,y error=response_error]
+    {plot_data/energy_deepsets.dat};
+  \addplot+[red!75!black,only marks,mark=square*] table[x=energy,y=response,y error=response_error]
+    {plot_data/energy_bdt_direct.dat};
+  \addplot+[green!45!black,only marks,mark=triangle*] table[x=energy,y=response,y error=response_error]
+    {plot_data/energy_bdt_ratio.dat};
+  \addplot+[orange!90!black,only marks,mark=triangle*] table[x=energy,y=response,y error=response_error]
+    {plot_data/energy_chi2.dat};
+\end{groupplot}
+\end{tikzpicture}
