@@ -54,6 +54,15 @@ des points suivants :
 - certains artefacts dépendent encore de fichiers de calibration externes et la
   sélection de fichiers par date de modification reste fragile.
 
+## Modifications explicites du contrat
+
+Les contrats ne sont pas immuables : ils interdisent la dérive accidentelle, pas
+l'évolution décidée. Chaque changement est consigné ici.
+
+| Date | Contrat | Changement | Motif |
+| --- | --- | --- | --- |
+| 2026-10-15 | `cli.energy_gnn.flags` | ajout de `--no-timing` | ablation contrôlée de l'information temporelle : la colonne temps est neutralisée, l'architecture et le nombre de paramètres restent identiques à ceux d'un run temporisé |
+
 Toute correction de ces sujets doit modifier ou remplacer le contrat concerné
 dans un changement scientifique explicite, et non être glissée dans un
 refactoring architectural.

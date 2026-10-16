@@ -5,11 +5,12 @@
 # settings below are not optional and none of them announce themselves when
 # wrong: the run simply reads a different sample and reports plausible numbers.
 #
-# SDHCAL_SHARDS_DIR is the one that already cost a day. The library defaults to
-# `new_data_params`, the lot produced *before* the ShowerAnalyzer corrections
-# (annex 1 of the report); these recipes override it with `new_data_params_v2`.
-# A model trained without this variable set is trained on the uncorrected
-# eccentricity and the unbounded Gaisser-Hillas fit, and nothing says so.
+# SDHCAL_SHARDS_DIR is the one that already cost a day. It now defaults to the
+# corrected lot, `data/lots/pi-proton/params`, so the trap is closed at the
+# source; the lot produced *before* the ShowerAnalyzer corrections (annex 1 of
+# the report) sits beside it as `params-superseded`. A model trained on that one
+# carries the uncorrected eccentricity and the unbounded Gaisser-Hillas fit, and
+# nothing says so - which is why these recipes still name the lot explicitly.
 
 set -euo pipefail
 
@@ -20,9 +21,9 @@ cd "$REPO"
 : "${ROOT_EXE:=root}"
 
 # Corrected parameter shards (training = 200k lot, evaluation = discret lot).
-: "${SDHCAL_SHARDS_DIR:=$REPO/new_data_params_v2}"
+: "${SDHCAL_SHARDS_DIR:=$REPO/data/lots/pi-proton/params}"
 # Raw hit shards, for the hit-level networks.
-: "${SDHCAL_HIT_SHARDS_DIR:=$REPO/new_data}"
+: "${SDHCAL_HIT_SHARDS_DIR:=$REPO/data/lots/pi-proton/hits}"
 # Two-class layout: pi/proton only, chi2_coefficients_2class.json.
 : "${SDHCAL_PARAMS_SET:=2class}"
 

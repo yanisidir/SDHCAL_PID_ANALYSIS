@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Consolidate the sharded parameter lots into the files the pipeline reads.
 
-The lots delivered as ``new_data_params`` are two independent Geant4 productions
+The lots delivered as ``data/lots/pi-proton/params-superseded`` are two independent Geant4 productions
 with two roles:
 
 ===========  ==========================  ==========================================

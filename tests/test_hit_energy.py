@@ -294,6 +294,10 @@ def test_script_keeps_minimal_historical_preprocessor_class_path_compatibility(m
             seed=restored.seed,
             spatial_scaler=restored.spatial_scaler,
             time_scaler=restored.time_scaler,
+            # Part of the state since the timing ablation: an artefact saved by an
+            # untimed run must rebuild as untimed, or this compares two different
+            # preprocessors. Artefacts written before the field default to False.
+            drop_timing=getattr(restored, "drop_timing", False),
         )
         event = _events()[2]
         np.testing.assert_array_equal(restored.transform(event), stable.transform(event))
@@ -341,3 +345,102 @@ def test_energy_cli_help_runs_from_root_and_script_directory(working_directory, 
     assert "--architecture" in completed.stdout
     assert "--target" in completed.stdout
     assert "--cluster-hits" in completed.stdout
+
+
+def test_the_timing_ablation_blanks_the_column_without_changing_the_input():
+    """The ablation must remove information, not capacity.
+
+    Dropping the time column outright would also shrink the first layer, so a
+    timed and an untimed run would differ in parameter count as well as in what
+    they can see, and the comparison would not isolate the timing. Blanking the
+    column keeps the architecture identical.
+    """
+    rng = np.random.default_rng(0)
+
+    def event() -> ShowerEvent:
+        n = 50
+        return ShowerEvent(
+            coordinates=rng.normal(size=(n, 3)).astype(np.float32),
+            time=rng.uniform(0.0, 20.0, n).astype(np.float32),
+            threshold=rng.integers(1, 4, n).astype(np.int64),
+            energy=30.0,
+            particle="pi",
+            event_id="e",
+        )
+
+    events = [event() for _ in range(40)]
+    indices = np.arange(len(events))
+
+    timed = ArrayHitPreprocessor(seed=1)
+    timed.fit(events, indices, max_hits=5000)
+    untimed = ArrayHitPreprocessor(seed=1, drop_timing=True)
+    untimed.fit(events, indices, max_hits=5000)
+
+    with_time = timed.transform(events[0])
+    without = untimed.transform(events[0])
+
+    assert with_time.shape == without.shape, "the ablation must not change the input width"
+    # Column 3 is the time, after the three spatial coordinates.
+    assert with_time[:, 3].std() > 0.5, "the timed run should carry a varying time feature"
+    assert np.all(without[:, 3] == 0.0), "the ablated run should carry a constant time feature"
+    # Everything else is untouched.
+    spatial_and_rest = [c for c in range(with_time.shape[1]) if c != 3]
+    np.testing.assert_allclose(with_time[:, spatial_and_rest], without[:, spatial_and_rest])
+
+
+def _cache_events(n_events: int = 60, n_nodes: int = 40) -> tuple[list, np.ndarray, ArrayHitPreprocessor]:
+    rng = np.random.default_rng(3)
+    events = [
+        ShowerEvent(
+            coordinates=rng.normal(size=(n_nodes, 3)).astype(np.float32),
+            time=rng.uniform(0.0, 20.0, n_nodes).astype(np.float32),
+            threshold=rng.integers(1, 4, n_nodes).astype(np.int64),
+            energy=30.0,
+            particle="pi",
+            event_id=f"e{i}",
+        )
+        for i in range(n_events)
+    ]
+    indices = np.arange(len(events))
+    preprocessor = ArrayHitPreprocessor(seed=1)
+    preprocessor.fit(events, indices, max_hits=100000)
+    return events, indices, preprocessor
+
+
+def _dataset_args() -> SimpleNamespace:
+    return SimpleNamespace(
+        k=8, time_window=2.0, causal=True, undirected=True, knn_chunk_size=512, architecture="deepsets"
+    )
+
+
+def test_the_feature_cache_returns_exactly_what_recomputing_returns():
+    """The cache is a speed-up, so it must not be a behaviour change.
+
+    The scalers are deterministic once fitted, so a cached feature matrix has to
+    equal the recomputed one bit for bit; anything else would make a run depend
+    on whether the cache was on.
+    """
+    events, indices, preprocessor = _cache_events()
+    args = _dataset_args()
+    cold = EnergyGraphDataset(events, indices, preprocessor, args, cache_features=False)
+    warm = EnergyGraphDataset(events, indices, preprocessor, args, cache_features=True)
+
+    for position in range(len(indices)):
+        np.testing.assert_array_equal(cold[position].x.numpy(), warm[position].x.numpy())
+    # A second pass reads the cache rather than the preprocessor; same answer.
+    for position in range(len(indices)):
+        np.testing.assert_array_equal(cold[position].x.numpy(), warm[position].x.numpy())
+
+
+def test_the_feature_cache_gives_up_rather_than_exhausting_memory():
+    """A raw-hit run needs several GB; the budget turns the cache off instead."""
+    events, indices, preprocessor = _cache_events()
+    dataset = EnergyGraphDataset(
+        events, indices, preprocessor, _dataset_args(), cache_features=True, cache_budget_bytes=16
+    )
+    first = dataset[0]
+    assert dataset._cache_enabled is False
+    assert dataset._cache == {}
+    # Still correct, just slower.
+    plain = EnergyGraphDataset(events, indices, preprocessor, _dataset_args(), cache_features=False)
+    np.testing.assert_array_equal(first.x.numpy(), plain[0].x.numpy())

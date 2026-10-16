@@ -53,10 +53,17 @@ pythonpath = ["src"]
 [tool.ruff]
 line-length = 110
 target-version = "py310"
-# The exploratory GNN/CNN studies and the figure scripts are kept as they were
-# written during the internship; they are not held to the lint rules applied to
-# the shared package and the maintained pipelines.
-exclude = ["analysis/archive", "analysis/3_pid/gnn", "analysis/3_pid/cnn", "report"]
+# The exploratory GNN/CNN studies, the figure scripts and the one-off data
+# preparation helpers are kept as they were written during the internship; they
+# are not held to the lint rules applied to the shared package and the
+# maintained pipelines.
+exclude = [
+    "analysis/archive",
+    "analysis/3_pid/gnn",
+    "analysis/3_pid/cnn",
+    "report",
+    "tools/data_prep",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "C4", "ARG", "SIM"]

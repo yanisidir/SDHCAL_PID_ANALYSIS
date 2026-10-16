@@ -1,4 +1,4 @@
-"""Ingestion of the sharded parameter lots delivered as ``new_data_params``.
+"""Ingestion of the sharded parameter lots delivered as ``data/lots/pi-proton/params-superseded``.
 
 Those lots already carry the 26 shower variables the PID stage trains on, so the
 C++ extraction does not have to run again. Three things still stand between them

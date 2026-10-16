@@ -35,7 +35,7 @@ avec les valeurs du code et écrits dans un fichier
 
 ```bash
 export SDHCAL_PARAMS_SET=2class
-export SDHCAL_SHARDS_DIR="$PWD/new_data_params_v2"
+export SDHCAL_SHARDS_DIR="$PWD/data/lots/pi-proton/params"
 
 python analysis/3_pid/bdt/train.py --config configs/two_class.json --seeds 5
 python analysis/3_pid/mlp/train.py --config configs/two_class.json --seed 42

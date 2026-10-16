@@ -30,12 +30,12 @@ matter, and none of them announce themselves when wrong — the run reads a
 different sample and reports numbers that look entirely reasonable:
 
 - `SDHCAL_SHARDS_DIR` — **the one to watch.** The Python library defaults to
-  `new_data_params`, the lot produced *before* the `ShowerAnalyzer` corrections;
-  these recipes override it with `new_data_params_v2`. Training without it set
+  `data/lots/pi-proton/params-superseded`, the lot produced *before* the `ShowerAnalyzer` corrections;
+  these recipes override it with `data/lots/pi-proton/params`. Training without it set
   means training on the inverted eccentricity and the unbounded Gaisser–Hillas
   fit. This already happened once, to the MLP, and was caught only because its
   AUC came out at 0.599 instead of 0.677.
-- `SDHCAL_HIT_SHARDS_DIR` — raw hit shards, defaults to `new_data`.
+- `SDHCAL_HIT_SHARDS_DIR` — raw hit shards, defaults to `data/lots/pi-proton/hits`.
 - `SDHCAL_PARAMS_SET=2class` — pion/proton layout and `chi2_coefficients_2class.json`.
 
 `PYTHON` vaut `python3` par défaut et peut viser n'importe quel environnement

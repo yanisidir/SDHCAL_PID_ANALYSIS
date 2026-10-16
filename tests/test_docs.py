@@ -223,6 +223,8 @@ def test_every_third_party_import_is_declared():
         "sklearn": "scikit-learn",
         "imblearn": "imbalanced-learn",
         "torch_geometric": "torch-geometric",
+        # Shipped inside matplotlib, not a distribution of its own.
+        "mpl_toolkits": "matplotlib",
     }
     not_on_pypi = {"root"}  # ROOT's own Python bindings
     import sys
@@ -261,7 +263,7 @@ def test_every_third_party_import_is_declared():
 def test_every_two_class_stage_is_pinned_to_the_corrected_shard_lot():
     """The 2class targets must not inherit the default shard directory.
 
-    ``paths.shards_dir()`` defaults to ``new_data_params``, the lot produced
+    ``paths.shards_dir()`` defaults to ``data/lots/pi-proton/params-superseded``, the lot produced
     before the ShowerAnalyzer corrections. Reading it raises nothing: it yields
     the inverted eccentricity and the unbounded Gaisser-Hillas fit, and a model
     trained on them reports plausible numbers. The MLP was trained that way once

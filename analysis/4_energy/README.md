@@ -21,7 +21,7 @@ python ml_bdt/train.py --particles mix-pi-proton
 ```
 
 **Reads** the configured consolidated files for LightGBM, the parameter shards
-derived from `new_data` for the MLP, the hit shards in `new_data` for the GNN,
+derived from `data/lots/pi-proton/hits` for the MLP, the hit shards in `data/lots/pi-proton/hits` for the GNN,
 and the digitized plus raw files for the chi2 fit.
 
 **Writes** `$SDHCAL_OUT_DIR/energy_reco_{lgbm,mlp,gnn,chi2}/`.
@@ -29,7 +29,7 @@ and the digitized plus raw files for the chi2 fit.
 ## Hit-level GNN (pion/proton)
 
 `gnn/train.py` reads the correct sharded productions directly from
-`$SDHCAL_HIT_SHARDS_DIR` (default: `<repo>/new_data`):
+`$SDHCAL_HIT_SHARDS_DIR` (default: `<repo>/data/lots/pi-proton/hits`):
 
 - `200k_pi-` and `200k_proton`, continuous from 1 to 130 GeV, are used for
   training and internal calibration (early stopping and target correction);
@@ -62,8 +62,8 @@ resolution are written under `$SDHCAL_OUT_DIR/energy_reco_gnn/`.
 
 ## Shower-variable MLP (pion/proton)
 
-`ml_mlp/train.py` uses the parameter shards derived from `new_data`
-under `$SDHCAL_SHARDS_DIR` (default: `<repo>/new_data_params`). As for the GNN,
+`ml_mlp/train.py` uses the parameter shards derived from `data/lots/pi-proton/hits`
+under `$SDHCAL_SHARDS_DIR` (default: `<repo>/data/lots/pi-proton/params`). As for the GNN,
 the continuous `200k` lots provide training and internal calibration, while the
 entire independent `100k` discrete lots are reserved for external validation.
 

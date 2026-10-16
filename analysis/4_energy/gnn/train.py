@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Hit-level GNN energy reconstruction for pion and proton showers.
 
-The script reads the sharded ROOT files under ``new_data``. Each event already
+The script reads the sharded ROOT files under ``data/lots/pi-proton/hits``. Each event already
 contains its digitized hits and true ``energy``. The continuous 200k production
 is used for training and internal calibration; the independent fixed-energy
 100k production is kept intact as the external validation sample. The model can
@@ -103,6 +103,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--calibration-size", type=float, default=0.1)
     parser.add_argument("--split-energy-bins", type=int, default=10)
     parser.add_argument("--sigma-time", type=float, default=0.1)
+    parser.add_argument(
+        "--no-timing",
+        action="store_true",
+        help="controlled ablation: blank the time feature, keeping the input width, the "
+        "architecture and the parameter count identical to a timed run, so the comparison "
+        "isolates the information the time carries",
+    )
     parser.add_argument("--require-contained", action="store_true")
     parser.add_argument("--scaler-max-hits", type=int, default=500_000)
     parser.add_argument("--hidden-dim", type=int, default=128)
@@ -275,7 +282,7 @@ def main() -> None:
         validation_events=len(validation_events),
     )
 
-    preprocessor = ArrayHitPreprocessor(seed=args.seed)
+    preprocessor = ArrayHitPreprocessor(seed=args.seed, drop_timing=args.no_timing)
     preprocessor.fit(events, split["train"], args.scaler_max_hits)
     datasets = {
         name: EnergyGraphDataset(events, indices, preprocessor, args) for name, indices in split.items()

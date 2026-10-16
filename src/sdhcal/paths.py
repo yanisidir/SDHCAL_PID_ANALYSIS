@@ -14,7 +14,7 @@ Environment variable  Meaning                                 Default
 ====================  ======================================  ==============================
 
 The hit-level pion/proton shards use ``SDHCAL_HIT_SHARDS_DIR`` and default to
-``<repo>/new_data``.
+``<repo>/data/lots/pi-proton/hits``.
 
 Usage::
 
@@ -61,8 +61,8 @@ PARTICLE_PDG: dict[str, int] = {"pi": -211, "proton": 2212, "kaon": 311}
 
 PDG_TO_PARTICLE: dict[int, str] = {v: k for k, v in PARTICLE_PDG.items()}
 
-#: Particles of the two-class study, rebuilt from the sharded lots delivered as
-#: ``new_data_params``. Those lots carry no kaon, and padding the kaon class from
+#: Particles of the two-class study, rebuilt from the sharded lots under
+#: ``data/lots/pi-proton/``. Those lots carry no kaon, and padding the kaon class from
 #: the older three-class sample would train the classifier to separate
 #: *productions* rather than species, so the study is pion/proton only.
 PARTICLES_2CLASS: tuple[str, ...] = ("pi", "proton")
@@ -156,19 +156,23 @@ def output_dir() -> Path:
 def shards_dir() -> Path:
     """Directory holding the sharded parameter lots (``$SDHCAL_SHARDS_DIR``).
 
-    Defaults to ``<repo>/new_data_params``, where the lots were delivered.
+    Defaults to ``<repo>/data/lots/pi-proton/params``, the lot regenerated after
+    the ShowerAnalyzer corrections (annex 1 of the report). The lot delivered
+    before them is kept beside it as ``params-superseded``; it is never the
+    default, because reading it raises nothing and yields the inverted
+    eccentricity and the unbounded Gaisser-Hillas fit.
     """
-    return _dir_from_env("SDHCAL_SHARDS_DIR", "new_data_params")
+    return _dir_from_env("SDHCAL_SHARDS_DIR", "data/lots/pi-proton/params")
 
 
 def hit_shards_dir() -> Path:
     """Directory holding the sharded hit-level pion/proton productions.
 
-    Defaults to ``<repo>/new_data`` and can be overridden with
+    Defaults to ``<repo>/data/lots/pi-proton/hits`` and can be overridden with
     ``SDHCAL_HIT_SHARDS_DIR``.
     """
 
-    return _dir_from_env("SDHCAL_HIT_SHARDS_DIR", "new_data")
+    return _dir_from_env("SDHCAL_HIT_SHARDS_DIR", "data/lots/pi-proton/hits")
 
 
 def params_set() -> str:

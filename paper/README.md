@@ -37,7 +37,7 @@ La configuration de production a été retrouvée dans `/home/midir/SDHCAL/Timin
 - scripts dédiés aux productions `200k_*` et `100k_*_discret` dans les dossiers
   `script/` et `SimDigitalScript/`.
 
-Cette provenance est cohérente avec les noms et les effectifs de `new_data`, mais elle
+Cette provenance est cohérente avec les noms et les effectifs de `data/lots/pi-proton/hits`, mais elle
 n'est pas encore immuable : plusieurs scripts de production sont ignorés par Git et
 `SDHCALMarlinProcessor` contient des modifications locales non commitées utilisées
 pour ajouter notamment les coordonnées `x/y/z`.

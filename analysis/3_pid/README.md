@@ -61,8 +61,8 @@ only, apply timing smearing exactly once to all events, save the best-validation
 checkpoint, and report AUC, accuracy, balanced accuracy, class efficiencies and
 purities under `$SDHCAL_OUT_DIR`.
 
-The shower-variable MLP reads the parameter shards derived from `new_data`
-under `$SDHCAL_SHARDS_DIR` (default: `<repo>/new_data_params`). It trains and
+The shower-variable MLP reads the parameter shards derived from `data/lots/pi-proton/hits`
+under `$SDHCAL_SHARDS_DIR` (default: `<repo>/data/lots/pi-proton/params`). It trains and
 calibrates only on the continuous `200k` production and evaluates only on the
 independent `100k` discrete production:
 

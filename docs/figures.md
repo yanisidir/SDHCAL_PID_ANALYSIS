@@ -15,6 +15,11 @@ attend.
 | `bench_species_*` (6) | `plots.C("coupling")`, vue par espèce |
 | `bench_coupling_*` (5) | `plots.C("coupling")`, vue par source d'étiquette |
 | `bench_confusion_matrix`, `bench_correlation_matrix` | `interpret_plots.C` |
+| `bench_ablation_difference`, `bench_ablation_resolution` | `plots.C("ablation")` |
+| `bench_timing_scan_a`, `_b`, `_band` | `plots.C("scan")` |
+
+La figure d'ablation passe d'abord par `tools/timing_ablation.py`, qui compare
+les deux runs point d'énergie par point d'énergie.
 
 Les courbes de couplage passent d'abord par `tools/coupling_curves.py`, qui
 recalcule réponse et résolution par tranche d'énergie à partir des tables par

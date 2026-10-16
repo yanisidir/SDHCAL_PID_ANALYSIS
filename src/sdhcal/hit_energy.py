@@ -52,11 +52,19 @@ class ShowerEvent:
 
 @dataclass
 class ArrayHitPreprocessor:
-    """Historical spatial/time transformation fitted on training hits only."""
+    """Historical spatial/time transformation fitted on training hits only.
+
+    ``drop_timing`` is the controlled ablation: the time column is replaced by a
+    constant rather than removed, so the input width, the architecture and the
+    parameter count are identical to the timed run. Only the information differs,
+    which is what an ablation is supposed to isolate; dropping the column would
+    also shrink the first layer and confound the two.
+    """
 
     seed: int
     spatial_scaler: RobustScaler | None = None
     time_scaler: QuantileTransformer | None = None
+    drop_timing: bool = False
 
     def fit(self, events: list[ShowerEvent], indices: np.ndarray, max_hits: int) -> None:
         if max_hits < 1:
@@ -92,7 +100,10 @@ class ArrayHitPreprocessor:
         if self.spatial_scaler is None or self.time_scaler is None:
             raise RuntimeError("Preprocessor must be fitted before transform")
         spatial = self.spatial_scaler.transform(event.coordinates)
-        timing = self.time_scaler.transform(event.time.reshape(-1, 1))
+        if self.drop_timing:
+            timing = np.zeros((len(event.time), 1), dtype=np.float64)
+        else:
+            timing = self.time_scaler.transform(event.time.reshape(-1, 1))
         if event.composition is not None:
             size = np.log1p(event.composition[:, 3:4])
             return np.hstack([spatial, timing, event.composition[:, :3], size]).astype(np.float32)
@@ -295,8 +306,21 @@ def split_train_calibration(
     raise ValueError(f"Cannot create a stratified train/calibration split: {last_error}")
 
 
+#: Memory a dataset may spend caching transformed features before it gives up and
+#: recomputes them. Clustered runs need about 0.4 GB; raw-hit runs about four
+#: times that, which is why the budget exists rather than an unconditional cache.
+FEATURE_CACHE_BUDGET_BYTES = 2 * 1024**3
+
+
 class EnergyGraphDataset(Dataset):
-    """Construct energy graphs lazily in the historical event-index order."""
+    """Construct energy graphs lazily in the historical event-index order.
+
+    The scalers are deterministic once fitted, so the transformed features of an
+    event never change between epochs; recomputing them every time cost about
+    12 % of a thirty-epoch run, measured at 782 us per event. They are cached on
+    first use, under a memory budget: the cache is sized from the first event and
+    switched off, with a line in the log, when it would not fit.
+    """
 
     def __init__(
         self,
@@ -304,6 +328,9 @@ class EnergyGraphDataset(Dataset):
         indices: np.ndarray,
         preprocessor: ArrayHitPreprocessor,
         args: argparse.Namespace,
+        *,
+        cache_features: bool = True,
+        cache_budget_bytes: int = FEATURE_CACHE_BUDGET_BYTES,
     ) -> None:
         self.events = events
         self.indices = np.asarray(indices, dtype=np.int64)
@@ -314,6 +341,35 @@ class EnergyGraphDataset(Dataset):
         self.undirected = args.undirected
         self.knn_chunk_size = args.knn_chunk_size
         self.build_edges = args.architecture != "deepsets"
+        self._cache_enabled = bool(cache_features)
+        self._cache_budget = int(cache_budget_bytes)
+        self._cache: dict[int, np.ndarray] = {}
+
+    def _features(self, index: int, event: ShowerEvent) -> np.ndarray:
+        """Transformed features of one event, from the cache when it is kept."""
+        if not self._cache_enabled:
+            return self.preprocessor.transform(event)
+        cached = self._cache.get(index)
+        if cached is not None:
+            return cached
+        features = self.preprocessor.transform(event)
+        if not self._cache:
+            # Size the whole cache from the first event rather than discovering
+            # the cost one event at a time.
+            estimate = features.nbytes * len(self.indices)
+            if estimate > self._cache_budget:
+                LOGGER.info(
+                    "feature cache off: %.1f GB needed, budget %.1f GB; features are recomputed each epoch",
+                    estimate / 1024**3,
+                    self._cache_budget / 1024**3,
+                )
+                self._cache_enabled = False
+                return features
+            LOGGER.info(
+                "feature cache on: about %.2f GB for %d events", estimate / 1024**3, len(self.indices)
+            )
+        self._cache[index] = features
+        return features
 
     def __len__(self) -> int:
         return len(self.indices)
@@ -321,7 +377,7 @@ class EnergyGraphDataset(Dataset):
     def __getitem__(self, position: int) -> Data:
         index = int(self.indices[position])
         event = self.events[index]
-        features = self.preprocessor.transform(event)
+        features = self._features(index, event)
         if self.build_edges:
             edge_index = build_knn_graph(
                 features,

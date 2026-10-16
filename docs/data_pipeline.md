@@ -134,8 +134,8 @@ inside uproot or returning an empty frame.
 
 ## The Two-Class Study (pion/proton)
 
-A later delivery, `new_data_params/`, holds **two independent Geant4 productions**
-with two roles:
+A later delivery, now under `data/lots/pi-proton/`, holds **two independent
+Geant4 productions** with two roles:
 
 | Role | Lot | Events | Energies | Why |
 |---|---|---|---|---|
@@ -193,7 +193,7 @@ at that directory; no stage script holds a second set of paths.
 `--roles val` rebuilds only the evaluation sample.
 
 `$SDHCAL_SHARDS_DIR` points at the lots themselves; it defaults to
-`<repo>/new_data_params`.
+`<repo>/data/lots/pi-proton/params`.
 
 ### Feature interpretation
 

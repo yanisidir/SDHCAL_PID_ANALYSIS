@@ -164,14 +164,14 @@ Les coefficients de la calibration servant de référence sont eux-mêmes ajust�
 
 \begin{table}[!ht]
 \centering
-\caption{Termes stochastique et constant de l'équation~\ref{eq:fit-ab}, résolution globale et écart maximal de la réponse à l'unité. Évaluation sur les $100\,744$ événements confinés de la production à énergies fixes, avec la même sélection pour tous les estimateurs.}
+\caption{Termes stochastique et constant de l'équation~\ref{eq:fit-ab}, résolution globale et écart maximal de la réponse à l'unité. La ligne du réseau est moyennée sur quatre graines d'entraînement, et son incertitude est la dispersion correspondante ; les autres estimateurs sont déterministes à données fixées et portent l'incertitude de l'ajustement. Évaluation sur les $100\,744$ événements confinés de la production à énergies fixes, avec la même sélection pour tous les estimateurs.}
 \label{tab:energie_comparaison}
 \small
 \begin{tabular}{lrrrrr}
 \toprule
 Estimateur & $N_{\mathrm{entr.}}$ & $a$ [\%] & $b$ [\%] & $\sigma/E$ & $\max|\mathcal{R}-1|$ \\
 \midrule
-Réseau sur amas, cible $C_\theta$ & $79\,451$  & $45{,}5 \pm 1{,}0$ & $6{,}4 \pm 0{,}2$ & $0{,}1115$ & $0{,}028$ \\
+Réseau sur amas, cible $C_\theta$ & $79\,451$  & $46{,}3 \pm 0{,}6$ & $6{,}0 \pm 0{,}5$ & $0{,}1105$ & $0{,}028$ \\
 BDT, cible $C_\theta$             & $176\,000$ & $53{,}7 \pm 1{,}0$ & $5{,}6 \pm 0{,}3$ & $0{,}1197$ & $0{,}052$ \\
 BDT, cible énergie                & $176\,000$ & $53{,}6 \pm 1{,}1$ & $5{,}6 \pm 0{,}3$ & $0{,}1199$ & $0{,}054$ \\
 Calibration $\chi^2$              & ---        & $54{,}4 \pm 1{,}2$ & $7{,}0 \pm 0{,}3$ & $0{,}1295$ & $0{,}031$ \\
@@ -190,9 +190,32 @@ Calibration $\chi^2$              & ---        & $54{,}4 \pm 1{,}2$ & $7{,}0 \pm
 
 C'est la même objection que celle opposée à l'exactitude au chapitre~\ref{sec:pid_mlp} — une figure de mérite ne doit pas dépendre de la composition de l'échantillon de test — et elle vaut ici aussi. Deux choses la désamorcent toutefois. Le \emph{classement} des estimateurs est inchangé sous les trois pondérations, de sorte que les comparaisons de ce chapitre sont robustes. Et les termes $a$ et $b$, eux, sont ajustés point par point et ne dépendent pas du spectre : ce sont eux qu'il faut citer pour caractériser un estimateur, la colonne $\sigma/E$ ne servant qu'à situer l'ordre de grandeur sur ce lot précis.
 
-\paragraph{Le terme stochastique est un plancher, sauf au niveau des hits.} La calibration $\chi^2$ et les deux variantes du BDT sont compatibles autour de $54\,\%$, dans leurs incertitudes : aucun estimateur fondé sur les descripteurs de gerbe ne déplace ce terme, ce qui est cohérent avec son interprétation comme propriété de l'échantillonnage du détecteur. Le réseau lisant les amas l'abaisse à $45{,}5 \pm 1{,}0\,\%$, soit huit points, très au-delà des incertitudes.
+\paragraph{Le terme stochastique est un plancher, sauf au niveau des hits.} La calibration $\chi^2$ et les deux variantes du BDT sont compatibles autour de $54\,\%$, dans leurs incertitudes : aucun estimateur fondé sur les descripteurs de gerbe ne déplace ce terme, ce qui est cohérent avec son interprétation comme propriété de l'échantillonnage du détecteur. Le réseau lisant les amas l'abaisse à $46{,}3 \pm 0{,}6\,\%$, soit huit points, très au-delà des incertitudes --- y compris de la dispersion d'entraînement du réseau lui-même, qui vaut $0{,}6$ point.
 
-\paragraph{Les deux familles n'améliorent pas le même terme.} L'avantage du BDT sur la calibration $\chi^2$ réside entièrement dans le terme \emph{constant} ($5{,}6\,\%$ contre $7{,}0\,\%$, environ quatre écarts-types), c'est-à-dire dans le traitement de la calibration et des fuites. Celui du réseau réside dans le terme \emph{stochastique}, c'est-à-dire dans la compensation, événement par événement, du partage entre composantes électromagnétique et hadronique — précisément le mécanisme invoqué pour le DRN de HGCAL. Ce sont deux effets distincts, qu'une résolution globale confond.
+\paragraph{Les deux familles n'améliorent pas le même terme.} L'avantage du BDT sur la calibration $\chi^2$ réside entièrement dans le terme \emph{constant} ($5{,}6\,\%$ contre $7{,}0\,\%$, environ quatre écarts-types), c'est-à-dire dans le traitement de la calibration et des fuites. Celui du réseau réside dans le terme \emph{stochastique}. Ce sont deux effets distincts, qu'une résolution globale confond.
+
+\paragraph{Ce que le réseau exploite, et ce qu'il n'exploite pas.} L'explication immédiate du gain sur le terme stochastique serait la compensation, événement par événement, du partage entre composantes électromagnétique et hadronique — le mécanisme invoqué pour le DRN de HGCAL. La simulation permet de la tester directement, puisqu'elle enregistre pour chaque événement la fraction électromagnétique, l'énergie déposée par les neutrons et l'énergie fuie. L'épreuve ne porte pas sur le réseau mais sur la correction \emph{idéale} $C_{\mathrm{ideal}} = E_{\mathrm{vrai}}/E_{\chi^2}$, qui borne ce qu'un modèle quelconque pourrait apprendre.
+
+Le résultat écarte cette explication. À énergie fixée --- indispensable, le nombre de neutrons étant corrélé à l'énergie incidente à $+0{,}75$ ---, la corrélation de $C_{\mathrm{ideal}}$ avec la fraction électromagnétique vaut $-0{,}084$ pour les pions et $-0{,}082$ pour les protons. Le signe est celui qu'on attend, et la dépendance est monotone par déciles, donc réelle ; mais son amplitude n'atteint qu'un demi-écart-type de $C_{\mathrm{ideal}}$ à 10~GeV et s'annule au-delà de 60~GeV. Les autres grandeurs ne font pas mieux : fraction neutronique $+0{,}08$, fuites $+0{,}13$, énergie déposée $-0{,}16$.
+
+\begin{table}[!ht]
+\centering
+\caption{Part de la variance de la correction idéale expliquée, par tranche d'énergie puis moyennée. La colonne de gauche est une régression linéaire sur l'ensemble des grandeurs de vérité disponibles par événement ; celle de droite est le carré de la corrélation entre la correction apprise et la correction idéale.}
+\label{tab:mecanisme}
+\small
+\begin{tabular}{lrr}
+\toprule
+Espèce & Vérité par événement & Réseau sur amas \\
+\midrule
+$\pi^-$ & $5{,}1\,\%$ & $49{,}8\,\%$ \\
+$p$     & $4{,}6\,\%$ & $44{,}8\,\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+L'écart est d'un ordre de grandeur. Aucune combinaison des grandeurs globales de la gerbe n'explique plus de $5\,\%$ de la correction à appliquer, là où le réseau en reconstitue près de la moitié. Le gain ne vient donc pas de la compensation d'un effet déjà identifié et résumable en un nombre par événement : il vient de la \emph{structure fine} du dépôt --- position, taille et composition en seuils de chaque amas --- que seule une lecture au niveau des hits met à disposition. C'est une conclusion plus forte que celle qu'on espérait, et moins confortable : elle signifie que l'information utile reste, à ce stade, non caractérisée.
+
+Deux réserves. Le test de la vérité est linéaire alors que le réseau ne l'est pas, de sorte qu'une dépendance non linéaire aux mêmes grandeurs n'est pas exclue ; le contrôle par déciles la rend peu probable pour la fraction électromagnétique, il n'a pas été fait pour les autres. Et la coupure de confinement supprimant les fuites, leur rôle est ici sous-estimé.
 
 \paragraph{Le gain tient à l'information, non à la formulation.} La forme~\ref{eq:correction-graphique} est \emph{nécessaire} au réseau : entraîné directement sur $\log E$, il plafonne à $\sigma/E = 0{,}203$ avec un terme stochastique de $78\,\%$, et surtout une réponse dérivant de $1{,}21$ à 5~GeV à $0{,}81$ à 100~GeV. Ce tassement vers la moyenne de l'échantillon améliore artificiellement la résolution apparente aux extrémités de la gamme tout en détruisant la linéarité, ce que seul le suivi de la réponse (Figure~\ref{fig:energie_linearite_comp}) permet de détecter.
 
@@ -205,7 +228,102 @@ C'est la même objection que celle opposée à l'exactitude au chapitre~\ref{sec
 
 Elle n'est pas pour autant \emph{suffisante}. Appliquée au BDT sur descripteurs de gerbe, la même cible ne change rien : $a = 53{,}7 \pm 1{,}0\,\%$ contre $53{,}6 \pm 1{,}1\,\%$. La formulation a donc permis au réseau d'exploiter une information que les descripteurs ne portent pas ; elle ne l'a pas créée. C'est, dans ce travail, l'argument le plus direct en faveur des méthodes au niveau des hits — et il contraste avec le constat de la section~\ref{sec:pid-approfondissement}, où le même accès aux hits n'apporte rien à l'identification.
 
-\paragraph{Réserves.} Le réseau a été entraîné sous contrainte de temps de calcul et dispose de deux fois moins d'événements que le BDT ; la comparaison lui est donc défavorable sur ce point, ce qui renforce plutôt la conclusion. La dispersion de graine n'a été établie que pour le BDT, où la résolution vaut $0{,}1200 \pm 0{,}0008$ sur cinq graines : l'écart au réseau y est très supérieur. La comparaison de $a = 45{,}5\,\%$ aux valeurs publiées sur DHCAL~\cite{borysova2025dhcalgnn} doit tenir compte de détecteurs, de gammes d'énergie et de définitions du c\oe{}ur différents, et toutes les valeurs de ce chapitre sont celles d'un échantillon confiné (section~\ref{subsec:confinement}).
+\subsection{Ce que le temps apporte, et où}
+\label{subsec:ablation-temps}
+
+Les hits portent un horodatage, et le réseau le lit : les résultats ci-dessus sont ceux d'un modèle disposant d'une résolution temporelle de 100~ps. Sa contribution propre n'avait jamais été isolée. Elle l'est ici par une ablation contrôlée : la colonne de temps est \emph{neutralisée} plutôt que retirée, de sorte que la largeur d'entrée, l'architecture et le nombre de paramètres restent identiques. Seule l'information change, ce qu'une ablation doit précisément garantir.
+
+\paragraph{La dispersion de graine, d'abord.} Un réseau entraîné deux fois sur les mêmes données ne donne pas le même résultat, et l'écart recherché ici est petit. La configuration temporisée a donc été répétée sur quatre graines : $\sigma/E = 0{,}1105 \pm 0{,}0020$, terme stochastique $46{,}3 \pm 0{,}6\,\%$, terme constant $6{,}0 \pm 0{,}5\,\%$. Cette largeur de $0{,}0020$ vaut deux fois et demie celle du BDT, et elle est du même ordre que les effets à mesurer : sans elle, aucune comparaison entre deux entraînements n'est interprétable. La comparaison ci-dessous oppose donc la \emph{moyenne} des quatre graines temporisées au run sans temps.
+
+\begin{table}[!ht]
+\centering
+\caption{Effet du retrait de l'information temporelle, à architecture et budget d'entraînement identiques. La configuration temporisée est moyennée sur quatre graines, dont l'incertitude est la dispersion ; la configuration sans temps n'en compte qu'une.}
+\label{tab:ablation_temps}
+\small
+\begin{tabular}{lrrr}
+\toprule
+& $a$ [\%] & $b$ [\%] & $\sigma/E$ \\
+\midrule
+Avec les temps (100~ps), 4 graines & $46{,}3 \pm 0{,}6$ & $6{,}0 \pm 0{,}5$ & $0{,}1105 \pm 0{,}0020$ \\
+Temps neutralisé, 1 graine         & $49{,}6$           & $5{,}6$           & $0{,}1134$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Le terme stochastique se dégrade de $3{,}3$ points lorsque le temps est retiré, soit environ cinq fois la dispersion de graine. Le terme constant, lui, ne bouge pas de façon significative : $0{,}4$ point d'écart pour une dispersion de $0{,}5$. Et la résolution globale ne se déplace que de $0{,}1105$ à $0{,}1134$, soit à peine plus d'une dispersion. Lue seule, cette dernière colonne conduirait à conclure que le temps ne sert à rien.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.74\linewidth]{Fig/bench_ablation_difference.png}
+\caption{Différence des résolutions, point d'énergie par point d'énergie, entre la moyenne des quatre graines temporisées et le run sans temps. En dessous de zéro, le temps améliore. Les barres sont la dispersion de graine, mise à l'échelle pour la comparaison d'une moyenne de quatre tirages à un tirage unique.}
+\label{fig:ablation_temps}
+\end{figure}
+
+La Figure~\ref{fig:ablation_temps} localise l'effet. En dessous de 15~GeV l'écart vaut $-5{,}4$ écarts-types en moyenne, avec un maximum de $-8{,}9$ à 15~GeV. Entre 20 et 30~GeV il décroît. Au-dessus de 35~GeV il vaut $+0{,}1$ écart-type : les points se dispersent autour de zéro sans structure.
+
+Le temps aide donc là où les gerbes sont peu peuplées, et ne fait rien là où elles sont denses. Il ne coûte rien non plus : l'hypothèse d'un sur-ajustement à haute énergie, qu'une première analyse à une seule graine avait suggérée, ne résiste pas à la mesure de la dispersion.
+
+Ce résultat vaut autant comme résultat que comme argument de méthode. Il est \emph{entièrement invisible} dans la résolution globale, et seules la décomposition en $a \oplus b$ et la comparaison résolue en énergie le font apparaître : c'est la justification rétrospective la plus directe du choix défendu à la section~\ref{subsec:fit_ab}. Il illustre aussi pourquoi la dispersion de graine n'est pas une précaution de forme : sans elle, la même mesure se lisait comme un croisement.
+
+\paragraph{Réserve.} La configuration sans temps n'a été entraînée qu'une fois ; seule la branche temporisée porte une dispersion mesurée. La significativité en dessous de 15~GeV est trop grande pour en dépendre, mais une conclusion quantitative sur l'ampleur du gain demanderait de répéter aussi cette branche.
+
+\subsection{Jusqu'où faut-il descendre en résolution temporelle ?}
+\label{subsec:balayage-temps}
+
+L'ablation établit que le temps sert. Elle ne dit pas à partir de quelle résolution, ce qui est la question que pose le programme T-SDHCAL : les chambres actuelles du prototype travaillent à l'échelle de la nanoseconde, et le passage à des chambres multi-gaps viserait $100$~ps~\cite{tytgat2025tsdhcal}. Le gain justifie-t-il le changement, et y a-t-il encore quelque chose à prendre en dessous ?
+
+Quatre points y répondent, obtenus en faisant varier la seule résolution temporelle appliquée aux temps vrais de la simulation, tout le reste étant inchangé.
+
+\begin{table}[!ht]
+\centering
+\caption{Effet de la résolution temporelle. Les deux premières colonnes de résultats sont les termes de l'ajustement, les deux suivantes des moyennes de résolution sur une bande d'énergie, qui ne dépendent d'aucun ajustement. Les incertitudes sont la dispersion de graine, divisée par la racine du nombre d'entraînements.}
+\label{tab:balayage_temps}
+\small
+\begin{tabular}{llrrrr}
+\toprule
+$\sigma_t$ & Correspondance & $a$ [\%] & $b$ [\%] & $5$--$15$~GeV & $35$--$100$~GeV \\
+\midrule
+--- & aucun temps & $49{,}6$ & $5{,}5$ & $0{,}1827$ & $0{,}0848$ \\
+$1$~ns   & chambres actuelles & $47{,}8$ & $5{,}9$ & $0{,}1776$ & $0{,}0858$ \\
+$100$~ps & objectif multi-gaps & $46{,}3$ & $6{,}0$ & $0{,}1744$ & $0{,}0851$ \\
+$0$      & limite idéale & $46{,}2$ & $5{,}8$ & $0{,}1721$ & $0{,}0833$ \\
+\midrule
+\multicolumn{2}{l}{\emph{dispersion de graine}} & $0{,}58$ & $0{,}46$ & $0{,}0018$ & $0{,}0030$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.49\linewidth]{Fig/bench_timing_scan_a.png}
+\hfill
+\includegraphics[width=0.49\linewidth]{Fig/bench_timing_scan_b.png}
+\caption{Termes de l'ajustement en fonction de la résolution temporelle supposée. Le terme stochastique (gauche) décroît régulièrement à mesure que le temps devient plus précis ; le terme constant (droite) reste compatible avec une valeur fixe. Le point le plus à droite de chaque figure est le modèle privé de toute information temporelle, placé hors échelle.}
+\label{fig:balayage_termes}
+\end{figure}
+
+\paragraph{Le temps agit sur un seul des deux termes.} La Figure~\ref{fig:balayage_termes} donne le résultat le plus directement interprétable du balayage : $a$ passe de $49{,}6$ à $46{,}2\,\%$, tandis que $b$ reste plat dans ses barres. C'est exactement ce que la section précédente avait conclu de l'ablation, retrouvé ici sur quatre configurations au lieu de deux, et cela conforte l'interprétation de $a$ comme la part de la résolution liée aux fluctuations de gerbe : une mesure du temps y mord, alors qu'elle ne touche pas aux effets d'échelle et de fuite que porte $b$.
+
+\paragraph{Pourquoi ne pas s'arrêter là.} La lecture de $a$ seul a toutefois une limite qu'il faut énoncer, car elle a failli nous tromper. Sur les quatre graines de la configuration à $100$~ps, les valeurs ajustées de $a$ et de $b$ sont corrélées à $\mathbf{-0{,}80}$ : l'ajustement à deux paramètres ne les sépare pas, une graine qui tombe sur un $a$ plus faible récupérant mécaniquement un $b$ plus élevé. Une partie de l'effet sur $a$ est donc absorbée par $b$, et l'écart entre deux configurations lu sur $a$ est systématiquement comprimé.
+
+La lecture non biaisée passe par les deux dernières colonnes du Tableau~\ref{tab:balayage_temps}, qui sont des moyennes de résolution sur une bande d'énergie et ne supposent aucune forme fonctionnelle.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.74\linewidth]{Fig/bench_timing_scan_band.png}
+\caption{Résolution moyenne entre $5$ et $15$~GeV en fonction de la résolution temporelle supposée, sans passer par l'ajustement. La progression ne présente pas de plateau, là où le seul terme $a$ en suggérait un entre $100$~ps et la limite idéale.}
+\label{fig:balayage_temps}
+\end{figure}
+
+\paragraph{Tout l'effet est à basse énergie.} Entre $35$ et $100$~GeV, les quatre configurations sont indiscernables : les écarts au modèle sans temps valent $+0{,}3$, $+0{,}1$ et $-0{,}5$ écart-type. Entre $5$ et $15$~GeV ils valent $-2{,}8$, $-4{,}6$ et $-5{,}8$. Ce résultat-là est solide, et il confirme sans ajustement la conclusion de la section précédente : le temps agit sur le terme stochastique et laisse le terme constant intact.
+
+\paragraph{Aucune marche n'est établie individuellement.} Dans la bande basse, passer de $1$~ns à $100$~ps vaut $1{,}6$ écart-type et passer de $100$~ps au temps parfait $1{,}1$. Les deux vont dans le sens attendu, la progression est monotone, mais aucune ne franchit le seuil avec un entraînement par point. En particulier, \textbf{rien n'établit que le gain sature à $100$~ps} : lu sur le seul terme ajusté $a$, l'écart au temps parfait paraissait nul à deux dixièmes d'écart-type, mais cette apparente platitude était un effet de la dégénérescence $a$--$b$. Sans ajustement, l'écart vaut $1{,}1$ écart-type et va dans le sens d'un gain résiduel.
+
+Trancher demanderait trois graines par point, soit une dizaine d'heures de calcul. En l'état, ce balayage établit que l'information temporelle sert, qu'elle sert en dessous de $15$~GeV, et que son apport croît encore entre la nanoseconde et la centaine de picosecondes ; il ne permet pas de désigner une résolution au-delà de laquelle il n'y aurait plus rien à gagner.
+
+\paragraph{Ce que ce balayage n'est pas.} Une convolution gaussienne appliquée aux temps vrais n'est pas une simulation de détecteur. Elle ignore la formation du signal, les seuils temporels, le \emph{time walk} et le regroupement des dépôts sur les pads. Surtout, la liste de physique employée est \texttt{QGSP\_BERT}, sans traitement haute précision des neutrons lents (chapitre~\ref{chap:sdhcal}) : la composante retardée des gerbes, qui est précisément ce qu'une mesure du temps exploite, y est modélisée de façon approchée. Ces chiffres mesurent donc la sensibilité de la reconstruction à la résolution temporelle \emph{dans cette modélisation}, et ne constituent pas une prédiction de performance pour un détecteur réel.
+
+\paragraph{Réserves.} Le réseau a été entraîné sous contrainte de temps de calcul et dispose de deux fois moins d'événements que le BDT ; la comparaison lui est donc défavorable sur ce point, ce qui renforce plutôt la conclusion. La dispersion de graine du réseau, $0{,}6$ point sur le terme stochastique et $0{,}0020$ sur la résolution, est incluse dans le Tableau~\ref{tab:energie_comparaison} ; elle vaut deux fois et demie celle du BDT, $0{,}1200 \pm 0{,}0008$ sur cinq graines. L'écart aux estimateurs tabulaires, de huit points, lui reste très supérieur. La comparaison de $a = 46{,}3\,\%$ aux valeurs publiées sur DHCAL~\cite{borysova2025dhcalgnn} doit tenir compte de détecteurs, de gammes d'énergie et de définitions du c\oe{}ur différents, et toutes les valeurs de ce chapitre sont celles d'un échantillon confiné (section~\ref{subsec:confinement}).
 
 Enfin, l'estimateur de dispersion lui-même repose sur une hypothèse. La largeur est extraite du c\oe{}ur central à $90\,\%$ puis corrigée du facteur de troncature gaussien ; cette correction est exacte pour un c\oe{}ur gaussien, ce que les résidus hadroniques ne sont pas tout à fait. Sur des distributions à queues lourdes, l'incertitude associée est sous-estimée d'environ un quart. Les écarts discutés plus haut — $0{,}009$ entre familles d'estimateurs, $0{,}0002$ entre sources d'étiquette au chapitre~\ref{sec:analyse_mixte} — se situent l'un très au-dessus et l'autre très en dessous de cette marge, de sorte qu'aucune conclusion n'en dépend. Il reste à vérifier, sur ce détecteur, si une connectivité explicite entre amas ajoute quoi que ce soit à l'encodeur d'ensemble employé ici : la question n'a pas été tranchée faute de temps de calcul.
 

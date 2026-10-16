@@ -484,6 +484,148 @@ void plotCoupling(const std::string& dir, const std::string& outDir) {
   plotCouplingSpecies(dir, outDir, "pid-bdt_reco-bdt", "BDT regressor, predicted label");
 }
 
+
+// ---------------------------------------------------------------------------
+// Timing ablation
+// ---------------------------------------------------------------------------
+// The two curves differ by little overall; the point of this figure is that the
+// difference is significant below about 25 GeV and consistent with zero above.
+// A difference panel shows that where two near-identical curves would not. The
+// error bars are the seed spread of the timed configuration, scaled for the
+// comparison of a four-seed mean against a single untimed run.
+void plotAblation(const std::string& dir, const std::string& outDir) {
+  const std::string path = dir + "/timing.csv";
+  if (gSystem->AccessPathName(path.c_str())) {
+    std::cerr << "missing " << path << "\n";
+    return;
+  }
+  Table t = readCsv(path);
+  const size_t n = t.columns.at("energy").size();
+
+  // Upper figure: the two resolution curves.
+  auto* timed = new TGraphErrors(n, t.columns.at("energy").data(),
+                                 t.columns.at("resolution_timed").data(), nullptr,
+                                 t.columns.at("spread_timed").data());
+  auto* untimed = new TGraphErrors(n, t.columns.at("energy").data(),
+                                   t.columns.at("resolution_untimed").data(), nullptr,
+                                   t.columns.at("resolution_err_untimed").data());
+  timed->SetMarkerStyle(kMarker[0]);
+  timed->SetMarkerColor(kColour[0]);
+  timed->SetLineColor(kColour[0]);
+  timed->SetMarkerSize(1.15);
+  untimed->SetMarkerStyle(kMarker[1]);
+  untimed->SetMarkerColor(kColour[1]);
+  untimed->SetLineColor(kColour[1]);
+  untimed->SetMarkerSize(1.15);
+
+  TMultiGraph mg;
+  mg.Add(timed, "P");
+  mg.Add(untimed, "P");
+  TLegend leg(0.58, 0.72, 0.95, 0.90);
+  leg.SetTextSize(0.032);
+  leg.AddEntry(timed, "with hit times (100 ps), 4 seeds", "p");
+  leg.AddEntry(untimed, "time feature blanked", "p");
+
+  TCanvas cRes("cAblRes", "", 800, 600);
+  cRes.SetLogx();
+  mg.Draw("A");
+  mg.GetXaxis()->SetTitle("E_{true} [GeV]");
+  mg.GetYaxis()->SetTitle("#sigma(E)/E");
+  mg.GetYaxis()->SetRangeUser(0.0, 0.30);
+  mg.GetXaxis()->SetLimits(4.0, 130.0);
+  leg.Draw();
+  drawHeader("#pi^{-}/p, cluster network");
+  save(cRes, outDir + "/ablation_resolution");
+
+  // Lower figure: the difference, where the crossing is legible.
+  auto* diff = new TGraphErrors(n, t.columns.at("energy").data(), t.columns.at("difference").data(),
+                                nullptr, t.columns.at("difference_err").data());
+  diff->SetMarkerStyle(kMarker[0]);
+  diff->SetMarkerColor(kColour[3]);
+  diff->SetLineColor(kColour[3]);
+  diff->SetMarkerSize(1.25);
+
+  TCanvas cDiff("cAblDiff", "", 800, 600);
+  cDiff.SetLogx();
+  TMultiGraph mgDiff;
+  mgDiff.Add(diff, "P");
+  mgDiff.Draw("A");
+  mgDiff.GetXaxis()->SetTitle("E_{true} [GeV]");
+  mgDiff.GetYaxis()->SetTitle("#sigma_{timed} #minus #sigma_{untimed}");
+  mgDiff.GetYaxis()->SetRangeUser(-0.022, 0.010);
+  mgDiff.GetXaxis()->SetLimits(4.0, 130.0);
+  auto* zero = new TLine(4.0, 0.0, 130.0, 0.0);
+  zero->SetLineStyle(3);
+  zero->SetLineColor(kGray + 2);
+  zero->Draw();
+  TLatex note;
+  note.SetNDC();
+  note.SetTextFont(42);
+  note.SetTextSize(0.034);
+  note.DrawLatex(0.20, 0.26, "timing helps");
+  note.DrawLatex(0.62, 0.62, "consistent with zero");
+  drawHeader("#pi^{-}/p, cluster network");
+  save(cDiff, outDir + "/ablation_difference");
+}
+
+
+// ---------------------------------------------------------------------------
+// Timing scan
+// ---------------------------------------------------------------------------
+void drawScanPanel(const Table& t, const std::string& value, const std::string& error,
+                   const char* axisTitle, double yLow, double yHigh, const std::string& stem,
+                   const std::string& outDir) {
+  const size_t n = t.columns.at("sigma_t").size();
+  auto* g = new TGraphErrors(n, t.columns.at("sigma_t").data(), t.columns.at(value).data(), nullptr,
+                             t.columns.at(error).data());
+  g->SetMarkerStyle(kMarker[0]);
+  g->SetMarkerColor(kColour[0]);
+  g->SetLineColor(kColour[0]);
+  g->SetMarkerSize(1.4);
+
+  TCanvas canvas(("cScan_" + value).c_str(), "", 800, 600);
+  canvas.SetLogx();
+  TMultiGraph mg;
+  mg.Add(g, "P");
+  mg.Draw("A");
+  mg.GetXaxis()->SetTitle("#sigma_{t} [ps]   (rightmost point: no time at all)");
+  mg.GetYaxis()->SetTitle(axisTitle);
+  mg.GetYaxis()->SetRangeUser(yLow, yHigh);
+  mg.GetXaxis()->SetLimits(0.5, 5000.0);
+
+  TLatex note;
+  note.SetNDC();
+  note.SetTextFont(42);
+  note.SetTextSize(0.030);
+  note.DrawLatex(0.185, 0.17, "ideal");
+  note.DrawLatex(0.40, 0.17, "MGRPC target");
+  note.DrawLatex(0.60, 0.17, "present GRPC");
+  note.DrawLatex(0.79, 0.17, "no timing");
+  drawHeader("#pi^{-}/p, cluster network");
+  save(canvas, outDir + "/" + stem);
+}
+
+// The detector question: moving from the present sub-nanosecond GRPCs to
+// ~100 ps MGRPCs, is there anything left to gain below 100 ps?
+//
+// Three panels, deliberately. The fitted a falls and the fitted b rises, which
+// looks like one term feeding the other - but across seeds the two are
+// anti-correlated at -0.80, so the fit does not separate them and neither panel
+// can be read on its own. The third panel is the mean resolution over 5-15 GeV,
+// where the whole effect sits and which needs no fit: that is the reliable read.
+void plotScan(const std::string& dir, const std::string& outDir) {
+  const std::string path = dir + "/timing_points.csv";
+  if (gSystem->AccessPathName(path.c_str())) {
+    std::cerr << "missing " << path << "\n";
+    return;
+  }
+  Table t = readCsv(path);
+  drawScanPanel(t, "a", "a_err", "stochastic term a [%]", 44.0, 52.0, "timing_scan_a", outDir);
+  drawScanPanel(t, "b", "b_err", "constant term b [%]", 4.4, 7.2, "timing_scan_b", outDir);
+  drawScanPanel(t, "low", "low_err", "#sigma(E)/E averaged over 5#minus15 GeV", 0.166, 0.190,
+                "timing_scan_band", outDir);
+}
+
 }  // namespace
 
 void plots(const char* kind = "energy") {
@@ -500,8 +642,12 @@ void plots(const char* kind = "energy") {
     plotPid(dir, outDir);
   } else if (what == "coupling") {
     plotCoupling(dir, outDir);
+  } else if (what == "ablation") {
+    plotAblation(dir, outDir);
+  } else if (what == "scan") {
+    plotScan(dir, outDir);
   } else {
-    std::cerr << "unknown kind '" << what << "'; expected energy, pid or coupling\n";
+    std::cerr << "unknown kind '" << what << "'; expected energy, pid, coupling, ablation or scan\n";
     return;
   }
   std::cout << "wrote plots to " << outDir << "\n";

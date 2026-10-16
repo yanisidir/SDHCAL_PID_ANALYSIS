@@ -219,16 +219,17 @@ coupling: ## 5. the three cases that belong in the same table
 #
 # SDHCAL_PARAMS_SET=2class redirects the stages at the consolidated files.
 #
-# SDHCAL_SHARDS_DIR says which shard lot those files are built from, and it is
-# the one to watch: paths.shards_dir() defaults to `new_data_params`, the lot
-# produced BEFORE the ShowerAnalyzer corrections (annex 1 of the report).
-# Reading the wrong lot raises nothing - it yields the inverted eccentricity and
-# the unbounded Gaisser-Hillas fit, and a model trained on them reports entirely
-# plausible numbers. It happened once, to the MLP, and was caught only because
-# its AUC came out at 0.599 instead of 0.677. Pinning it here means no 2class
-# target can read the old lot by omission.
+# SDHCAL_SHARDS_DIR says which shard lot those files are built from. Since the
+# reorganisation it defaults to the CORRECTED lot, so the trap it used to guard
+# against is gone at the source; the pin stays because it also documents, in the
+# recipe itself, which lot a run read. The superseded lot produced BEFORE the
+# ShowerAnalyzer corrections (annex 1 of the report) is kept beside it as
+# `params-superseded`. Reading it raises nothing - it yields the inverted
+# eccentricity and the unbounded Gaisser-Hillas fit, and a model trained on it
+# reports entirely plausible numbers. It happened once, to the MLP, and was
+# caught only because its AUC came out at 0.599 instead of 0.677.
 
-SHARDS_2CLASS ?= $(CURDIR)/new_data_params_v2
+SHARDS_2CLASS ?= $(CURDIR)/data/lots/pi-proton/params
 TWO_CLASS     := SDHCAL_PARAMS_SET=2class SDHCAL_SHARDS_DIR="$(SHARDS_2CLASS)"
 PID_ARGS_2    ?= --seeds 5
 ENERGY_ARGS_2 ?= --seeds 5
@@ -338,9 +339,12 @@ benchmark-2class: ## benchmark-2. the comparison tables, the ROOT plots, the rep
 	$(TWO_CLASS) "$(PYTHON)" tools/compare_models.py --kind pid    --models $(BENCH_PID)
 	$(TWO_CLASS) "$(PYTHON)" tools/compare_models.py --kind energy --models $(BENCH_ENERGY)
 	$(TWO_CLASS) "$(PYTHON)" tools/coupling_curves.py
+	$(TWO_CLASS) "$(PYTHON)" tools/timing_ablation.py
 	"$(ROOT)" -l -b -q 'analysis/6_benchmark/plots.C("pid")'
 	"$(ROOT)" -l -b -q 'analysis/6_benchmark/plots.C("energy")'
 	"$(ROOT)" -l -b -q 'analysis/6_benchmark/plots.C("coupling")'
+	"$(ROOT)" -l -b -q 'analysis/6_benchmark/plots.C("ablation")'
+	"$(ROOT)" -l -b -q 'analysis/6_benchmark/plots.C("scan")'
 	"$(ROOT)" -l -b -q 'analysis/6_benchmark/interpret_plots.C'
 	$(MAKE) report-figures
 
@@ -363,6 +367,11 @@ report-figures: ## benchmark-3. copy the benchmark plots under the names the rep
 	@cp output/benchmark/coupling/plots/coupling_linearity_chi2_p.png                  report/Fig/bench_coupling_linearity_chi2_proton.png
 	@cp output/benchmark/interpret/plots/confusion_matrix.png                          report/Fig/bench_confusion_matrix.png
 	@cp output/benchmark/interpret/plots/correlation_matrix.png                        report/Fig/bench_correlation_matrix.png
+	@cp output/benchmark/ablation/plots/ablation_difference.png report/Fig/bench_ablation_difference.png
+	@cp output/benchmark/ablation/plots/ablation_resolution.png  report/Fig/bench_ablation_resolution.png
+	@cp output/benchmark/scan/plots/timing_scan_a.png report/Fig/bench_timing_scan_a.png
+	@cp output/benchmark/scan/plots/timing_scan_b.png report/Fig/bench_timing_scan_b.png
+	@cp output/benchmark/scan/plots/timing_scan_band.png report/Fig/bench_timing_scan_band.png
 	@echo "report/Fig updated"
 
 # ---------------------------------------------------------------------------
