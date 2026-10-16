@@ -47,15 +47,25 @@ part and draws every figure and number from the test part. Before, the fit and
 the figures used the same events, so the method was quoted in-sample while the
 regressors were quoted on a held-out set.
 
-Two conditions remain for a fair comparison:
+Both conditions for a fair comparison are now met for the pion/proton study:
 
-1. **Re-run the fit.** The coefficients committed in
-   [`../../../calibration/`](../../../calibration/) are the ones recovered from
-   the internship code and carry `"fitted_on_train_split": false`. `sdhcal.calib`
-   warns when they are used.
-2. **Match the event selection.** This chain rejects showers reaching the last
-   layer (`requireContained`, on by default). Pass `--require-contained` to the
-   ML pipeline to apply the identical cut.
+1. **The fit is out of sample.** `calibration/chi2_coefficients_2class.json`,
+   the file the published comparison reads, was re-fitted on the training split
+   and carries `"fitted_on_train_split": true`. The legacy three-class file
+   `calibration/chi2_coefficients.json` still carries `false` -- it is the set
+   recovered from the internship code, fitted on every event -- and
+   `sdhcal.calib` warns whenever those coefficients are used.
+2. **The selection matches.** This chain rejects showers reaching the last layer
+   (`requireContained`, on by default), and the ML pipeline applies the
+   identical cut with `--require-contained`. Note what that cut costs: it keeps
+   95.8 % of the sample at 5 GeV and 23.1 % at 100 GeV, so the surviving
+   population is not the same population at the two ends of the range. Every
+   number quoted from either chain is conditional on it.
+
+The chi2 reconstruction is also the baseline the hit-level network corrects
+rather than replaces: its target is `log(E_true / E_chi2)`, so these
+coefficients enter that result directly and the two methods are not
+independent.
 
 ## Files
 

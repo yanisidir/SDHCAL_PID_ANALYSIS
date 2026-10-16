@@ -21,5 +21,12 @@ root -l -b -q density.C       # one of them
 | `thr3.C` | fraction of third-threshold hits |
 | `em_fraction.C` | electromagnetic-like fraction |
 
+`emFraction` is not computed by `ShowerAnalyzer`: it is a simulation truth
+branch carried through the production, so the overlay it produces here is a
+truth-level comparison, not a reconstructed observable. The same branch is used
+by [`../../tools/correction_mechanism.py`](../../tools/correction_mechanism.py)
+to test whether the correction the energy network learns tracks the
+electromagnetic fraction of the shower -- it does not.
+
 The committed PDFs (`Begin.pdf`, `Density.pdf`, `Radius.pdf`, `Thr3.pdf`,
 `emFraction.pdf`) are the outputs of these macros on the internship samples.

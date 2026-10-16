@@ -113,7 +113,7 @@ or derived shower parameters. Maintained scripts resolve their inputs through
 ├── tools/                   utilities outside the chain (held-out sample, log repair)
 ├── tests/                   test suite for the shared library
 ├── docs/                    data-pipeline and validated-results documentation
-├── results/                 curated figures referenced by the report
+├── results/                 frozen archive of the internship figures (see below)
 ├── report/                  M2 internship LaTeX report and compiled PDF (self-contained)
 ├── data/                    detector data, not versioned
 │
@@ -131,10 +131,33 @@ every stage shares.
 
 See also:
 
+Start here:
+
 - [Project handover](docs/HANDOVER.md)
 - [Data pipeline](docs/data_pipeline.md)
 - [Execution and reproducibility](docs/reproducibility.md)
 - [Results summary](docs/results_summary.md)
+
+Provenance, without which no number here can be reproduced or defended:
+
+- [Simulation provenance](docs/simulation_provenance.md) - Geant4 version, physics
+  list, digitisation window and the two production configurations. Read it before
+  quoting anything about the delayed shower component.
+- [Figure provenance](docs/figures.md) - which command regenerates each figure of
+  the report, and which three cannot be regenerated.
+- [Characterisation baseline](docs/r0_baseline.md) - the behaviour frozen before
+  the architectural refactoring, the log of deliberate contract changes, and the
+  scientific questions those contracts explicitly do *not* validate.
+
+Architecture of the shared package, written during the refactoring:
+
+- [Configuration](docs/configuration.md) and [artifacts](docs/artifacts.md)
+- [Tabular models](docs/tabular.md), [BDT](docs/bdt_architecture.md),
+  [MLP](docs/mlp_architecture.md)
+- [Hit-level models](docs/hit_architecture.md) and
+  [hit-level energy](docs/hit_energy_architecture.md)
+- [Prediction](docs/prediction_architecture.md) and
+  [C++/ROOT](docs/cpp_root_architecture.md)
 
 ## Internship Report
 
@@ -216,7 +239,8 @@ figure can be traced back to the configuration that produced it. See
 [analysis/README.md](analysis/README.md) for the conventions every stage shares.
 For future published result sets, `tools/create_release.py` writes a portable
 manifest under `results/<release-id>/` without moving or duplicating the existing
-models and predictions. Explicit run selection, environment snapshots and the
+models and predictions -- a release manifest beside the frozen archive, not a
+figure copied into it. Explicit run selection, environment snapshots and the
 manifest schema are documented in
 [docs/reproducibility.md](docs/reproducibility.md).
 
@@ -229,20 +253,49 @@ while treating the historical width curves as qualitative dispersion indicators.
 The results retained in the final report are:
 
 - a multiclass LightGBM balanced accuracy of **67.8 %**, with recalls of
-  **48.8 %** for pi-, **68.6 %** for protons and **86.0 %** for K0L;
-- a binary pion/proton accuracy close to **61 %**;
-- for the BDT-PID + BDT-energy chain at 80 GeV, an energy bias below **1 %**
-  in magnitude for all three species;
-- the conclusion that species-dependent routing primarily changes the energy
-  scale bias. No numerical gain in absolute energy resolution is claimed;
-- the GNN study as an exploratory proof of feasibility, without a headline
-  performance value.
+  **48.8 %** for pi-, **68.6 %** for protons and **86.0 %** for K0. The sample
+  carries PDG code 311, a flavour eigenstate, not the 130 of a K0L; about 1.2 %
+  of those events are purely electromagnetic, the signature of a K0S decay;
+- the pion/proton confusion of **47.9 %** established as a property of the
+  showers rather than of the models: pion and proton start their showers in the
+  same layer with the same spread, where the neutral kaon starts six layers
+  deeper, and neither a CNN nor a graph network reading the hits improves on the
+  shower descriptors;
+- a binary pion/proton balanced accuracy of **61.3 ± 0.1 %** over five seeds;
+- a cluster-level DeepSets correction to the semi-digital calibration that lowers
+  the stochastic term from **54.4 ± 1.2 %** to **46.3 ± 0.6 %** over four seeds,
+  where every descriptor-based estimator sits at the same floor;
+- hit timing at 100 ps shown to act on the stochastic term alone, and only below
+  about 25 GeV; no saturation below 100 ps is established;
+- **routing by species buys nothing** once the regressor is trained on the
+  mixture: sigma/E is 0.1199 with no label, 0.1201 with the predicted label and
+  0.1199 with the true one. What routing does fix is the scale error of a pion
+  calibration applied to protons, worth -4.9 % to -0.4 % of proton bias at 20 GeV.
 
 <p align="center">
   <img src="results/pid-energy-coupling/summary/confusion_matrix_pid_LGBM.png" width="31%" alt="Example PID confusion matrix">
   <img src="analysis/4_energy/ml_bdt/plots/Lin_n_Dev_all_LGBM.png" width="31%" alt="Example ML energy reconstruction linearity and deviation">
   <img src="results/energy-reconstruction/chi2-tminuit/summary-plots/Lin_n_Dev_all_chi2.png" width="31%" alt="Example chi2/TMinuit energy reconstruction linearity and deviation">
 </p>
+
+### Where figures live
+
+Three directories, with three different statuses, which is worth stating plainly:
+
+| Directory | Status |
+|---|---|
+| `output/` | Everything a run writes, under `$SDHCAL_OUT_DIR`. Not versioned, regenerable by construction, and each run carries its own `runs/<id>.json`. |
+| `report/Fig/` | Versioned. The figures the report compiles against, written by `make report-figures`, which copies them out of `output/benchmark/` under the names the LaTeX expects. This is the maintained path from a run to a published figure. |
+| `results/` | Versioned, and **frozen**. The internship figures, produced before runs were logged; no current run reproduces them, and none of their filenames exists under `output/`. Kept as a record and for the images shown above, not as a destination for new figures. |
+
+One exception survives: `analysis/4_energy/ml_bdt/plots/` holds six committed
+figures beside the script that wrote them, including one shown above. They
+belong in `results/` by the convention stated in
+[analysis/archive/README.md](analysis/archive/README.md); they are left where
+the report's links already point at them.
+
+Which figure in the report comes from which macro, and the three that cannot be
+regenerated at all, are listed in [docs/figures.md](docs/figures.md).
 
 Additional useful figure locations:
 
@@ -263,12 +316,17 @@ Read these before quoting any number from this repository.
   the width curves use an uncorrected 90 %-truncated RMS and must not be read as
   an absolute measurement of sigma. The final report therefore uses them only
   for qualitative comparisons and reports bias separately from dispersion.
-- **The chi2-versus-ML comparison is not yet like-for-like.** The chi2 fit now
-  splits train and test, but it has to be re-run; until then the committed
-  coefficients are flagged `fitted_on_train_split: false`.
-- **The PID-agnostic baseline has never been measured.** The scripts named
-  `noPID_*` routed events by the true particle, so what was compared was real
-  PID against perfect PID. `--pid none` now exists and needs to be run.
+- **The chi2-versus-ML comparison is now like-for-like.** The calibration
+  coefficients are fitted out of sample, and every estimator is evaluated on the
+  same events under the same containment selection.
+- **The PID-agnostic baseline has been measured.** The scripts named `noPID_*`
+  had routed events by the true particle, so what was compared was real PID
+  against perfect PID. The missing cell, an inclusive regressor with no label at
+  all, reverses the reading: see the routing result above.
+- **Only one model carries a measured training variance in full.** The cluster
+  network was repeated on four seeds for the 100 ps energy configuration; the
+  other timing points and the cluster-level PID models are still single-seed, and
+  their comparisons should be read accordingly.
 - **The final DRD6 results use disjoint training and evaluation samples.** The
   corresponding ROOT inputs are not versioned in this repository, so their
   separation cannot be replayed from a fresh checkout. New runs use

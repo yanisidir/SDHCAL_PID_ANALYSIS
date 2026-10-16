@@ -15,6 +15,8 @@ make
 
 Le résultat est `main.pdf`. La compilation utilise `latexmk`, `biber` et des paquets
 TeX Live courants. Les deux figures de PID sont les figures validées du rapport. La
+section sur le temps s'appuie sur l'ablation contrôlée et le balayage en résolution
+temporelle décrits au chapitre 7 du rapport. La
 figure d'énergie est reconstruite par PGFPlots depuis les tables textuelles gelées dans
 `plot_data/`, avec le nom scientifique correct « DeepSets » à la place de la clé historique
 `gnn_ratio`.
@@ -28,8 +30,10 @@ figure d'énergie est reconstruite par PGFPlots depuis les tables textuelles gel
 
 La configuration de production a été retrouvée dans `/home/midir/SDHCAL/Timing` :
 
-- Geant4 10.04.p03 et `QGSP_BERT`, confirmés par les logs de génération et le cache
-  de compilation de `SDHCALSim` ;
+- Geant4 10.04.p03 (`geant4-10-04-patch-03`) et `QGSP_BERT`, confirmés par l'en-tête
+  des logs de génération et le cache CMake de `SDHCALSim`. À noter : la première
+  ligne d'`init_ilcsoft.sh` nomme une pile plus ancienne (`v02-00-02`,
+  Geant4 10.03.p02) qui n'est **pas** celle utilisée ;
 - iLCSoft v02-02-01, Marlin v01-17-01, LCIO v02-16-01 et ROOT 6.18.04 ;
 - paramètres géométriques dans `SDHCALSim/src/SDHCALDetectorConstruction.cpp` et
   `SDHCALSim/src/SDHCALRPC.cpp` ;
@@ -56,8 +60,10 @@ Git. Ils ne remplacent pas les tables événementielles utilisées pour le calcu
    collaboration le cas échéant.
 5. Publier une archive logicielle avec DOI et préciser les conditions d'accès aux
    simulations.
-6. Compléter l'étude systématique et répéter les réseaux sur plusieurs graines avant
-   de présenter les incertitudes comme complètes.
+6. Compléter l'étude systématique. La configuration DeepSets d'énergie à 100 ps est
+   désormais répétée sur quatre graines (dispersion 0,0020 sur sigma/E, 0,6 point sur
+   le terme stochastique) ; restent à répéter les autres points du balayage temporel
+   et les modèles PID au niveau des amas, tous encore à une graine.
 7. Faire relire et approuver toute affirmation physique par les coauteurs.
 8. Quantifier l'effet des graines partagées entre espèces et de la graine fixe de
    numérisation ; pour une nouvelle production, attribuer une graine unique par job.

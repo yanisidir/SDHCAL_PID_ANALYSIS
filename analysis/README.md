@@ -14,13 +14,15 @@ digitized hits (.root)
         v                                v
 2_variable_study/              3_pid/            4_energy/
 how the variables differ       pi- / p / K0      E from the shower variables
-between species                classifiers       (LightGBM, MLP, chi2/TMinuit)
+between species                classifiers       or the hits (LightGBM, MLP,
+                                                 DeepSets, chi2/TMinuit)
                                        |                |
                                        +-------+--------+
                                                |
                                                v
                                        5_pid_energy/
                                        does identifying first help?
+                                       (measured: no)
 ```
 
 Stages 3 and 4 are independent branches off stage 1; stage 5 joins them. The
@@ -32,7 +34,7 @@ numbering gives a reading order, not a strict dependency chain.
 | [2_variable_study](2_variable_study/) | Which variables separate the species at all? | ROOT macros |
 | [3_pid](3_pid/) | Which hadron produced this shower? | Python |
 | [4_energy](4_energy/) | What was its energy? | Python + C++/ROOT |
-| [5_pid_energy](5_pid_energy/) | Does identifying it first improve the energy? | Python |
+| [5_pid_energy](5_pid_energy/) | Does identifying it first improve the energy? (no) | Python |
 
 ## Running a stage
 
@@ -85,14 +87,23 @@ output/<study>/
 └── *_performances.csv
 ```
 
-Figures worth keeping are copied by hand into [`../results/`](../results/) and
-committed; everything else stays in `output/`.
+Figures that end up in the report are copied by `make report-figures`, which
+renames the 22 benchmark plots to what the LaTeX expects and writes them to
+[`../report/Fig/`](../report/Fig/). That is the maintained path out of
+`output/`, and it is scripted so no figure in the report is a file somebody
+copied by hand.
+
+[`../results/`](../results/) is **not** that path. It is the frozen archive of
+the internship figures -- 88 files that predate run logging, which no current
+run reproduces: not one of its filenames exists anywhere under `output/`. It is
+kept because the root README displays some of them and because they are the
+record of what was produced, not as a place to promote new figures to.
 
 **Every run is identified.** The JSON record holds the feature list, the
 smearing width, the seeds, the git commit and the package versions, so a figure
 can be traced back to the configuration that produced it. This was not true of
-the original code, and it is why the figures already in `results/` cannot be
-attributed to an exact run; the limitation is stated in the root README.
+the original code, and it is why the figures in `results/` cannot be attributed
+to an exact run; the limitation is stated in the root README.
 
 **Shared code** lives in [`../src/sdhcal/`](../src/sdhcal/) (Python) and
 [`../cpp/`](../cpp/) (C++): paths, time smearing, bias and resolution

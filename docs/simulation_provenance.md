@@ -18,8 +18,15 @@ rien ici ne permet de les distinguer.
 | Digitalisation | `digitizerTuning/SimDigitalScript` | `.slcio` |
 | Conversion | `SDHCALMarlinProcessor/LcioToRootProcessor.py` | `.root` |
 
-Environnement : iLCSoft sous CVMFS, **Geant4 10.03.p02**
-(`/cvmfs/ilc.desy.de/sw/.../v02-00-02/geant4/10.03.p02`).
+Environnement : iLCSoft v02-02-01 sous CVMFS, **Geant4 10.04.p03**
+(`geant4-10-04-patch-03`, 8 février 2019).
+
+La version se lit dans l'en-tête des journaux de génération
+(`SDHCALSim/script/output*.log`) et dans le cache CMake de la compilation, qui
+pointe vers `v02-02-01/geant4/10.04.p03`. Elle ne se lit **pas** dans
+`init_ilcsoft.sh`, dont la première ligne nomme une pile plus ancienne
+(`v02-00-02/geant4/10.03.p02`) qui n'est pas celle utilisée : c'est la seconde
+ligne, `v02-02-01`, que le Readme du projet demande de sourcer.
 
 ## Configuration commune aux deux lots
 

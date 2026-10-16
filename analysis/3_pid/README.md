@@ -23,12 +23,13 @@ the run record.
 |---|---|
 | `bdt/` | **The maintained classifier.** LightGBM, with SMOTE applied to the training split only, early stopping on validation, and multi-seed uncertainties. |
 | `mlp/` | Maintained binary scikit-learn MLP baseline on the same engineered variables. |
-| `gnn/` | Binary pion/proton PyTorch Geometric workflow on hit-level graphs. `train.py` is maintained; the other variants are archived internship prototypes. Needs `requirements-gnn.txt`. |
+| `gnn/` | Binary pion/proton PyTorch Geometric workflow on hit-level graphs -- here the edges are real (`GATConv` then two `GraphConv` over a k-NN neighbourhood), unlike the DeepSets model used for energy. `train.py` is maintained; the other variants are archived internship prototypes. Needs `requirements-gnn.txt`. |
 | `cnn/` | Binary pion/proton hit-level baseline using permutation-invariant point-wise convolutions and masked pooling. |
 
 ### Main scripts
 
-- `bdt/train.py`: maintained multiclass classifier.
+- `bdt/train.py`: the maintained classifier; two classes by default,
+  three with `--particles pi proton kaon`.
 - `bdt/interpret.py`: correlation and permutation-importance diagnostics.
 - `mlp/train.py`: maintained binary pion/proton MLP.
 - `mlp/evaluate.py`: evaluation of a saved model on the discrete sample.
@@ -86,3 +87,19 @@ python analysis/3_pid/mlp/train.py \
   detector time resolution. The width is `--sigma-time` and is recorded in the
   run log; it used to be hard-coded at 0.1 ns in five places. The smearing is
   independent per variable and applied exactly once.
+- **The pion/proton separation has a physical ceiling.** The two-class BDT
+  plateaus around 47.9 % rejection at 90 % efficiency, and that is not a
+  modelling shortfall: the showers genuinely start at the same place. The
+  `Begin` variable has a median of 0/0/6 layers and an interquartile range of
+  1/1/10, so most events carry no usable difference in the first interactions.
+  Reporting rejection at a fixed efficiency rather than accuracy is deliberate,
+  because accuracy follows the class mixture of whatever sample it is read on.
+- **The third class is K0, not K0_L.** The generated PDG code is 311, the
+  flavour eigenstate, so the sample mixes short- and long-lived components; the
+  measured electromagnetic contamination it brings is 1.2 %. The report says K0
+  for that reason, and a claim about K0_L would not be supported by this
+  production.
+- **The graph in `gnn/` is undirected while its construction is described as
+  causal.** `build_knn_graph` uses the hit time, but the edge set is symmetrised,
+  so exactly 50 % of the edges run backwards in time. The model therefore cannot
+  be read as propagating a shower front; it is a neighbourhood model.

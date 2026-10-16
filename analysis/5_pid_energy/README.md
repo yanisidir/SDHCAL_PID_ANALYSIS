@@ -22,6 +22,15 @@ The three `--pid` modes are the point of the study and must be quoted together:
 The gap between `none` and `true` is how much particle identification could
 possibly buy; the gap between `none` and `bdt` is how much it actually buys.
 
+**What was measured: nothing.** The PID-agnostic baseline and the routed chain
+land on the same resolution, 0.1199 against 0.1199, and perfect PID does not
+separate from either. Routing buys nothing here, which is the result the stage
+reports -- not a negative to be explained away. Two reasons stand behind it: the
+shower variables the regressors read already carry whatever the classifier could
+tell them, and the pion/proton separation itself is close to its physical limit
+(see [`../3_pid/`](../3_pid/)). The figure to quote is the three modes side by
+side, not the routed chain alone.
+
 `--pid none` needs an inclusive regressor, trained with:
 
 ```bash

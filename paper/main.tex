@@ -75,7 +75,8 @@ trained with a substantially smaller event budget and therefore do not constitut
 a capacity-matched comparison. For energy reconstruction, a permutation-invariant
 DeepSets model learns an event-wise correction to the conventional three-threshold
 calibration. On 100744 contained showers it yields a stochastic term of
-$(45.5\pm1.0)\%$, compared with $(54.4\pm1.2)\%$ for the semi-digital calibration,
+$(46.3\pm0.6)\%$ over four training seeds, compared with $(54.4\pm1.2)\%$ for the
+semi-digital calibration,
 while maintaining a constant term of $(6.4\pm0.2)\%$. Finally, explicit routing by
 the predicted or true particle label does not improve the resolution of an inclusive
 boosted-tree regressor within the evaluated pion--proton mixture. These results show
@@ -438,7 +439,7 @@ figures of merit.
     \toprule
     Estimator & Training events & $a$ [\%] & $b$ [\%] & pooled $\sigma/E$ & $\max|\mathcal{R}-1|$ \\
     \midrule
-    DeepSets correction & 79451 & $45.5\pm1.0$ & $6.4\pm0.2$ & 0.1115 & 0.028 \\
+    DeepSets correction & 79451 & $46.3\pm0.6$ & $6.0\pm0.5$ & 0.1105 & 0.028 \\
     BDT correction & 176000 & $53.7\pm1.0$ & $5.6\pm0.3$ & 0.1197 & 0.052 \\
     BDT direct energy & 176000 & $53.6\pm1.1$ & $5.6\pm0.3$ & 0.1199 & 0.054 \\
     Semi-digital calibration & --- & $54.4\pm1.2$ & $7.0\pm0.3$ & 0.1295 & 0.031 \\
@@ -462,7 +463,8 @@ constant term, which decreases from $(7.0\pm0.3)\%$ to $(5.6\pm0.3)\%$. Changing
 BDT target from direct energy to the correction of \cref{eq:ratio} has no significant
 effect.
 
-The DeepSets correction instead decreases the stochastic term to $(45.5\pm1.0)\%$.
+The DeepSets correction instead decreases the stochastic term to $(46.3\pm0.6)\%$,
+averaged over four training seeds whose spread is quoted as the uncertainty.
 It gives the best resolution over the complete evaluated range and keeps the maximum
 response deviation below 2.9\%. Because DeepSets contains no graph edges, this gain
 cannot be attributed to explicit cluster connectivity. It is evidence that the
@@ -475,6 +477,52 @@ a stochastic term near 78\%, while its response changed from approximately 1.21 
 ratio target in \cref{eq:ratio}. Conversely, applying the ratio target to the BDT does
 not improve its result, which indicates that the DeepSets gain is not explained by the
 target transformation alone.
+
+\section{Contribution of the hit timing}
+\label{sec:timing}
+
+The cluster representation of \cref{sec:clusters} carries one time per cluster, the
+earliest hit it contains, smeared with a $100$~ps Gaussian resolution. The specific
+contribution of that variable had not been isolated.
+
+\paragraph{Ablation.} The time column was blanked rather than removed, so that the
+input width, the architecture and the parameter count remain identical to a timed run
+and only the information differs. Removing the time degrades the stochastic term from
+$(46.3\pm0.6)\%$ to $49.6\%$ while the constant term is unchanged within its spread.
+The global resolution moves only from $0.1105$ to $0.1134$, little more than one seed
+spread, so a single resolution figure would have suggested no effect.
+
+Resolved in energy, the whole effect is concentrated below $25$~\GeV{}. Averaged over
+$5$--$15$~\GeV{} the timed configuration is better by $5.4$ standard deviations of the
+seed spread; averaged over $35$--$100$~\GeV{} the difference is $0.1$. Timing therefore
+helps where showers contain few clusters and does nothing where they are dense.
+
+\paragraph{Resolution scan.} Three further configurations were trained, varying only
+the Gaussian resolution applied to the true simulated times: no timing at all,
+$1$~ns corresponding to the present glass chambers, and a perfect time. The fitted
+stochastic term decreases monotonically ($49.6$, $47.8$, $46.3$, $46.2$)\% while the
+constant term remains compatible with a fixed value.
+
+The two fitted terms must not be read independently. Across the four seeds of the
+$100$~ps configuration the fitted $a$ and $b$ are correlated at $-0.80$: the two-term
+fit does not separate them, and a difference read on $a$ alone is systematically
+compressed. Using instead the mean resolution over $5$--$15$~\GeV{}, which assumes no
+functional form, the step from $1$~ns to $100$~ps is $1.6$ standard deviations and the
+step from $100$~ps to a perfect time is $1.1$. Neither is established with one
+training per point, and in particular the data do not support a saturation at
+$100$~ps: read on the fitted $a$ the latter step appeared null at $0.2$ standard
+deviations, which was an artefact of the $a$--$b$ degeneracy.
+
+\paragraph{What this scan measures.} Two caveats bound the interpretation. First, the
+per-cluster time enters the network through a quantile transform, which is rank-based:
+a $100$~ps perturbation displaces a cluster at $2$~ns by $0.10$ in transformed units
+but a cluster at $300$~ns by $10^{-4}$. The scan therefore probes the timing precision
+on the prompt component, not the sensitivity to the delayed neutron component, which
+would require a time-window study instead. Second, the physics list is
+\texttt{QGSP\_BERT} without high-precision neutron transport, so the delayed component
+itself is modelled approximately. These numbers quantify the sensitivity of the
+reconstruction to the assumed time resolution within this simulation; they are not a
+performance prediction for an instrumented detector.
 
 \section{Does explicit particle identification improve energy reconstruction?}
 \label{sec:coupling}
@@ -552,8 +600,10 @@ Several limitations define the scope of the numerical results:
         in the retained benchmark;
   \item the containment selection changes from 95.8\% to 23.1\% across the energy
         range and preferentially retains compact high-energy showers;
-  \item the DeepSets result corresponds to one training seed, whereas a five-seed
-        spread is available only for the inclusive BDT;
+  \item the DeepSets energy result is averaged over four training seeds, whose
+        spread is $0.0020$ on $\sigma/E$ and $0.6$ points on the stochastic term,
+        about $2.5$ times the spread of the inclusive BDT; the timing configurations
+        other than $100$~ps and the cluster-level PID models remain single-seed;
   \item the PID comparison uses a model-dependent common intersection of 6027 events
         and markedly different training budgets;
   \item the quoted uncertainties are statistical and do not cover hadronic-model,
@@ -596,7 +646,7 @@ the comparison therefore motivates, but does not replace, a budget-matched study
 
 For energy reconstruction, a particle-blind DeepSets correction to the three-threshold
 calibration reduces the fitted stochastic term from $(54.4\pm1.2)\%$ to
-$(45.5\pm1.0)\%$ on contained showers. The corresponding constant term is
+$(46.3\pm0.6)\%$ on contained showers. The corresponding constant term is
 $(6.4\pm0.2)\%$. An inclusive boosted-tree regressor is not improved by adding either
 the predicted or true pion--proton label, showing that explicit PID routing is
 redundant for that estimator in the evaluated mixture. Validation on beam-test data,

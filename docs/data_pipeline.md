@@ -297,3 +297,64 @@ correctly built sample. The pool is the complement the training stages read.
 
 This writes `val_set_manifest.json` next to the data, recording the fraction,
 the seed, the per-particle counts and a digest of the held-out event numbers.
+
+## What is actually on disk, and what reads it
+
+`data/` is not versioned, so nothing above says which of its thirteen
+directories are still inputs and which are sediment. Measured on 2026-10-16:
+**50 GB in total, of which about 30 GB is read by nothing.** The inventory is
+here because the question was asked once and the answer took an hour of
+cross-checking `paths.py`, the macros and the Makefile against the filesystem.
+
+### Read by the maintained analysis
+
+| Directory | Size | Read by |
+| --- | --- | --- |
+| `lots/pi-proton/{hits,params}` | 3.5 GB + 54 MB | everything in the two-class study, through `$SDHCAL_HIT_SHARDS_DIR` and `$SDHCAL_SHARDS_DIR` |
+| `params_2class/` | 53 MB | `paths.dataset(...)` under `SDHCAL_PARAMS_SET=2class`; built by `tools/build_2class_params.py` |
+| `hits_v2/` | 1.3 GB | `scripts/20_pid_hits.sh` |
+| `digitized/` | 2.5 GB | stage 1 and the three-class chi2 fit |
+| `raw/130k_*` | 9.7 GB | `fit.C` and `plots.C`, through `sdhcal::raw()`, for the true energy |
+| `params/130k_*` | ~60 MB | `paths.dataset("params")` in the three-class layout |
+| `merged_primaryEnergy/200k_*` | 2.5 GB | the five stage-2 macros -- see the caveat below |
+| `merged_primaryEnergy/130k_*` | 36 MB | `paths.dataset("params_merged")`, three-class layout |
+
+### Read by nothing
+
+| Directory | Size | Why it is still there |
+| --- | --- | --- |
+| `lots/pi-proton/params-superseded/` | 3.5 GB | the shards from before the `ShowerAnalyzer` corrections. Median `eccentricity3D` is 0.058 against 0.843 in the corrected lot. It reads without error and yields plausible wrong numbers; that is the trap `scripts/common.sh` documents. |
+| `raw/200k_*`, `raw/100k_*_discret` | 14 GB | generator-level files of the two-class lots. The lots carry the true energy themselves, so no stage opens these. |
+| `raw/100k_*_E1to100`, `raw/10k_*` | 6.3 GB | in no layout. |
+| `params/200k_*`, `params/100k_*_discret` | 3.6 GB | inputs to `tools/data_prep/merge_primary_energy.py`, a step already consumed. |
+| `merged_primaryEnergy/` others | ~1.1 GB | in no layout. |
+| `legacy/` | 1.7 GB | no reference anywhere. `paths.legacy()` is a path translator for the internship machine, not a reader of this directory -- the name coincidence misleads. |
+| `hits/` | 293 MB | superseded by `hits_v2/`, same filenames, four times smaller. |
+| `split/`, `split_pi/`, `split_pr/` | 3.6 MB | thirty `partN.root` of 115 kB, no reference. |
+| `data_1k/` | 13 MB | no reference. |
+
+Nothing here is deleted. There are 301 GB free on the machine and **no second
+copy of these lots exists on it**, so deleting the generator-level files would
+close the door on ever re-digitising the two-class lots. Naming them as dead is
+the point; removing them is a separate decision.
+
+### Three traps this inventory exposes
+
+**`tools/export_hits.py` writes where nothing reads.** Its default output is
+`data/hits/`, while `scripts/20_pid_hits.sh` reads `data/hits_v2/`. Re-running
+the exporter does not refresh what the PID study trains on.
+
+**The stage-2 macros read pre-correction parameters.** `begin.C`, `density.C`,
+`em_fraction.C`, `radius.C` and `thr3.C` open
+`merged_primaryEnergy/200k_*_params_merged.root`, whose `eccentricity3D` median
+is 0.058 -- the superseded generation. Checked, and the committed figures are
+safe: `Begin`, `Density`, `Radius` and `Thr3` are bit-identical between the two
+generations on the same shard, and `emFraction` is a simulation truth branch
+that `ShowerAnalyzer` does not compute. The caveat is for the next variable
+added to those macros, which may not be.
+
+**Four source files were living under `data/`.** `clean_csv.py`,
+`analyse_csv.py`, `root_to_csv.py` and `repack_tree.C` sat in `data/data_1k/`
+and `data/params/`, a git-ignored tree, so they existed only on this disk. They
+are now in `tools/data_prep/`, beside the other preparation utilities;
+`repack_tree.C` is the provenance of `params/kaon_params_repacked.root`.

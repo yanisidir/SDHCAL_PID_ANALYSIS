@@ -13,15 +13,49 @@ Run them in order. Each is independent once the one before it has finished.
 | [`20_pid_hits.sh`](20_pid_hits.sh) | CNN and graph network for PID, on clusters | ~2 h |
 | [`30_energy_gnn.sh`](30_energy_gnn.sh) | graph network for energy: ratio target + control | ~5 h |
 | [`40_benchmark.sh`](40_benchmark.sh) | comparison tables, ROOT figures, copy into `report/Fig/` | minutes |
+| [`50_energy_seeds.sh`](50_energy_seeds.sh) | three more seeds of the cluster network | ~8 h |
+| [`60_timing_scan.sh`](60_timing_scan.sh) | the two missing time resolutions, 1 ns and perfect | ~5 h |
 
-The last one delegates to the Makefile (`predictions-2class`, `benchmark-2class`,
-`report-figures`): the model lists and the figure names live there, beside the
-rest of the pipeline, rather than in two places that can drift apart. `make
-hits-2class` runs the two long scripts above it.
+`40_benchmark.sh` delegates to the Makefile (`predictions-2class`,
+`benchmark-2class`, `report-figures`): the model lists and the figure names live
+there, beside the rest of the pipeline, rather than in two places that can drift
+apart. `make hits-2class` runs the two long scripts above it.
 
 ```bash
 scripts/10_tabular.sh && scripts/20_pid_hits.sh && scripts/30_energy_gnn.sh && scripts/40_benchmark.sh
 ```
+
+## The two long ones, and why they exist
+
+Scripts 50 and 60 are not part of the main chain; they answer questions the
+first four raised.
+
+**`50_energy_seeds.sh`** measures the training variance of the cluster network,
+which nothing else in this repository does. It matters more than it sounds: the
+spread turned out to be 0.0020 on σ/E and 0.6 points on the stochastic term,
+about 2.5 times the BDT's, and it is comparable to the differences the timing
+study was trying to resolve. A first reading of the timing ablation on one seed
+per configuration showed a crossover around 30 GeV; against four seeds that
+crossover disappeared. Any comparison between two trainings of this network is
+uninterpretable without this number.
+
+**`60_timing_scan.sh`** adds σ_t = 1 ns (the present glass chambers) and a
+perfect time to the 100 ps run and the blanked-time run that already existed,
+framing the question the way the T-SDHCAL proposal does rather than as a sweep.
+One seed each, deliberately: how many seeds a point needs follows from the
+spread that script 50 measures, so committing to three per point beforehand
+would be the mistake script 50 exists to prevent.
+
+## Analysis tools these runs feed
+
+Under `tools/`, each reads what the runs wrote and needs no retraining:
+
+| Tool | Question |
+|---|---|
+| `seed_spread.py` | how much does a retraining move the result, and what does that do to the ablation |
+| `timing_ablation.py` | per-energy comparison of the timed and untimed runs |
+| `correction_mechanism.py` | is the gain explained by the electromagnetic fraction or the neutron content |
+| `coupling_curves.py` | response and resolution per scenario of the PID–energy coupling |
 
 ## The environment
 

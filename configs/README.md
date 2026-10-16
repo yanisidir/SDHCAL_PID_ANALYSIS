@@ -18,9 +18,13 @@ refusés.
 ## Profils disponibles
 
 - `two_class.json` décrit les productions indépendantes pion/proton : `200k`
-  pour l'entraînement/calibration et `discret` pour la validation. Il faut
-  conserver `SDHCAL_PARAMS_SET=2class` et, comme dans `scripts/common.sh`, faire
-  pointer `SDHCAL_SHARDS_DIR` vers les shards corrigés.
+  pour l'entraînement/calibration et `discret` pour la validation. Il suppose
+  `SDHCAL_PARAMS_SET=2class`. Les deux répertoires de shards ont désormais un
+  défaut dans `scripts/common.sh` (`data/lots/pi-proton/params` et
+  `.../hits`) : les exporter à la main n'est plus nécessaire quand on passe par
+  les scripts, et `common.sh` refuse de démarrer si le répertoire n'existe pas.
+  En appelant un script Python directement, les exports ci-dessous restent la
+  manière sûre de ne pas lire les anciens shards.
 - `three_class.json` décrit le flux historique pion/proton/kaon basé sur les
   fichiers `130k` et son holdout. Il ne contient pas les MLP à deux classes,
   puisqu'ils lisent exclusivement les shards pion/proton.
@@ -33,9 +37,12 @@ avec les valeurs du code et écrits dans un fichier
 
 ## Exemples réels
 
+Hors `scripts/`, où `common.sh` s'en charge :
+
 ```bash
 export SDHCAL_PARAMS_SET=2class
 export SDHCAL_SHARDS_DIR="$PWD/data/lots/pi-proton/params"
+export SDHCAL_HIT_SHARDS_DIR="$PWD/data/lots/pi-proton/hits"
 
 python analysis/3_pid/bdt/train.py --config configs/two_class.json --seeds 5
 python analysis/3_pid/mlp/train.py --config configs/two_class.json --seed 42

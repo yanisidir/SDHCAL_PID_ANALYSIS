@@ -7,7 +7,7 @@ report compares:
 |---|---|
 | `ml_bdt/` | **LightGBM regressors** on the shower variables. The maintained pipeline. |
 | `ml_mlp/` | scikit-learn MLP regressors, same inputs, for comparison. |
-| `gnn/` | Hit-level PyTorch Geometric regressor for pion, proton, or a PID-agnostic pion+proton mixture. |
+| `gnn/` | Hit-level regressor on the clustered hits, for pion, proton, or a PID-agnostic pion+proton mixture. Despite the directory name, the published model is a **DeepSets** set encoder (`--architecture deepsets`, the default); a graph variant exists but has never been run on energy. |
 | `chi2_tminuit/` | **Semi-digital calibration**: a weighted least-squares fit with TMinuit on the threshold multiplicities N1, N2, N3. |
 
 ```bash
@@ -21,12 +21,22 @@ python ml_bdt/train.py --particles mix-pi-proton
 ```
 
 **Reads** the configured consolidated files for LightGBM, the parameter shards
-derived from `data/lots/pi-proton/hits` for the MLP, the hit shards in `data/lots/pi-proton/hits` for the GNN,
+in `data/lots/pi-proton/params` for the MLP, the hit shards in `data/lots/pi-proton/hits` for the
+hit-level model,
 and the digitized plus raw files for the chi2 fit.
 
 **Writes** `$SDHCAL_OUT_DIR/energy_reco_{lgbm,mlp,gnn,chi2}/`.
 
-## Hit-level GNN (pion/proton)
+## Hit-level model (pion/proton)
+
+The directory is called `gnn/` and the output files are keyed `gnn`, but **the
+model that produced the published result is a DeepSets**, selected with
+`--architecture deepsets`: a permutation-invariant set encoder that builds no
+edges at all. A graph variant (`--architecture gat`, attention plus graph
+convolutions over a k-NN neighbourhood) exists in the same script and has never
+been run on energy. The naming is historical; calling the published number a GNN
+result would be wrong, and the gain it shows cannot be attributed to explicit
+connectivity between clusters.
 
 `gnn/train.py` reads the correct sharded productions directly from
 `$SDHCAL_HIT_SHARDS_DIR` (default: `<repo>/data/lots/pi-proton/hits`):
@@ -58,12 +68,39 @@ fits the back-transform correction on the internal 200k calibration split only.
 Graphs are generated lazily per batch rather than retaining hundreds of
 thousands of graphs in RAM. The 100k validation sample never affects training.
 Results, checkpoints, preprocessing, predictions, linearity, bias and
-resolution are written under `$SDHCAL_OUT_DIR/energy_reco_gnn/`.
+resolution are written under `$SDHCAL_OUT_DIR/energy_reco_gnn/` (the key is historical, see above).
+
+## Timing, and how many seeds a comparison needs
+
+Two questions were answered on top of the main run, and both are reproduced by
+scripts rather than by hand:
+
+**Training variance.** `scripts/50_energy_seeds.sh` repeats the 100 ps
+configuration on four seeds. The spread is 0.0020 on sigma/E and 0.6 points on
+the stochastic term, about 2.5 times the BDT's. It is not a formality: read on
+one seed per configuration, the timing ablation showed a crossover around 30 GeV
+that four seeds made disappear. No comparison between two trainings of this
+network means anything without it. `tools/seed_spread.py` reports it and
+converts the ablation difference into units of that spread.
+
+**Time resolution.** `--no-timing` blanks the time column while keeping the input
+width, architecture and parameter count identical, so the comparison isolates the
+information rather than the capacity. `--sigma-time` sets the Gaussian resolution
+applied to the true simulated times, and `scripts/60_timing_scan.sh` adds 1 ns
+and a perfect time to the 100 ps and blanked runs. `tools/timing_ablation.py`
+compares them per energy point against the seed mean.
+
+Two cautions carried into the report. The two fitted terms are correlated at
+-0.80 across seeds, so a difference read on `a` alone is systematically
+compressed; use the per-energy bands instead. And the per-cluster time passes
+through a rank-based quantile transform, so a 100 ps perturbation moves a cluster
+at 2 ns by 0.10 in transformed units and one at 300 ns by 1e-4: the scan probes
+the prompt component, not the delayed neutron one.
 
 ## Shower-variable MLP (pion/proton)
 
 `ml_mlp/train.py` uses the parameter shards derived from `data/lots/pi-proton/hits`
-under `$SDHCAL_SHARDS_DIR` (default: `<repo>/data/lots/pi-proton/params`). As for the GNN,
+under `$SDHCAL_SHARDS_DIR` (default: `<repo>/data/lots/pi-proton/params`). As for the hit-level model,
 the continuous `200k` lots provide training and internal calibration, while the
 entire independent `100k` discrete lots are reserved for external validation.
 
